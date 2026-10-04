@@ -9,7 +9,9 @@ from app.services.market_context_helper import (
     extract_relevant_stocks,
     classify_user_intent,
     get_all_methods_overview,
-    SYMBOL_ALIASES
+    SYMBOL_ALIASES,
+    extract_chart_swings_and_extrema,
+    format_detailed_chart_context
 )
 from app.services.prop_firm_risk_tool import (
     extract_trade_intent,
@@ -37,6 +39,35 @@ GREETING_KEYWORDS = [
   "hi", "hello", "chào", "xin chào", "hey", "halo", "alo", "chào bạn", "bạn là ai", 
   "who are you", "giới thiệu", "bạn làm được gì", "hướng dẫn", "bắt đầu", "help"
 ]
+
+
+ICT_SMC_CANONICAL_GUIDELINES = """
+==================================================
+📚 BỘ QUY CHUẨN ĐỊNH NGHĨA CHÍNH XÁC ICT / SMC (INNER CIRCLE TRADER & SMART MONEY CONCEPTS):
+==================================================
+Khi giải thích hoặc phân tích bất kỳ khái niệm nào về ICT / SMC, bạn BẮT BUỘC phải tuân thủ 100% định nghĩa chuẩn xác sau:
+
+1. BSL (Buy-Side Liquidity - Thanh khoản Phía Mua):
+   - VỊ TRÍ: Luôn luôn nằm ở PHÍA TRÊN CÁC ĐỈNH (Old Highs, Swing Highs, Equal Highs - EQH, Previous Day High - PDH, Session Highs).
+   - BẢN CHẤT: Nơi tập trung các lệnh BUY STOP gồm: (1) Lệnh Dừng Lỗ (Stop Loss) của phe Bán/Short và (2) Lệnh Mua Đuổi (Buy Stop) của Breakout Traders.
+   - HÀNH VI SMART MONEY: Smart Money cần một lượng MUA cực lớn để khớp lệnh BÁN (Short/Sell) của họ. Do đó họ ĐẨY GIÁ VƯỢT ĐỈNH để quét BSL (kích hoạt các lệnh Buy của nhỏ lẻ), biến nhỏ lẻ thành đối ứng để Smart Money BÁN RA ở giá cao (Premium), sau đó giá đảo chiều GIẢM mạnh.
+   - TUYỆT ĐỐI KHÔNG NÓI: BSL là "lực mua", BSL là "vùng hỗ trợ", hay BSL nằm ở dưới đáy (sai hoàn toàn!).
+
+2. SSL (Sell-Side Liquidity - Thanh khoản Phía Bán):
+   - VỊ TRÍ: Luôn luôn nằm ở PHÍA DƯỚI CÁC ĐÁY (Old Lows, Swing Lows, Equal Lows - EQL, Previous Day Low - PDL, Session Lows).
+   - BẢN CHẤT: Nơi tập trung các lệnh SELL STOP gồm: (1) Lệnh Dừng Lỗ (Stop Loss) của phe Mua/Long và (2) Lệnh Bán Đuổi (Sell Stop) của Breakdown Traders.
+   - HÀNH VI SMART MONEY: Smart Money cần một lượng BÁN cực lớn để khớp lệnh MUA (Long/Buy) của họ. Do đó họ ĐẨY GIÁ ĐÂM THỦNG ĐÁY để quét SSL (kích hoạt các lệnh Sell cắt lỗ của nhỏ lẻ), biến nhỏ lẻ thành đối ứng để Smart Money MUA VÀO ở giá rẻ (Discount), sau đó giá đảo chiều TĂNG mạnh.
+   - TUYỆT ĐỐI KHÔNG NÓI: SSL là "lực bán", SSL là "vùng kháng cự", hay SSL nằm ở trên đỉnh (sai hoàn toàn!).
+
+3. LIQUIDITY SWEEP (Săn / Quét thanh khoản - Raid / Turtle Soup):
+   - Giá chỉ đâm râu nến (Wick) qua đỉnh BSL hoặc đáy SSL để gom thanh khoản rồi lập tức rút chân đóng nến quay ngược lại bên trong (SFP - Swing Failure Pattern) -> Tín hiệu chuẩn bị đảo chiều.
+   - Phân biệt với LIQUIDITY RUN (Expansion): Thân nến (Candle Body) đóng cửa dứt khoát vượt qua kèm nến Displacement dài -> Bứt phá tiếp diễn để tìm đến vùng thanh khoản tiếp theo.
+
+4. ERL (External Range Liquidity) vs IRL (Internal Range Liquidity):
+   - ERL: Các mốc đỉnh/đáy lớn bên ngoài cấu trúc (Swing Highs/Lows, BSL, SSL).
+   - IRL: Các vùng mất cân bằng bên trong cấu trúc, bao gồm FVG (Fair Value Gap) và Order Block (OB).
+   - Quy luật IPDA: Giá luôn đi từ ERL -> IRL (quét đỉnh đáy ngoài xong hồi về FVG/OB trong), rồi từ IRL -> ERL (bật từ FVG/OB trong để mở rộng ra quét đỉnh đáy ngoài tiếp theo).
+"""
 
 class AiTutorService:
     """
@@ -139,6 +170,8 @@ class AiTutorService:
         question_intent = intent_info["intent"]
         matched_tags = intent_info["matchedTags"]
 
+        limit = 999999
+        used = 0
         if plan != "PRO":
             limit = sub.get("monthly_chat_limit", 300) if plan in ["PLUS", "PREMIUM"] else sub.get("daily_ai_limit", FREE_DAILY_LIMIT)
             used = sub.get("monthly_chat_used", 0) if plan in ["PLUS", "PREMIUM"] else sub.get("daily_ai_used", 0)
@@ -337,7 +370,7 @@ class AiTutorService:
                 "==================================================\n"
                 "PHƯƠNG PHÁP ĐƯỢC KÍCH HOẠT CHO CÂU HỎI HIỆN TẠI:\n"
                 "==================================================\n"
-                f"{intent_guidance}\n\n"
+                f"{intent_guidance}\n\n" + f"{ICT_SMC_CANONICAL_GUIDELINES}\n\n"
                 f"{tiered_prompt_section}\n\n"
                 "YÊU CẦU BẮT BUỘC:\n"
                 "1. Tuân thủ nghiêm ngặt các mục trong [Các yếu tố bắt buộc phân tích] và [Quy chuẩn phản hồi] của phương pháp trên.\n"
@@ -1011,7 +1044,7 @@ class AiTutorService:
                 "Bạn có quyền truy cập ĐẦY ĐỦ VÀO DATABASE HỆ THỐNG gồm:\n"
                 "1. Bảng giá thời gian thực của các mã tài sản trên hệ thống liên quan đến câu hỏi.\n"
                 "2. Toàn bộ dữ liệu tài khoản của học viên trong Database.\n\n"
-                f"{intent_guidance}\n\n"
+                f"{intent_guidance}\n\n" + f"{ICT_SMC_CANONICAL_GUIDELINES}\n\n"
                 f"{tiered_prompt_section}\n\n"
                 "YÊU CẦU BẮT BUỘC:\n"
                 "1. Tuân thủ nghiêm ngặt phương pháp trên.\n"
@@ -1309,7 +1342,7 @@ class AiTutorService:
             "Nhiệm vụ của bạn là soi kỹ ảnh chụp màn hình biểu đồ nến mà học viên cung cấp, đặc biệt chú ý đến:\n"
             "- Các vùng hình hộp chữ nhật (Box / Zone), đường kẻ (Trendline, Support/Resistance), mũi tên hoặc ghi chú mà học viên ĐÃ VẼ trên biểu đồ.\n"
             "- Cấu trúc giá hiện tại (Đỉnh/Đáy, Swing High/Low, Cấu trúc xu hướng tăng/giảm).\n"
-            "- Các khái niệm ICT/SMC: Order Block (OB), Fair Value Gap (FVG), Imbalance, Liquidity Sweep (BSL / SSL), Change of Character (CHoCH), Break of Structure (BOS), Premium vs Discount.\n\n"
+            "- Các khái niệm ICT/SMC: Order Block (OB), Fair Value Gap (FVG), Imbalance, Liquidity Sweep (BSL nằm trên Đỉnh, SSL nằm dưới Đáy), CHoCH, BOS, Premium vs Discount.\n- BẮT BUỘC TUÂN THỦ NGUYÊN TẮC: BSL (Buy-Side Liquidity) luôn ở trên ĐỈNH (chứa Buy Stop của phe Short và Breakout). SSL (Sell-Side Liquidity) luôn ở dưới ĐÁY (chứa Sell Stop của phe Long và Breakdown).\n\n"
             "Hãy trả lời theo cấu trúc Markdown rõ ràng, chuẩn sư phạm, truyền cảm hứng và sắc sảo như sau:\n\n"
             "### 1. Đánh giá sơ bộ về hình thức lý thuyết\n"
             "- Kết luận rõ ràng: Bạn vẽ **ĐÚNG** hay **SAI / CHƯA CHUẨN**?\n"
