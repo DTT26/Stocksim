@@ -359,8 +359,97 @@ registerOverlay({
     const maxX = Math.max(p1.x, p2.x);
     const minY = Math.min(p1.y, p2.y);
     const maxY = Math.max(p1.y, p2.y);
+
+    const isCisd = overlay?.extendData?.isLine === true ||
+                   overlay?.extendData?.type?.toUpperCase().includes('CISD') || 
+                   overlay?.extendData?.name?.toUpperCase().includes('CISD') ||
+                   overlay?.extendData?.label?.toUpperCase().includes('CISD') ||
+                   (overlay?.extendData?.priceHigh !== undefined && overlay?.extendData?.priceLow !== undefined && Math.abs(overlay.extendData.priceHigh - overlay.extendData.priceLow) < 0.001);
+
+    const label = overlay?.extendData?.label || overlay?.extendData?.name || overlay?.text || (isCisd ? '🎯 AI: CISD' : '🎯 AI: Order Block (OB)');
+    const priceText = overlay?.extendData?.priceText ? ` (${overlay.extendData.priceText})` : '';
+    const badgeText = `${label}${priceText}`;
+
+    // If it's CISD: Render as 1 single horizontal reference line (NOT a box/zone)
+    if (isCisd) {
+      const lineY = (minY + maxY) / 2;
+      const isBullish = overlay?.extendData?.type?.toUpperCase().includes('BULLISH');
+      const lineColor = isBullish ? '#10b981' : '#ef4444';
+      const badgeBg = isBullish ? '#059669' : '#dc2626';
+
+      return [
+        // 1. Single solid reference ray line
+        {
+          type: 'line',
+          attrs: {
+            coordinates: [
+              { x: minX, y: lineY },
+              { x: Math.max(maxX + 150, minX + 320), y: lineY }
+            ]
+          },
+          styles: {
+            style: 'solid',
+            color: lineColor,
+            size: 2.5
+          }
+        },
+        // 2. Dashed forward extension
+        {
+          type: 'line',
+          attrs: {
+            coordinates: [
+              { x: Math.max(maxX + 150, minX + 320), y: lineY },
+              { x: Math.max(maxX + 500, minX + 650), y: lineY }
+            ]
+          },
+          styles: {
+            style: 'dashed',
+            color: lineColor,
+            size: 1.5,
+            dashedValue: [6, 4]
+          }
+        },
+        // 3. Anchor dot at starting trigger candle Open
+        {
+          type: 'circle',
+          attrs: {
+            x: minX,
+            y: lineY,
+            r: 4
+          },
+          styles: {
+            style: 'fill',
+            color: lineColor
+          }
+        },
+        // 4. Badge label attached directly to the single CISD line
+        {
+          type: 'text',
+          attrs: {
+            x: minX + 8,
+            y: lineY - 6,
+            text: badgeText,
+            align: 'left',
+            baseline: 'bottom'
+          },
+          styles: {
+            color: '#ffffff',
+            backgroundColor: badgeBg,
+            borderRadius: 4,
+            paddingLeft: 6,
+            paddingRight: 6,
+            paddingTop: 2,
+            paddingBottom: 2,
+            size: 11,
+            family: 'Inter, system-ui, sans-serif',
+            weight: 'bold'
+          }
+        }
+      ];
+    }
+
+    // Default: Shaded polygon box zone with dashed border
     const figures: any[] = [
-      // 1. Shaded polygon zone with dashed border
       {
         type: 'polygon',
         attrs: {
@@ -378,36 +467,33 @@ registerOverlay({
           borderSize: 2,
           borderStyle: 'dashed'
         }
+      },
+      {
+        type: 'text',
+        attrs: {
+          x: minX + 6,
+          y: minY > 30 ? minY - 8 : minY + 14,
+          text: badgeText,
+          align: 'left',
+          baseline: minY > 30 ? 'bottom' : 'top'
+        },
+        styles: {
+          color: '#ffffff',
+          backgroundColor: '#d97706',
+          borderRadius: 4,
+          paddingLeft: 7,
+          paddingRight: 7,
+          paddingTop: 3,
+          paddingBottom: 3,
+          size: 11,
+          family: 'Inter, system-ui, sans-serif',
+          weight: 'bold'
+        }
       }
     ];
-    // 2. High-visibility Badge Note on the Zone (e.g. "đŸ¯ AI: Order Block (OB) | 4,398.25 - 4,433.72")
-    const label = overlay?.extendData?.label || overlay?.extendData?.name || overlay?.text || 'đŸ¯ AI: Order Block (OB)';
-    const priceText = overlay?.extendData?.priceText ? ` (${overlay.extendData.priceText})` : '';
-    const badgeText = `${label}${priceText}`;
-    figures.push({
-      type: 'text',
-      attrs: {
-        x: minX + 6,
-        y: minY > 30 ? minY - 8 : minY + 14,
-        text: badgeText,
-        align: 'left',
-        baseline: minY > 30 ? 'bottom' : 'top'
-      },
-      styles: {
-        color: '#ffffff',
-        backgroundColor: '#d97706',
-        borderRadius: 4,
-        paddingLeft: 7,
-        paddingRight: 7,
-        paddingTop: 3,
-        paddingBottom: 3,
-        size: 11,
-        family: 'Inter, system-ui, sans-serif',
-        weight: 'bold'
-      }
-    });
     return figures;
   }
+
 });
 
 let globalTriggerAutoSave: (() => void) | null = null;
@@ -463,6 +549,8 @@ export const clearAiCorrectionOverlay = () => {
 export const drawAiCorrectionOverlay = (suggestedZone: {
   priceHigh: number;
   priceLow: number;
+  price?: number;
+  isLine?: boolean;
   startTimestamp?: number;
   endTimestamp?: number;
   userTimeStart?: number;
@@ -590,14 +678,25 @@ export const drawAiCorrectionOverlay = (suggestedZone: {
       borderColor = '#3b82f6';
     }
 
-    const zoneLabel = suggestedZone.label || (suggestedZone.type ? `🎯 AI: ${suggestedZone.type}` : (suggestedZone.name ? `🎯 AI: ${suggestedZone.name}` : '🎯 AI: Vùng Chuẩn'));
-    const priceText = `$${suggestedZone.priceLow?.toLocaleString('en-US')} - $${suggestedZone.priceHigh?.toLocaleString('en-US')}`;
+    const isCisd = suggestedZone.isLine === true || 
+                   zType.includes('CISD') || 
+                   suggestedZone.name?.toUpperCase().includes('CISD') ||
+                   (suggestedZone.priceHigh !== undefined && suggestedZone.priceLow !== undefined && Math.abs(suggestedZone.priceHigh - suggestedZone.priceLow) < 0.001);
+
+    const cisdPrice = suggestedZone.price ?? suggestedZone.priceHigh ?? suggestedZone.priceLow;
+    const finalHigh = isCisd ? cisdPrice : suggestedZone.priceHigh;
+    const finalLow = isCisd ? cisdPrice : suggestedZone.priceLow;
+
+    const zoneLabel = suggestedZone.label || (suggestedZone.type ? `🎯 AI: ${suggestedZone.type}` : (suggestedZone.name ? `🎯 AI: ${suggestedZone.name}` : (isCisd ? '🎯 AI: CISD' : '🎯 AI: Vùng Chuẩn')));
+    const priceText = isCisd 
+      ? `$${Number(cisdPrice).toLocaleString('en-US')}` 
+      : `$${suggestedZone.priceLow?.toLocaleString('en-US')} - $${suggestedZone.priceHigh?.toLocaleString('en-US')}`;
 
     const newId = chart.createOverlay({
       name: 'aiCorrectionZone',
       points: [
-        { timestamp: finalT1, value: suggestedZone.priceHigh },
-        { timestamp: finalT2, value: suggestedZone.priceLow }
+        { timestamp: finalT1, value: finalHigh },
+        { timestamp: finalT2, value: finalLow }
       ],
       extendData: {
         label: zoneLabel,

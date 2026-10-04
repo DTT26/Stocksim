@@ -789,20 +789,21 @@ def detect_cisd(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 first_up_idx, first_up = up_candles[-1]
                 first_up_open = first_up.get("open", 0)
                 if c_close < first_up_open:
-                    p_high = max(c.get("high", 0) for _, c in up_candles)
-                    p_low = min(first_up_open, min(c.get("low", 0) for _, c in up_candles))
+                    cisd_price = round(first_up_open, 2)
                     cisd_list.append({
                         "type": "Bearish CISD",
-                        "name": "Bearish CISD (Change In State of Delivery)",
-                        "label": "AI: Bearish CISD",
-                        "priceHigh": p_high,
-                        "priceLow": p_low,
+                        "name": "Bearish CISD",
+                        "label": f"AI: Bearish CISD (${cisd_price:,.2f})",
+                        "price": cisd_price,
+                        "priceHigh": cisd_price,
+                        "priceLow": cisd_price,
                         "startTimestamp": first_up.get("timestamp"),
                         "endTimestamp": curr_c.get("timestamp"),
                         "trigger_close": c_close,
                         "first_open": first_up_open,
+                        "isLine": True,
                         "candles_ago": n - 1 - i,
-                        "rule": f"Nến giảm đóng cửa (${c_close:,.2f}) dưới giá Mở cửa (${first_up_open:,.2f}) của chuỗi nến tăng, kích hoạt Bearish CISD (Kháng cự)."
+                        "rule": f"Đường Bearish CISD tại mức giá Mở cửa ${cisd_price:,.2f} (Nến giảm đóng cửa ${c_close:,.2f} phá vỡ mốc này, lật trạng thái sang Kháng cự)."
                     })
 
         # Bullish CISD: Current candle is up close
@@ -817,20 +818,21 @@ def detect_cisd(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 first_down_idx, first_down = down_candles[-1]
                 first_down_open = first_down.get("open", 0)
                 if c_close > first_down_open:
-                    p_low = min(c.get("low", 0) for _, c in down_candles)
-                    p_high = max(first_down_open, max(c.get("high", 0) for _, c in down_candles))
+                    cisd_price = round(first_down_open, 2)
                     cisd_list.append({
                         "type": "Bullish CISD",
-                        "name": "Bullish CISD (Change In State of Delivery)",
-                        "label": "AI: Bullish CISD",
-                        "priceHigh": p_high,
-                        "priceLow": p_low,
+                        "name": "Bullish CISD",
+                        "label": f"AI: Bullish CISD (${cisd_price:,.2f})",
+                        "price": cisd_price,
+                        "priceHigh": cisd_price,
+                        "priceLow": cisd_price,
                         "startTimestamp": first_down.get("timestamp"),
                         "endTimestamp": curr_c.get("timestamp"),
                         "trigger_close": c_close,
                         "first_open": first_down_open,
+                        "isLine": True,
                         "candles_ago": n - 1 - i,
-                        "rule": f"Nến tăng đóng cửa (${c_close:,.2f}) trên giá Mở cửa (${first_down_open:,.2f}) của chuỗi nến giảm, kích hoạt Bullish CISD (Hỗ trợ)."
+                        "rule": f"Đường Bullish CISD tại mức giá Mở cửa ${cisd_price:,.2f} (Nến tăng đóng cửa ${c_close:,.2f} phá vỡ mốc này, lật trạng thái sang Hỗ trợ)."
                     })
 
     return cisd_list
