@@ -31,10 +31,13 @@ class LocalVectorStore:
     # Strict Concept Keyword Registry to ensure 100% precision on trading terms
     CONCEPT_KEYWORDS = {
         "ict_001": ["fvg", "fair value gap", "khoảng trống", "imbalance", "mất cân bằng"],
-        "ict_002": ["liquidity", "thanh khoản", "bsl", "ssl", "quét thanh khoản", "sweep", "raid", "equal high", "equal low", "eqh", "eql"],
+        "ict_002": ["liquidity", "thanh khoản", "bsl", "ssl", "buy side", "sell side", "buy-side", "sell-side", "quét thanh khoản", "sweep", "raid", "equal high", "equal low", "eqh", "eql", "turtle soup", "sfp", "purge", "erl", "irl"],
         "ict_003": ["order block", "ob", "breaker", "breaker block", "khối lệnh"],
         "ict_004": ["market structure shift", "mss", "bos", "break of structure", "chuyển dịch cấu trúc"],
         "ict_005": ["ote", "optimal trade entry", "fibonacci", "fibo", "discount", "premium", "equilibrium"],
+    "ict_006": ["erl", "irl", "external range liquidity", "internal range liquidity", "ipda", "draw on liquidity"],
+    "ict_008": ["pd array", "price delivery array", "mảng giao hàng giá", "breaker block", "mitigation block", "ifvg", "inversion fvg", "bpr", "balanced price range", "volume imbalance", "rejection block", "propulsion block", "ndog", "nwog", "unfinished business", "dấu chân thể chế"],
+        "ict_007": ["inducement", "idm", "smt", "smt divergence", "phân kỳ", "dụ dỗ"],
         "pa_001": ["higher high", "higher low", "cấu trúc thị trường", "market structure", "hh", "hl", "downtrend", "uptrend", "đỉnh đáy"],
         "pa_002": ["breakout", "retest", "pullback", "hỗ trợ", "kháng cự", "support", "resistance", "thoái lui", "vượt cản"],
         "pa_003": ["pinbar", "rejection", "từ chối giá", "false breakout", "bull trap", "bear trap", "bẫy giá", "râu nến", "shooting star", "hammer"],

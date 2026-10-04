@@ -17,6 +17,8 @@ import {
   getChartDrawingsData, 
   drawAiCorrectionOverlay, 
   clearAiCorrectionOverlay,
+  removeChartDrawing,
+  clearAllChartDrawings,
   type UserChartDrawing 
 } from '../market/components/ChartArea';
 
@@ -87,10 +89,127 @@ const renderInlineStyles = (text: string) => {
 };
 
 const renderFormattedText = (text: string) => {
-  const lines = text.split('\n');
+  // Pre-process into structured blocks: code, table, or line
+  const rawLines = text.split('\n');
+  type Block = 
+    | { type: 'code'; lang: string; content: string }
+    | { type: 'table'; headers: string[]; rows: string[][] }
+    | { type: 'line'; line: string };
+
+  const blocks: Block[] = [];
+  let inCode = false;
+  let codeLang = '';
+  let codeBuffer: string[] = [];
+  let tableBuffer: string[] = [];
+
+  const flushTable = () => {
+    if (tableBuffer.length >= 2) {
+      const parseRow = (r: string) => 
+        r.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+      const headers = parseRow(tableBuffer[0]);
+      // Skip separator row (|---|---|)
+      const dataRows = tableBuffer.slice(1).filter(r => !/^[|\s\-:]+$/.test(r)).map(parseRow);
+      blocks.push({ type: 'table', headers, rows: dataRows });
+    } else {
+      tableBuffer.forEach(line => blocks.push({ type: 'line', line }));
+    }
+    tableBuffer = [];
+  };
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const l = rawLines[i];
+    const trimmed = l.trim();
+
+    // Check code fence
+    if (trimmed.startsWith('```')) {
+      if (inCode) {
+        // closing fence
+        blocks.push({ type: 'code', lang: codeLang, content: codeBuffer.join('\n') });
+        inCode = false;
+        codeBuffer = [];
+        codeLang = '';
+      } else {
+        if (tableBuffer.length > 0) flushTable();
+        inCode = true;
+        codeLang = trimmed.replace(/^```/, '').trim();
+        codeBuffer = [];
+      }
+      continue;
+    }
+
+    if (inCode) {
+      codeBuffer.push(l);
+      continue;
+    }
+
+    // Check table row (| ... |)
+    if (trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2) {
+      tableBuffer.push(trimmed);
+      continue;
+    } else {
+      if (tableBuffer.length > 0) flushTable();
+    }
+
+    blocks.push({ type: 'line', line: l });
+  }
+
+  if (inCode && codeBuffer.length > 0) {
+    blocks.push({ type: 'code', lang: codeLang, content: codeBuffer.join('\n') });
+  }
+  if (tableBuffer.length > 0) {
+    flushTable();
+  }
+
   return (
     <div className="space-y-1.5 text-[13px] leading-relaxed text-slate-800 dark:text-slate-100">
-      {lines.map((line, idx) => {
+      {blocks.map((block, idx) => {
+        if (block.type === 'code') {
+          // If internal zone JSON block, skip or render compact
+          if (block.lang.includes('zone') || block.lang === 'json:zone') {
+            return null;
+          }
+          return (
+            <div key={idx} className="my-2 rounded-xl overflow-hidden border border-slate-700/60 bg-[#0f141c] shadow-sm">
+              {block.lang && (
+                <div className="px-3 py-1 bg-slate-800/60 border-b border-slate-700/50 text-[10px] text-slate-400 font-mono uppercase tracking-wider">
+                  {block.lang}
+                </div>
+              )}
+              <pre className="p-3 text-[11px] font-mono leading-relaxed text-emerald-400 dark:text-emerald-300 overflow-x-auto whitespace-pre">
+                {block.content}
+              </pre>
+            </div>
+          );
+        }
+
+        if (block.type === 'table') {
+          return (
+            <div key={idx} className="my-2.5 overflow-x-auto rounded-xl border border-slate-200 dark:border-[#2b3347] bg-white dark:bg-[#181d2a] shadow-xs">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-50 dark:bg-[#1f2637] border-b border-slate-200 dark:border-[#2b3347] text-slate-800 dark:text-slate-200 font-semibold text-[11.5px]">
+                  <tr>
+                    {block.headers.map((h, hi) => (
+                      <th key={hi} className="py-2 px-3">{renderInlineStyles(h)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-[#252c3f] text-[11px]">
+                  {block.rows.map((row, ri) => (
+                    <tr key={ri} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
+                      {row.map((cell, ci) => (
+                        <td key={ci} className="py-2 px-3 text-slate-700 dark:text-slate-300">
+                          {renderInlineStyles(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        const line = block.line;
         const trimmed = line.trim();
         if (!trimmed) {
           return <div key={idx} className="h-1" />;
@@ -101,13 +220,30 @@ const renderFormattedText = (text: string) => {
           return <hr key={idx} className="border-slate-200 dark:border-[#252c3f] my-2" />;
         }
 
-        // Section Title
-        if (trimmed.startsWith('### ') || trimmed.startsWith('## ')) {
+        // Section Titles (#, ##, ###, ####)
+        if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
           const title = trimmed.replace(/^#+\s*/, '');
           return (
-            <div key={idx} className="pt-2 pb-0.5 text-[13.5px] font-bold text-amber-600 dark:text-amber-300 flex items-center gap-1.5 border-b border-slate-200 dark:border-[#252c3f]/70">
-              <span className="w-1 h-3.5 rounded-full bg-gradient-to-b from-amber-500 to-amber-600 inline-block shrink-0" />
+            <div key={idx} className="pt-2.5 pb-0.5 text-[13.5px] font-bold text-amber-600 dark:text-amber-300 flex items-center gap-1.5 border-b border-slate-200 dark:border-[#252c3f]/70">
+              <span className="w-1.5 h-3.5 rounded-full bg-gradient-to-b from-amber-500 to-amber-600 inline-block shrink-0" />
               <span>{renderInlineStyles(title)}</span>
+            </div>
+          );
+        }
+        if (trimmed.startsWith('#### ')) {
+          const title = trimmed.replace(/^#+\s*/, '');
+          return (
+            <div key={idx} className="pt-2 text-[12.5px] font-bold text-slate-800 dark:text-slate-200">
+              {renderInlineStyles(title)}
+            </div>
+          );
+        }
+
+        // Hard Breach Warning Box (Red alert)
+        if (trimmed.includes('🔴') || trimmed.includes('HARD BREACH') || trimmed.includes('CẢNH BÁO VI PHẠM LUẬT QUỸ')) {
+          return (
+            <div key={idx} className="my-2 p-2.5 rounded-xl bg-rose-500/10 border-l-4 border-rose-500 text-rose-800 dark:text-rose-200 text-xs font-semibold leading-relaxed">
+              {renderInlineStyles(trimmed)}
             </div>
           );
         }
@@ -423,13 +559,42 @@ export const AiTutorDrawer = ({
   const [inspectResult, setInspectResult] = useState<any | null>(null);
   const [hasDrawnCorrection, setHasDrawnCorrection] = useState(false);
 
+  // Scanning state and user feedback banner
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
+
   // Scan drawings directly from chart instance
-  const handleScanDrawings = () => {
+  const handleScanDrawings = (clearResult = true) => {
+    setIsScanning(true);
     const data = getChartDrawingsData();
     setDetectedDrawings(data.drawings);
     setDetectedKlines(data.klines);
+    if (clearResult) {
+      setInspectResult(null);
+      setInspectError(null);
+      setHasDrawnCorrection(false);
+      clearAiCorrectionOverlay();
+    }
+    const count = data.drawings.length;
+    const msg = isEn
+      ? (count > 0 ? `Synced ${count} drawing(s) from chart.` : 'No drawings found on chart.')
+      : (count > 0 ? `Đã đồng bộ ${count} hình vẽ từ biểu đồ.` : 'Không có hình vẽ nào trên biểu đồ.');
+    setScanMessage(msg);
+    setTimeout(() => setIsScanning(false), 500);
+    setTimeout(() => setScanMessage(null), 3500);
     return data;
   };
+
+  // Real-time synchronization when drawings change on the chart
+  useEffect(() => {
+    const handleDrawingsChange = () => {
+      const data = getChartDrawingsData();
+      setDetectedDrawings(data.drawings);
+      setDetectedKlines(data.klines);
+    };
+    window.addEventListener('stocksim-drawings-changed', handleDrawingsChange);
+    return () => window.removeEventListener('stocksim-drawings-changed', handleDrawingsChange);
+  }, []);
 
   const handleTagDrawing = (index: number, tagType: string) => {
     setDetectedDrawings(prev => {
@@ -483,13 +648,12 @@ export const AiTutorDrawer = ({
       login();
       return;
     }
-    let currentDrawings = detectedDrawings;
-    let currentKlines = detectedKlines;
-    if (!currentDrawings || currentDrawings.length === 0) {
-      const currentData = handleScanDrawings();
-      currentDrawings = currentData.drawings;
-      currentKlines = currentData.klines;
-    }
+    // Always rescan live from chart so freshly typed text (e.g. FVG D) or modified coordinates are 100% current!
+    const liveData = getChartDrawingsData();
+    let currentDrawings = liveData.drawings && liveData.drawings.length > 0 ? liveData.drawings : detectedDrawings;
+    let currentKlines = liveData.klines && liveData.klines.length > 0 ? liveData.klines : detectedKlines;
+    setDetectedDrawings(currentDrawings);
+    setDetectedKlines(currentKlines);
     if (!currentDrawings || currentDrawings.length === 0) {
       setInspectError(
         isEn
@@ -525,7 +689,13 @@ export const AiTutorDrawer = ({
 
   const handleApplyAiCorrection = () => {
     if (!inspectResult?.suggestedZone) return;
-    const overlayId = drawAiCorrectionOverlay(inspectResult.suggestedZone);
+    const firstDrawing = detectedDrawings[0];
+    const zoneWithTiming = {
+      ...inspectResult.suggestedZone,
+      userTimeStart: firstDrawing?.timeStart,
+      userTimeEnd: firstDrawing?.timeEnd
+    };
+    const overlayId = drawAiCorrectionOverlay(zoneWithTiming);
     if (overlayId) {
       setHasDrawnCorrection(true);
     }
@@ -1139,6 +1309,28 @@ export const AiTutorDrawer = ({
                             </div>
                           </div>
                         )}
+
+                        {/* Socratic Reflection Questions (Interactive Action Chips) */}
+                        {msg.data?.socraticQuestions && msg.data.socraticQuestions.length > 0 && (
+                          <div className="pt-2 border-t border-slate-200 dark:border-[#252c3f]/60 space-y-1.5">
+                            <div className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-amber-500" />
+                              {isEn ? 'Socratic Thinking Questions (Click to ask):' : '💡 Câu hỏi đào sâu tư duy (Bấm để hỏi tiếp):'}
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              {msg.data.socraticQuestions.map((sq: string, i: number) => (
+                                <button
+                                  key={i}
+                                  onClick={() => handleAsk(sq)}
+                                  className="text-left px-2.5 py-1.5 rounded-lg bg-amber-500/5 hover:bg-amber-500/15 border border-amber-500/20 hover:border-amber-500/40 text-[11.5px] text-amber-700 dark:text-amber-300 transition-all flex items-center justify-between group shadow-2xs cursor-pointer"
+                                >
+                                  <span>💬 {sq}</span>
+                                  <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-amber-500 shrink-0 ml-1.5" />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1207,14 +1399,22 @@ export const AiTutorDrawer = ({
                 </div>
 
                 <button
-                  onClick={handleScanDrawings}
+                  onClick={() => handleScanDrawings(true)}
                   className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-[#1f2430] hover:bg-slate-200 dark:hover:bg-[#2b3347] text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
                   title={isEn ? 'Rescan latest drawings on chart' : 'Quét lại hình vẽ mới nhất trên biểu đồ'}
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin text-amber-500' : ''}`} />
                   <span>{isEn ? 'Rescan' : 'Quét lại hình'}</span>
                 </button>
               </div>
+
+              {/* Scan Feedback Banner */}
+              {scanMessage && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs animate-in fade-in slide-in-from-top-1 duration-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>{scanMessage}</span>
+                </div>
+              )}
 
               {/* Evaluation Quota Strip */}
               <div className="flex items-center justify-between pt-2 border-t border-amber-500/20 text-[11px]">
@@ -1317,10 +1517,10 @@ export const AiTutorDrawer = ({
                 </div>
 
                 <button
-                  onClick={handleScanDrawings}
+                  onClick={() => handleScanDrawings(true)}
                   className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-950 font-bold text-xs shadow-xs transition-all cursor-pointer inline-flex items-center gap-2"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
                   <span>{isEn ? 'Rescan drawings on chart' : 'Quét lại hình vẽ trên biểu đồ'}</span>
                 </button>
               </div>
@@ -1338,13 +1538,26 @@ export const AiTutorDrawer = ({
                         : `Đã phát hiện ${detectedDrawings.length} vùng vẽ trên ${activeSymbol} (${timeframe}):`}
                     </span>
                   </div>
-                  <button
-                    onClick={handleScanDrawings}
-                    className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    {isEn ? 'Update' : 'Cập nhật'}
-                  </button>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      onClick={() => handleScanDrawings(true)}
+                      className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isScanning ? 'animate-spin' : ''}`} />
+                      {isEn ? 'Update' : 'Quét lại'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        clearAllChartDrawings();
+                        handleScanDrawings(true);
+                      }}
+                      className="text-[11px] text-red-500 hover:text-red-600 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                      title={isEn ? 'Clear all drawings on chart' : 'Xóa tất cả hình vẽ trên biểu đồ'}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>{isEn ? 'Clear all' : 'Xóa tất cả'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* List detected drawing data items */}
@@ -1381,18 +1594,25 @@ export const AiTutorDrawer = ({
                               )}
                             </div>
                           </div>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0 font-semibold border border-emerald-500/20">
-                            {isEn ? 'Ready to evaluate' : 'Sẵn sàng chấm'}
-                          </span>
-                        </div>
-
-                        {/* Price Details */}
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono px-0.5">
-                          <span>
-                            {d.priceLow !== undefined && d.priceHigh !== undefined
-                              ? `$${d.priceLow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} → $${d.priceHigh.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}`
-                              : `${d.points?.length || 0} ${isEn ? 'points' : 'điểm neo'}`}
-                          </span>
+                                                    <div className="flex items-center gap-2 shrink-0">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold">
+                              {d.priceLow !== undefined && d.priceHigh !== undefined
+                                ? `$${d.priceLow.toLocaleString('en-US')} → $${d.priceHigh.toLocaleString('en-US')}`
+                                : 'Coordinates active'}
+                            </span>
+                            <button
+                              onClick={() => {
+                                if (d.id) {
+                                  removeChartDrawing(d.id);
+                                  handleScanDrawings(false);
+                                }
+                              }}
+                              className="p-1 rounded hover:bg-red-500/15 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                              title={isEn ? 'Delete this drawing from chart' : 'Xóa hình vẽ này khỏi biểu đồ'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                           {d.rangeAmount !== undefined && (
                             <span className="text-[10px] text-slate-400 dark:text-slate-500">
                               {isEn ? 'Range:' : 'Biên độ:'} {d.rangeAmount >= 1 ? d.rangeAmount.toLocaleString('en-US', { maximumFractionDigits: 2 }) : d.rangeAmount.toFixed(4)}
