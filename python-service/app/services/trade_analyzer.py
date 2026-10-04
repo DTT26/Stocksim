@@ -37,7 +37,7 @@ class TradeAnalyzer:
         sl = trade.stopLoss
         tp = trade.takeProfit
         qty = trade.quantity or 1.0
-        balance = trade.accountBalance or 10000.0  # 10k USD default
+        balance = float(trade.accountBalance) if (trade.accountBalance and float(trade.accountBalance) > 0) else 10000.0
 
         has_sl = sl is not None and sl > 0
         has_tp = tp is not None and tp > 0
@@ -208,12 +208,14 @@ class TradeAnalyzer:
             if not has_tp:
                 rule_violations.append("Thiếu Take Profit định vị theo thanh khoản (Missing DOL).")
 
+        # Kiểm tra xem đây có phải là setup có chủ đích hay chỉ là lệnh thị trường vãng lai
+        is_market_direct = any(k in notes_combined for k in ["lệnh thị trường", "thực thi trực tiếp", "chưa cài", "no pre-set", "chưa có sl/tp"])
+        has_explicit_notes = bool(trade.reason and len(trade.reason.strip()) > 15 and not is_market_direct)
+
         # 1.3 Phản ứng tại HTF POI (5đ)
-        # Giá xuất phát / chạm trạm đón HTF Key Level (Daily/H4 OB, FVG, Rejection Block)
         has_htf_poi = (
             getattr(trade, 'htfPoi', None) is not None or
-            any(k in notes_combined for k in ["htf", "d1", "h4", "daily", "poi", "key level", "trạm đón", "cản lớn", "khung lớn", "ob htf", "fvg htf"]) or
-            bool(trade.strategy or trade.setupName)
+            (has_explicit_notes and any(k in notes_combined for k in ["htf", "d1", "h4", "daily", "poi", "key level", "trạm đón", "cản lớn"]))
         )
         if has_htf_poi:
             score_1_3 = 5
@@ -270,8 +272,7 @@ class TradeAnalyzer:
         # 3.1 Nhịp Quét Thanh khoản (Liquidity Sweep) (10đ)
         has_sweep = (
             getattr(trade, 'hasLiquiditySweep', None) is True or
-            any(k in notes_combined for k in ["sweep", "quét", "ssl", "bsl", "râu nến", "liquidity sweep", "fakeout"]) or
-            "sweep" in (trade.setupName or "").lower()
+            (has_explicit_notes and any(k in notes_combined for k in ["sweep", "quét", "ssl", "bsl", "râu nến", "liquidity sweep", "fakeout"]))
         )
         if has_sweep:
             score_3_1 = 10
@@ -279,14 +280,13 @@ class TradeAnalyzer:
             strengths.append(desc_3_1)
         else:
             score_3_1 = 0
-            desc_3_1 = "Không có nhịp quét thanh khoản (Liquidity Sweep) trước khi giá đảo chiều (0đ)."
+            desc_3_1 = "Không có nhịp quét thanh khoản (Liquidity Sweep) rõ ràng trước khi vào lệnh (0đ)."
             strategy_issues.append(desc_3_1)
 
         # 3.2 Lực đẩy Dứt khoát (Displacement & MSS / CISD) (10đ)
         has_disp = (
             getattr(trade, 'hasDisplacement', None) is True or
-            any(k in notes_combined for k in ["displacement", "mss", "cisd", "choch", "bos", "nến thân lớn", "xung lực", "bứt phá", "dứt khoát"]) or
-            bool(trade.setupName or trade.strategy)
+            (has_explicit_notes and any(k in notes_combined for k in ["displacement", "mss", "cisd", "choch", "bos", "nến thân lớn", "xung lực"]))
         )
         if has_disp:
             score_3_2 = 10
@@ -294,14 +294,13 @@ class TradeAnalyzer:
             strengths.append(desc_3_2)
         else:
             score_3_2 = 0
-            desc_3_2 = "Thiếu lực đẩy Displacement dứt khoát; nến lềnh đềnh giằng co rủi ro cao (0đ)."
+            desc_3_2 = "Chưa xác nhận lực đẩy Displacement hoặc dịch chuyển cấu trúc MSS/CISD dứt khoát (0đ)."
             execution_issues.append(desc_3_2)
 
         # 3.3 Chất lượng trạm đón PD Array (5đ)
         has_pd_array = (
             getattr(trade, 'pdArrayType', None) is not None or
-            any(k in notes_combined for k in ["fvg", "ob", "order block", "breaker", "ifvg", "mitigation", "rejection block", "pd array"]) or
-            "fvg" in (trade.setupName or "").lower()
+            (has_explicit_notes and any(k in notes_combined for k in ["fvg", "ob", "order block", "breaker", "ifvg", "mitigation"]))
         )
         if has_pd_array:
             score_3_3 = 5
@@ -714,6 +713,7 @@ class TradeAnalyzer:
                 "hasStopLoss": has_sl,
                 "hasTakeProfit": has_tp,
                 "quantity": qty,
+                "accountBalance": round(balance, 2),
                 "pnl": total_pnl,
                 "returnPct": return_pct,
                 "plannedRR": f"1 : {planned_rr}" if (has_sl and has_tp and planned_rr > 0) else "Chưa thiết lập",
@@ -748,6 +748,7 @@ class TradeAnalyzer:
             "afterTrade": after_trade,
             "planVsExecution": plan_vs_execution,
             "riskAnalysis": {
+                "accountBalance": round(balance, 2),
                 "hasStopLoss": has_sl,
                 "capitalAtRisk": capital_at_risk,
                 "maxPotentialLoss": max_potential_loss,

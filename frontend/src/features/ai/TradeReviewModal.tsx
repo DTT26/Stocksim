@@ -103,6 +103,7 @@ interface TradeReviewModalProps {
     stopLoss?: number;
     takeProfit?: number;
     quantity: number;
+    accountBalance?: number;
     realPnL?: number;
     isOpen?: boolean;
     timeframe?: string;
@@ -236,6 +237,7 @@ const TradeReviewModalInner = ({
   const currentPrice = Number(review?.summary?.currentPrice ?? tradeData?.currentPrice ?? entryPrice);
   const pnl = Number(review?.summary?.pnl ?? tradeData?.realPnL ?? 0);
   const quantity = Number(tradeData?.quantity || 1);
+  const accountBalance = Number(review?.summary?.accountBalance ?? tradeData?.accountBalance ?? 0);
   const returnPct = review?.summary?.returnPct !== undefined 
     ? Number(review.summary.returnPct) 
     : (entryPrice > 0 && quantity > 0 ? Number(((pnl / (entryPrice * quantity)) * 100).toFixed(2)) : 0);
@@ -310,8 +312,19 @@ const TradeReviewModalInner = ({
         {/* ================================================================ */}
         {/* Trade Execution Data Strip (Dữ liệu vào/kết thúc thực tế của lệnh) */}
         {/* ================================================================ */}
-        <div className="px-5 py-2.5 bg-[#0e121a] border-b border-[#232838] flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="px-5 py-2.5 bg-[#0c1017] border-b border-[#212738] flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-3.5 flex-wrap">
+            {accountBalance > 0 && (
+              <>
+                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#161c28] border border-[#2b354c] shadow-sm">
+                  <span className="text-[11px] text-slate-400 font-medium">{isEn ? 'Account Balance:' : 'Số dư:'}</span>
+                  <span className="font-mono font-bold text-amber-300">
+                    ${safeMoney(accountBalance)}
+                  </span>
+                </div>
+                <div className="h-3.5 w-px bg-slate-700 hidden sm:block"></div>
+              </>
+            )}
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-slate-400">Entry:</span>
               <span className="font-mono font-bold text-white">
@@ -329,7 +342,7 @@ const TradeReviewModalInner = ({
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-slate-400">{isEn ? 'Quantity:' : 'Khối lượng:'}</span>
               <span className="font-mono font-semibold text-slate-200">
-                {tradeData.quantity} {tradeData.symbol.replace(/USDT$/, '')}
+                {typeof tradeData.quantity === 'number' ? (tradeData.quantity >= 1000 ? tradeData.quantity.toLocaleString('en-US', { maximumFractionDigits: 4 }) : safeMoney(tradeData.quantity, 4)) : tradeData.quantity} {tradeData.symbol.replace(/USDT$/, '')}
               </span>
             </div>
             <div className="h-3.5 w-px bg-slate-700 hidden sm:block"></div>
@@ -603,7 +616,7 @@ const TradeReviewModalInner = ({
                             </div>
                             <div className="text-[10px] text-slate-400 flex items-center justify-between">
                               <span>M15 / M5</span>
-                              <span className="text-slate-300 font-medium">R:R $\ge$ 1:2 & SL</span>
+                              <span className="text-slate-300 font-medium">R:R ≥ 1:2 & SL</span>
                             </div>
                           </div>
 
@@ -634,42 +647,59 @@ const TradeReviewModalInner = ({
               })()}
 
               {/* ============================================================ */}
-              {/* VIP AI Trading Coach Mentor Card                             */}
+              {/* Senior Prop Firm Risk Manager & Execution Audit Card         */}
               {/* ============================================================ */}
-              <div className="relative overflow-hidden rounded-xl border border-amber-500/35 bg-gradient-to-r from-amber-500/10 via-[#161a25] to-indigo-500/10 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.3)] space-y-2">
-                <div className="absolute top-0 left-0 bottom-0 w-1 bg-amber-400"></div>
-                <div className="flex items-center justify-between gap-2">
+              <div className="relative overflow-hidden rounded-xl border border-slate-700/60 bg-[#121622]/90 backdrop-blur p-4 shadow-lg space-y-3">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-700/40 pb-2.5">
                   <div className="flex items-center gap-2">
-                    <div className="p-1 rounded-md bg-amber-400/20 text-amber-300">
-                      <Sparkles className="w-3.5 h-3.5" />
+                    <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                      <Target className="w-4 h-4" />
                     </div>
-                    <span className="text-xs font-bold text-amber-300 tracking-wide uppercase">
-                      {isEn ? 'AI TRADING COACH FEEDBACK (MINDSET MENTOR)' : 'GÓP Ý TỪ AI TRADING COACH (MENTOR TƯ DUY)'}
-                    </span>
+                    <div>
+                      <span className="text-xs font-bold text-white tracking-wide uppercase">
+                        {isEn ? 'EXECUTIVE TRADE AUDIT & RISK REVIEW' : 'NHẬN ĐỊNH CHUYÊN MÔN & KIỂM TOÁN QUY TRÌNH'}
+                      </span>
+                      <p className="text-[10px] text-slate-400">
+                        {isEn ? 'Prop Firm Risk Desk Evaluation • Objective Process Audit' : 'Bàn Quản Trị Rủi Ro Quỹ • Đánh giá kỷ luật & bảo vệ vốn'}
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-[10px] text-slate-400 italic hidden sm:inline">
-                    {isEn ? 'Process-First Mentorship • Objective & Evidence-Based' : 'Process-First Mentorship • Khách quan & Bằng chứng'}
+                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                    {isEn ? 'Independent Audit' : 'Đánh giá độc lập'}
                   </span>
                 </div>
-                <p className="text-slate-200 text-xs sm:text-[13px] leading-relaxed pl-1">
-                  {review.aiCoach?.explanation || review.summary.coachingAdvice || review.summary.verdictDescription}
-                </p>
-                {review.aiCoach?.actionItem && (
-                  <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-start gap-2 text-xs text-amber-200">
-                    <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-amber-300">{isEn ? 'Actionable Correction:' : 'Hành động khắc phục:'}</strong> {review.aiCoach?.actionItem || (isEn ? 'Stick strictly to your execution plan.' : 'Kiên định tuân thủ kế hoạch giao dịch.')}
-                    </div>
+
+                <div className="text-slate-200 text-xs sm:text-[13px] leading-relaxed space-y-1 bg-[#0b0e15] p-3 rounded-lg border border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    {isEn ? 'Process Assessment:' : 'Đánh giá chi tiết:'}
                   </div>
-                )}
-                {review.aiCoach?.reflectionQuestion && (
-                  <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/25 flex items-start gap-2 text-xs text-indigo-200">
-                    <Scale className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="text-indigo-300">{isEn ? 'Reflection Question:' : 'Câu hỏi gợi mở tư duy (Reflection Question):'}</strong> {review.aiCoach?.reflectionQuestion || (isEn ? 'Did this setup fully align with your trading criteria?' : 'Lệnh này đã đáp ứng đầy đủ điều kiện vào lệnh của bạn chưa?')}
+                  <p>{review.aiCoach?.explanation || review.summary.coachingAdvice || review.summary.verdictDescription}</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                  {review.aiCoach?.actionItem && (
+                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-start gap-2.5 text-xs text-amber-200">
+                      <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-amber-300 block text-[11px] uppercase tracking-wider mb-0.5">
+                          {isEn ? 'Priority Action:' : 'Hành động ưu tiên:'}
+                        </span>
+                        {review.aiCoach?.actionItem}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                  {review.aiCoach?.reflectionQuestion && (
+                    <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-start gap-2.5 text-xs text-cyan-200">
+                      <Scale className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-cyan-300 block text-[11px] uppercase tracking-wider mb-0.5">
+                          {isEn ? 'Mental & Risk Check:' : 'Kiểm soát rủi ro & tâm lý:'}
+                        </span>
+                        {review.aiCoach?.reflectionQuestion}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* ============================================================ */}
@@ -847,7 +877,7 @@ const TradeReviewModalInner = ({
                             <span className="text-indigo-400 font-mono font-bold">10đ</span>
                           </div>
                           <p className="text-[10px] text-slate-400 leading-relaxed">
-                            Mức R:R thực tế đo về mốc DOL đạt tối thiểu $\ge$ 1:2 (+10đ). R:R &lt; 1:1.5 bị loại (0đ).
+                            Mức R:R thực tế đo về mốc DOL đạt tối thiểu ≥ 1:2 (+10đ). R:R &lt; 1:1.5 bị loại (0đ).
                           </p>
                         </div>
                         <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
