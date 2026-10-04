@@ -356,10 +356,52 @@ registerOverlay({
   }
 });
 
-export const clearAiCorrectionOverlay = () => {
-  if (!globalChartInstance) return;
+let globalTriggerAutoSave: (() => void) | null = null;
+
+export const removeChartDrawing = (overlayId: string) => {
+  const chart = globalChartInstance || (typeof window !== 'undefined' ? (window as any).__STOCKSIM_CHART__ : null);
+  if (!chart || !overlayId) return;
   try {
-    globalChartInstance.removeOverlay({ name: 'aiCorrectionZone' });
+    chart.removeOverlay({ id: overlayId });
+    if (globalTriggerAutoSave) {
+      globalTriggerAutoSave();
+    }
+    window.dispatchEvent(new CustomEvent('stocksim-drawings-changed', { detail: { removedId: overlayId } }));
+  } catch (err) {
+    console.error('Error removing chart drawing:', err);
+  }
+};
+
+export const clearAllChartDrawings = () => {
+  const chart = globalChartInstance || (typeof window !== 'undefined' ? (window as any).__STOCKSIM_CHART__ : null);
+  if (!chart) return;
+  try {
+    const raw = typeof chart.getOverlays === 'function' ? chart.getOverlays() : [];
+    if (Array.isArray(raw)) {
+      raw.forEach((ov: any) => {
+        if (isUserDrawingOverlay(ov)) {
+          chart.removeOverlay({ id: ov.id });
+        }
+      });
+    }
+    try {
+      chart.removeOverlay({ name: 'aiCorrectionZone' });
+    } catch (_) {}
+
+    if (globalTriggerAutoSave) {
+      globalTriggerAutoSave();
+    }
+    window.dispatchEvent(new CustomEvent('stocksim-drawings-changed', { detail: { cleared: true } }));
+  } catch (err) {
+    console.error('Error clearing all chart drawings:', err);
+  }
+};
+
+export const clearAiCorrectionOverlay = () => {
+  const chart = globalChartInstance || (typeof window !== 'undefined' ? (window as any).__STOCKSIM_CHART__ : null);
+  if (!chart) return;
+  try {
+    chart.removeOverlay({ name: 'aiCorrectionZone' });
   } catch (err) {
     console.error('Error removing AI correction overlay:', err);
   }
@@ -4302,6 +4344,7 @@ export const ChartArea = ({
       saveDrawingsRef.current?.();
     }, 150);
   };
+  globalTriggerAutoSave = triggerAutoSaveDrawings;
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<Chart | null>(null);
   const activeToolRef = useRef<string>('cursor');
@@ -4851,7 +4894,12 @@ export const ChartArea = ({
 
       // If Eraser tool is active, delete it immediately!
       if (activeToolRef.current === 'eraser') {
-        if (overlayId) chartRef.current?.removeOverlay(overlayId);
+        if (overlayId) {
+          chartRef.current?.removeOverlay({ id: overlayId });
+          if (floatingToolbar?.overlayId === overlayId) setFloatingToolbar(null);
+          if (selectedOverlay?.id === overlayId) setSelectedOverlay(null);
+          triggerAutoSaveDrawings();
+        }
         return true; // prevent default behavior
       }
 
@@ -5154,7 +5202,24 @@ export const ChartArea = ({
     updateCrosshairStyles(chart, activeTool);
 
     if (activeTool === 'clear') {
-      chart.removeOverlay();
+      const activeChart = chartRef.current;
+      if (activeChart) {
+        const raw = typeof activeChart.getOverlays === 'function' ? activeChart.getOverlays() : [];
+        if (Array.isArray(raw)) {
+          raw.forEach((ov: any) => {
+            if (isUserDrawingOverlay(ov)) {
+              activeChart.removeOverlay({ id: ov.id });
+            }
+          });
+        }
+        try {
+          activeChart.removeOverlay({ name: 'aiCorrectionZone' });
+        } catch (_) {}
+      }
+      setFloatingToolbar(null);
+      setSelectedOverlay(null);
+      triggerAutoSaveDrawings();
+      onToolSelect?.('cursor');
     } else if (activeTool === 'cursor' || activeTool === 'cursor_group' || activeTool === 'cursor_dot' || activeTool === 'cursor_arrow' || activeTool === 'eraser') {
       // Cancel active overlay creation mode
     } else if (activeTool.startsWith('emojiMark:')) {
@@ -7162,7 +7227,9 @@ export const ChartArea = ({
               <button
                 onClick={() => {
                   chartRef.current?.removeOverlay({ id: floatingToolbar.overlayId });
+                  if (selectedOverlay?.id === floatingToolbar.overlayId) setSelectedOverlay(null);
                   setFloatingToolbar(null);
+                  triggerAutoSaveDrawings();
                 }}
                 className="flex items-center justify-between px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-red-500"
               >

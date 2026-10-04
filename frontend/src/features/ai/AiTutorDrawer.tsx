@@ -17,6 +17,8 @@ import {
   getChartDrawingsData, 
   drawAiCorrectionOverlay, 
   clearAiCorrectionOverlay,
+  removeChartDrawing,
+  clearAllChartDrawings,
   type UserChartDrawing 
 } from '../market/components/ChartArea';
 
@@ -557,13 +559,42 @@ export const AiTutorDrawer = ({
   const [inspectResult, setInspectResult] = useState<any | null>(null);
   const [hasDrawnCorrection, setHasDrawnCorrection] = useState(false);
 
+  // Scanning state and user feedback banner
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
+
   // Scan drawings directly from chart instance
-  const handleScanDrawings = () => {
+  const handleScanDrawings = (clearResult = true) => {
+    setIsScanning(true);
     const data = getChartDrawingsData();
     setDetectedDrawings(data.drawings);
     setDetectedKlines(data.klines);
+    if (clearResult) {
+      setInspectResult(null);
+      setInspectError(null);
+      setHasDrawnCorrection(false);
+      clearAiCorrectionOverlay();
+    }
+    const count = data.drawings.length;
+    const msg = isEn
+      ? (count > 0 ? `Synced ${count} drawing(s) from chart.` : 'No drawings found on chart.')
+      : (count > 0 ? `Đã đồng bộ ${count} hình vẽ từ biểu đồ.` : 'Không có hình vẽ nào trên biểu đồ.');
+    setScanMessage(msg);
+    setTimeout(() => setIsScanning(false), 500);
+    setTimeout(() => setScanMessage(null), 3500);
     return data;
   };
+
+  // Real-time synchronization when drawings change on the chart
+  useEffect(() => {
+    const handleDrawingsChange = () => {
+      const data = getChartDrawingsData();
+      setDetectedDrawings(data.drawings);
+      setDetectedKlines(data.klines);
+    };
+    window.addEventListener('stocksim-drawings-changed', handleDrawingsChange);
+    return () => window.removeEventListener('stocksim-drawings-changed', handleDrawingsChange);
+  }, []);
 
   const handleTagDrawing = (index: number, tagType: string) => {
     setDetectedDrawings(prev => {
@@ -1363,14 +1394,22 @@ export const AiTutorDrawer = ({
                 </div>
 
                 <button
-                  onClick={handleScanDrawings}
+                  onClick={() => handleScanDrawings(true)}
                   className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-[#1f2430] hover:bg-slate-200 dark:hover:bg-[#2b3347] text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
                   title={isEn ? 'Rescan latest drawings on chart' : 'Quét lại hình vẽ mới nhất trên biểu đồ'}
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin text-amber-500' : ''}`} />
                   <span>{isEn ? 'Rescan' : 'Quét lại hình'}</span>
                 </button>
               </div>
+
+              {/* Scan Feedback Banner */}
+              {scanMessage && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs animate-in fade-in slide-in-from-top-1 duration-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>{scanMessage}</span>
+                </div>
+              )}
 
               {/* Evaluation Quota Strip */}
               <div className="flex items-center justify-between pt-2 border-t border-amber-500/20 text-[11px]">
@@ -1473,10 +1512,10 @@ export const AiTutorDrawer = ({
                 </div>
 
                 <button
-                  onClick={handleScanDrawings}
+                  onClick={() => handleScanDrawings(true)}
                   className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-950 font-bold text-xs shadow-xs transition-all cursor-pointer inline-flex items-center gap-2"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
                   <span>{isEn ? 'Rescan drawings on chart' : 'Quét lại hình vẽ trên biểu đồ'}</span>
                 </button>
               </div>
@@ -1494,13 +1533,26 @@ export const AiTutorDrawer = ({
                         : `Đã phát hiện ${detectedDrawings.length} vùng vẽ trên ${activeSymbol} (${timeframe}):`}
                     </span>
                   </div>
-                  <button
-                    onClick={handleScanDrawings}
-                    className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    {isEn ? 'Update' : 'Cập nhật'}
-                  </button>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      onClick={() => handleScanDrawings(true)}
+                      className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isScanning ? 'animate-spin' : ''}`} />
+                      {isEn ? 'Update' : 'Quét lại'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        clearAllChartDrawings();
+                        handleScanDrawings(true);
+                      }}
+                      className="text-[11px] text-red-500 hover:text-red-600 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                      title={isEn ? 'Clear all drawings on chart' : 'Xóa tất cả hình vẽ trên biểu đồ'}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>{isEn ? 'Clear all' : 'Xóa tất cả'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* List detected drawing data items */}
@@ -1537,18 +1589,25 @@ export const AiTutorDrawer = ({
                               )}
                             </div>
                           </div>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0 font-semibold border border-emerald-500/20">
-                            {isEn ? 'Ready to evaluate' : 'Sẵn sàng chấm'}
-                          </span>
-                        </div>
-
-                        {/* Price Details */}
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono px-0.5">
-                          <span>
-                            {d.priceLow !== undefined && d.priceHigh !== undefined
-                              ? `$${d.priceLow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} → $${d.priceHigh.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}`
-                              : `${d.points?.length || 0} ${isEn ? 'points' : 'điểm neo'}`}
-                          </span>
+                                                    <div className="flex items-center gap-2 shrink-0">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold">
+                              {d.priceLow !== undefined && d.priceHigh !== undefined
+                                ? `$${d.priceLow.toLocaleString('en-US')} → $${d.priceHigh.toLocaleString('en-US')}`
+                                : 'Coordinates active'}
+                            </span>
+                            <button
+                              onClick={() => {
+                                if (d.id) {
+                                  removeChartDrawing(d.id);
+                                  handleScanDrawings(false);
+                                }
+                              }}
+                              className="p-1 rounded hover:bg-red-500/15 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                              title={isEn ? 'Delete this drawing from chart' : 'Xóa hình vẽ này khỏi biểu đồ'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                           {d.rangeAmount !== undefined && (
                             <span className="text-[10px] text-slate-400 dark:text-slate-500">
                               {isEn ? 'Range:' : 'Biên độ:'} {d.rangeAmount >= 1 ? d.rangeAmount.toLocaleString('en-US', { maximumFractionDigits: 2 }) : d.rangeAmount.toFixed(4)}
