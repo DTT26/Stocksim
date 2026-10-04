@@ -582,7 +582,7 @@ def detect_breaker_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     - Lật ngược vai trò hỗ trợ <-> kháng cự (Polarity).
     """
     breakers = []
-    if not klines or len(klines) < 5:
+    if not klines or len(klines) < 4:
         return breakers
 
     obs = detect_order_blocks(klines)
@@ -627,32 +627,40 @@ def detect_mitigation_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any
     Nhận diện Mitigation Block (MB) theo chuẩn ICT:
     - Vùng giá thể chế quay lại khớp nốt lệnh dở dang / giảm thiểu rủi ro vị thế.
     - KHÔNG yêu cầu phá vỡ cấu trúc (Structure Break) trước đó và đóng vai trò tiếp diễn xu hướng (Continuation).
+    - Tọa độ chuẩn: Toàn bộ cây nến hồi thất bại (từ Low đến High của cây nến đó).
     """
     mits = []
-    if not klines or len(klines) < 4:
+    if not klines or len(klines) < 3:
         return mits
 
-    for i in range(1, len(klines) - 2):
+    n = len(klines)
+    for i in range(1, len(klines) - 1):
         c0 = klines[i - 1]
         c1 = klines[i]
         c2 = klines[i + 1]
 
-        # Swing failed to make new extreme, then pierced through
-        if c1.get("high", 0) > c0.get("high", 0) and c2.get("close", 0) < c0.get("low", 0):
+        c1_h = c1.get("high", 0)
+        c1_l = c1.get("low", 0)
+
+        # Bearish MB: Swing failed to make higher high, then pierced through downwards
+        if c1_h < c0.get("high", 0) and c2.get("close", 0) < c0.get("low", 0):
             mits.append({
                 "type": "Bearish Mitigation Block",
-                "priceHigh": c1.get("high"),
-                "priceLow": c0.get("low"),
+                "priceHigh": c1_h,
+                "priceLow": c1_l,
                 "startTimestamp": c1.get("timestamp"),
-                "rule": "Khối giảm thải không tạo đỉnh cao hơn bị đâm xuyên, đóng vai trò giảm thiểu rủi ro tiếp diễn xu hướng."
+                "candles_ago": n - 1 - i,
+                "rule": "Cây nến hồi không tạo đỉnh cao hơn bị đâm xuyên xuống, đóng vai trò giảm thiểu rủi ro tiếp diễn xu hướng giảm."
             })
-        elif c1.get("low", 0) < c0.get("low", 0) and c2.get("close", 0) > c0.get("high", 0):
+        # Bullish MB: Swing failed to make lower low, then pierced through upwards
+        elif c1_l < c0.get("low", 0) and c2.get("close", 0) > c0.get("high", 0):
             mits.append({
                 "type": "Bullish Mitigation Block",
-                "priceHigh": c0.get("high"),
-                "priceLow": c1.get("low"),
+                "priceHigh": c1_h,
+                "priceLow": c1_l,
                 "startTimestamp": c1.get("timestamp"),
-                "rule": "Khối giảm thải không tạo đáy thấp hơn bị đâm xuyên, đóng vai trò giảm thiểu rủi ro tiếp diễn xu hướng."
+                "candles_ago": n - 1 - i,
+                "rule": "Cây nến hồi không tạo đáy thấp hơn bị đâm xuyên lên, đóng vai trò giảm thiểu rủi ro tiếp diễn xu hướng tăng."
             })
 
     return mits

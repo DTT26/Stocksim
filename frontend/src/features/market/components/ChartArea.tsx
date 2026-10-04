@@ -168,11 +168,32 @@ export const detectSmcConcept = (text: string, overlayName: string): { tag: stri
       displayLabel: clean ? `Breaker Block (${clean})` : 'Breaker Block'
     };
   }
-  if (/\b(mb|mitigation|mitigation\s*block)\b/i.test(lower)) {
+  if (/\b(mb|mitigation|mitigation\s*block|giảm\s*thải)\b/i.test(lower)) {
     return {
       tag: 'MITIGATION',
       detectedConcept: 'Mitigation Block',
       displayLabel: clean ? `Mitigation Block (${clean})` : 'Mitigation Block'
+    };
+  }
+  if (/\b(ifvg|inversion\s*fvg|inversion|fvg\s*đảo)\b/i.test(lower)) {
+    return {
+      tag: 'IFVG',
+      detectedConcept: 'Inversion Fair Value Gap (IFVG)',
+      displayLabel: clean ? `Inversion FVG (${clean})` : 'Inversion Fair Value Gap (IFVG)'
+    };
+  }
+  if (/\b(vi|volume\s*imbalance|gap\s*thân|hở\s*thân)\b/i.test(lower)) {
+    return {
+      tag: 'VI',
+      detectedConcept: 'Volume Imbalance (VI)',
+      displayLabel: clean ? `Volume Imbalance (${clean})` : 'Volume Imbalance (VI)'
+    };
+  }
+  if (/\b(rb|rejection\s*block|rejection|râu\s*từ\s*chối)\b/i.test(lower)) {
+    return {
+      tag: 'REJECTION',
+      detectedConcept: 'Rejection Block (RB)',
+      displayLabel: clean ? `Rejection Block (${clean})` : 'Rejection Block (RB)'
     };
   }
   if (/\b(sd|supply|demand|cung|cầu)\b/i.test(lower)) {
