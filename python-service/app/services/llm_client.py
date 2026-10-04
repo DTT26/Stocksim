@@ -182,6 +182,46 @@ class LLMClient:
 
         return None
 
+    def generate_inspection_text(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int = 4000
+    ) -> Optional[str]:
+        """
+        Chuyên biệt cho tính năng Chấm Bài Phân Tích Kỹ Thuật (SMC / ICT / Chart Grading).
+        Ưu tiên Google Gemini theo cấu hình phân nhiệm (Gemini Chấm Bài, OpenAI Chat),
+        dự phòng tự động sang OpenAI nếu Gemini gặp sự cố.
+        """
+        self.last_error = None
+        self.active_provider = None
+        if not self.is_configured():
+            return None
+
+        # 1. Ưu tiên số 1: Google Gemini chấm bài
+        if self.gemini_key:
+            try:
+                res = self._call_gemini(system_prompt, user_prompt, max_tokens)
+                if res:
+                    self.active_provider = "gemini"
+                    return res
+            except Exception as e:
+                self.last_error = str(e)
+                print(f"Gemini chart inspection failed, falling back to OpenAI: {e}")
+
+        # 2. Dự phòng: OpenAI GPT-4o nếu Gemini gặp lỗi
+        if self.openai_key:
+            try:
+                res = self._call_openai(system_prompt, user_prompt, max_tokens)
+                if res:
+                    self.active_provider = "openai"
+                    return res
+            except Exception as e:
+                self.last_error = str(e)
+                print(f"OpenAI inspection fallback failed: {e}")
+
+        return None
+
     def _call_gemini(
         self, 
         system_prompt: str, 

@@ -1575,7 +1575,7 @@ class AiTutorService:
             if user_notes:
                 user_prompt += f"\nGhi chú học viên: {user_notes}\n"
 
-        analysis = llm_client.generate_text(system_prompt, user_prompt, max_tokens=4000)
+        analysis = llm_client.generate_inspection_text(system_prompt, user_prompt, max_tokens=4000)
         if not analysis:
             analysis = (
                 "Unable to analyze data at this time. Please try again later."
@@ -1667,7 +1667,7 @@ class AiTutorService:
             "analysis": analysis,
             "suggestedZone": suggested_zone,
             "drawingsCount": len(drawings),
-            "provider": llm_client.active_provider or "openai",
+            "provider": llm_client.active_provider or "gemini",
             "remainingToday": remaining_today,
             "isPremium": is_premium
         }
