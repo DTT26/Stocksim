@@ -368,7 +368,7 @@ registerOverlay({
 
     const label = overlay?.extendData?.label || overlay?.extendData?.name || overlay?.text || (isCisd ? '🎯 AI: CISD' : '🎯 AI: Order Block (OB)');
     const priceText = overlay?.extendData?.priceText ? ` (${overlay.extendData.priceText})` : '';
-    const badgeText = `${label}${priceText}`;
+    const badgeText = (label.includes('(') || label.includes('$')) ? label : `${label}${priceText}`;
 
     // If it's CISD: Render as 1 single horizontal reference line (NOT a box/zone)
     if (isCisd) {

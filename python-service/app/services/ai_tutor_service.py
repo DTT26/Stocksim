@@ -2007,13 +2007,18 @@ class AiTutorService:
                     "explanation": matched_cisd.get("rule", "Vùng Change In State of Delivery (CISD) chuẩn xác theo Smart Money")
                 }
                 if user_p_high and user_p_low:
-                    h_err = abs(user_p_high - matched_cisd["priceHigh"]) / max(1.0, matched_cisd["priceHigh"])
-                    l_err = abs(user_p_low - matched_cisd["priceLow"]) / max(1.0, matched_cisd["priceLow"])
-                    user_h = abs(user_p_high - user_p_low)
-                    cisd_h = abs(matched_cisd["priceHigh"] - matched_cisd["priceLow"])
-                    if user_h <= max(cisd_h * 2.5, avg_candle_h * 3.0) and (h_err < 0.12 or l_err < 0.12):
+                    ref_price = matched_cisd.get("price") or matched_cisd.get("priceHigh") or 1.0
+                    err_high = abs(user_p_high - ref_price) / max(1.0, ref_price)
+                    err_low = abs(user_p_low - ref_price) / max(1.0, ref_price)
+                    err_mid = abs(user_mid - ref_price) / max(1.0, ref_price)
+                    min_err = min(err_high, err_low, err_mid)
+                    # Đường kẻ CISD phải gần đúng mốc giá CISD (sai số <= 2.5%)
+                    if not has_fail_signal and min_err <= 0.025:
                         score = max(score, 95)
                         verdict = "CORRECT"
+                    else:
+                        score = min(score, 45)
+                        verdict = "INCORRECT"
             elif not suggested_zone:
                 suggested_zone = {
                     "type": "CISD",
@@ -2366,10 +2371,11 @@ class AiTutorService:
             suggested_zone["name"] = matched_cisd["name"]
             suggested_zone["label"] = matched_cisd["label"]
 
-        # SYNCHRONIZATION GUARANTEE:
+                # SYNCHRONIZATION GUARANTEE:
         if verdict == "CORRECT":
+            score = max(score, 90)
             analysis = re.sub(
-                r'(-\s*\*\*Kết luận tổng quan:\*\*\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:CHƯA ĐÚNG|SAI|ĐÚNG MỘT PHẦN)[^\r\n]*',
+                r'([•\-\*]\s*(?:\*\*)?Kết luận tổng quan:(?:\*\*)?\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:CHƯA ĐÚNG|SAI|ĐÚNG MỘT PHẦN)[^\r\n]*',
                 r'\1Bài vẽ của học viên **ĐÚNG** chuẩn xác theo định nghĩa Smart Money Concepts (SMC/ICT).',
                 analysis,
                 flags=re.IGNORECASE
@@ -2379,16 +2385,18 @@ class AiTutorService:
             analysis = re.sub(r'chỉ được vẽ DUY NHẤT 1 CÂY NẾN[^\r\n]*', '', analysis)
             analysis = re.sub(r'giá đã đâm thủng.*?nên không còn hợp lệ[^\r\n]*', '', analysis, flags=re.IGNORECASE)
         elif verdict == "INCORRECT":
+            score = min(score, 45)
             analysis = re.sub(
-                r'(-\s*\*\*Kết luận tổng quan:\*\*\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:ĐÚNG|CHÍNH XÁC|ĐÚNG MỘT PHẦN)[^\r\n]*',
+                r'([•\-\*]\s*(?:\*\*)?Kết luận tổng quan:(?:\*\*)?\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:ĐÚNG|CHÍNH XÁC|ĐÚNG MỘT PHẦN)[^\r\n]*',
                 r'\1Bài vẽ của học viên **CHƯA ĐÚNG** theo tiêu chuẩn kỹ thuật.',
                 analysis,
                 flags=re.IGNORECASE
             )
         elif verdict == "PARTIALLY_CORRECT":
+            score = max(55, min(score, 75))
             if "ĐÚNG MỘT PHẦN" not in analysis[:350].upper():
                 analysis = re.sub(
-                    r'(-\s*\*\*Kết luận tổng quan:\*\*\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:ĐÚNG|CHÍNH XÁC|CHƯA ĐÚNG|SAI)[^\r\n]*',
+                    r'([•\-\*]\s*(?:\*\*)?Kết luận tổng quan:(?:\*\*)?\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:ĐÚNG|CHÍNH XÁC|CHƯA ĐÚNG|SAI)[^\r\n]*',
                     r'\1Bài vẽ của học viên **ĐÚNG MỘT PHẦN** (cần lưu ý hoàn thiện thêm).',
                     analysis,
                     flags=re.IGNORECASE
@@ -2396,7 +2404,7 @@ class AiTutorService:
 
         # CRITICAL: Always keep Section 5 score synchronized with final score
         analysis = re.sub(
-            r'((?:Điểm\s*(?:đánh giá|số)?|Score)[:\s*]+)\d{1,3}(\s*(?:/\s*100)?)',
+            r'((?:[•\-\*]\s*)?(?:\*\*)?(?:Điểm\s*(?:đánh giá|số)?|Score)[:\s*]+)(?:\*\*)?\d{1,3}(?:\*\*)?(\s*(?:/\s*100)?)',
             rf'\g<1>{score}\g<2>',
             analysis,
             flags=re.IGNORECASE
