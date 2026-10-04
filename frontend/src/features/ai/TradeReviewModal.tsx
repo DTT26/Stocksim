@@ -1,4 +1,85 @@
-import { useState, useEffect } from 'react';
+import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect } from 'react';
+
+// Safe formatting helpers to prevent any runtime exceptions (e.g. undefined.toLocaleString)
+const safeMoney = (val?: number | string | null, decimals: number = 2): string => {
+  if (val === undefined || val === null || val === '') return '0.00';
+  const num = typeof val === 'number' ? val : parseFloat(String(val));
+  if (isNaN(num)) return '0.00';
+  return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+};
+
+const safeFormat = (val?: number | string | null): string => {
+  if (val === undefined || val === null || val === '') return '0.00';
+  const num = typeof val === 'number' ? val : parseFloat(String(val));
+  if (isNaN(num)) return '0.00';
+  return num.toLocaleString('en-US');
+};
+
+const safePts = (val?: number | string | null, digits: number = 2): string => {
+  if (val === undefined || val === null || val === '') return '0.00';
+  const num = typeof val === 'number' ? val : parseFloat(String(val));
+  if (isNaN(num)) return '0.00';
+  return num.toFixed(digits);
+};
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  onClose: () => void;
+  isEn?: boolean;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  errorMessage?: string;
+}
+
+class TradeReviewErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = {
+    hasError: false
+  };
+
+  public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, errorMessage: error?.message || 'Unknown render error' };
+  }
+
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('TradeReviewErrorBoundary caught error:', error, errorInfo);
+  }
+
+  public render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="bg-[#10141d] border border-rose-500/30 text-slate-200 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mx-auto text-rose-400">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white">
+                {this.props.isEn ? 'AI Review Interface Error' : 'Lỗi Giao Diện Đánh Giá AI'}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {this.props.isEn 
+                  ? 'An unexpected error occurred while rendering the review. The window has been prevented from crashing.' 
+                  : 'Đã có lỗi ngoại lệ trong khi kết xuất đánh giá. Hệ thống đã bảo vệ không làm đen màn hình.'}
+              </p>
+            </div>
+            <div className="pt-2 flex justify-center gap-2">
+              <button
+                onClick={this.props.onClose}
+                className="px-5 py-2 bg-[#202533] hover:bg-[#2c3345] text-white font-semibold rounded-lg text-xs transition-colors"
+              >
+                {this.props.isEn ? 'Close Window' : 'Đóng cửa sổ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 import { 
   X, Sparkles, CheckCircle2, AlertTriangle, 
   BookOpen, Target, Compass, Zap,
@@ -35,7 +116,17 @@ interface TradeReviewModalProps {
   };
 }
 
-export const TradeReviewModal = ({
+export const TradeReviewModal = (props: TradeReviewModalProps) => {
+  const { lang } = useI18n();
+  if (!props.isOpen) return null;
+  return (
+    <TradeReviewErrorBoundary onClose={props.onClose} isEn={lang === 'en'}>
+      <TradeReviewModalInner {...props} />
+    </TradeReviewErrorBoundary>
+  );
+};
+
+const TradeReviewModalInner = ({
   isOpen,
   onClose,
   tradeData
@@ -44,22 +135,30 @@ export const TradeReviewModal = ({
   const isEn = lang === 'en';
   const [review, setReview] = useState<TradeReviewData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'ALL' | 'ICT_RUBRIC' | 'TIMEFRAMES' | 'CONTEXT' | 'RISK' | 'IMPROVEMENTS'>('ALL');
 
   useEffect(() => {
     if (!isOpen) return;
     setLoading(true);
+    setError(null);
 
     aiService.analyzeTrade({ ...tradeData, lang })
-      .then(res => setReview(res))
-      .catch(err => console.error('Failed to load trade review', err))
+      .then(res => {
+        if (!res) throw new Error(isEn ? 'Empty response from AI service' : 'Hệ thống AI không phản hồi');
+        setReview(res);
+      })
+      .catch(err => {
+        console.error('Failed to load trade review', err);
+        setError(err.message || (isEn ? 'Failed to analyze trade' : 'Không thể kết nối dịch vụ AI'));
+      })
       .finally(() => setLoading(false));
   }, [isOpen, tradeData, lang]);
 
   if (!isOpen) return null;
 
-  const isBuy = tradeData.side.toUpperCase() === 'BUY' || tradeData.side.toUpperCase() === 'LONG';
-  const isOpenTrade = tradeData.isOpen ?? (tradeData.exitPrice === undefined || tradeData.exitPrice === null);
+  const isBuy = (tradeData?.side || 'BUY').toUpperCase() === 'BUY' || (tradeData?.side || 'BUY').toUpperCase() === 'LONG';
+  const isOpenTrade = tradeData?.isOpen ?? (tradeData?.exitPrice === undefined || tradeData?.exitPrice === null);
 
   const getVerdictBadge = (verdict: string) => {
     switch (verdict) {
@@ -132,13 +231,16 @@ export const TradeReviewModal = ({
     return 'text-rose-400 border-rose-500/30 bg-rose-500/10';
   };
 
-  const entryPrice = review?.summary.entryPrice ?? tradeData.entryPrice;
-  const exitPrice = review?.summary.exitPrice ?? tradeData.exitPrice;
-  const currentPrice = review?.summary.currentPrice ?? tradeData.currentPrice ?? entryPrice;
-  const pnl = review?.summary.pnl ?? tradeData.realPnL ?? 0;
-  const returnPct = review?.summary.returnPct ?? (entryPrice > 0 && tradeData.quantity > 0 ? Number(((pnl / (entryPrice * tradeData.quantity)) * 100).toFixed(2)) : 0);
+  const entryPrice = Number(review?.summary?.entryPrice ?? tradeData?.entryPrice ?? 0);
+  const exitPrice = review?.summary?.exitPrice ?? tradeData?.exitPrice;
+  const currentPrice = Number(review?.summary?.currentPrice ?? tradeData?.currentPrice ?? entryPrice);
+  const pnl = Number(review?.summary?.pnl ?? tradeData?.realPnL ?? 0);
+  const quantity = Number(tradeData?.quantity || 1);
+  const returnPct = review?.summary?.returnPct !== undefined 
+    ? Number(review.summary.returnPct) 
+    : (entryPrice > 0 && quantity > 0 ? Number(((pnl / (entryPrice * quantity)) * 100).toFixed(2)) : 0);
   const isProfit = pnl >= 0;
-  const effectiveExitPrice = isOpenTrade ? currentPrice : (exitPrice ?? entryPrice);
+  const effectiveExitPrice = isOpenTrade ? currentPrice : Number(exitPrice ?? entryPrice);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
@@ -192,8 +294,8 @@ export const TradeReviewModal = ({
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
                 : 'bg-rose-500/15 text-rose-400 border-rose-500/40'
             }`}>
-              <span>{isProfit ? '+' : '-'}${Math.abs(pnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span className="text-[10px] opacity-85">({isProfit ? '+' : ''}{returnPct}%)</span>
+              <span>{isProfit ? '+' : '-'}${safeMoney(Math.abs(pnl))}</span>
+              <span className="text-[10px] opacity-85">({isProfit ? '+' : ''}{safePts(returnPct)}%)</span>
             </div>
 
             <button 
@@ -213,14 +315,14 @@ export const TradeReviewModal = ({
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-slate-400">Entry:</span>
               <span className="font-mono font-bold text-white">
-                ${entryPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${safeMoney(entryPrice)}
               </span>
             </div>
             <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-slate-400">{isOpenTrade ? 'Current:' : 'Exit:'}</span>
               <span className="font-mono font-bold text-white">
-                ${effectiveExitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${safeMoney(effectiveExitPrice)}
               </span>
             </div>
             <div className="h-3.5 w-px bg-slate-700 hidden sm:block"></div>
@@ -234,13 +336,13 @@ export const TradeReviewModal = ({
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-slate-400">Stop Loss:</span>
               <span className={`font-mono font-semibold ${tradeData.stopLoss ? 'text-rose-400' : 'text-slate-500 italic'}`}>
-                {tradeData.stopLoss ? `$${tradeData.stopLoss.toLocaleString('en-US')}` : (isEn ? 'Not Set' : 'Chưa đặt')}
+                {tradeData?.stopLoss ? `$${safeFormat(tradeData.stopLoss)}` : (isEn ? 'Not Set' : 'Chưa đặt')}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-slate-400">Take Profit:</span>
               <span className={`font-mono font-semibold ${tradeData.takeProfit ? 'text-emerald-400' : 'text-slate-500 italic'}`}>
-                {tradeData.takeProfit ? `$${tradeData.takeProfit.toLocaleString('en-US')}` : (isEn ? 'Not Set' : 'Chưa đặt')}
+                {tradeData?.takeProfit ? `$${safeFormat(tradeData.takeProfit)}` : (isEn ? 'Not Set' : 'Chưa đặt')}
               </span>
             </div>
           </div>
@@ -301,7 +403,43 @@ export const TradeReviewModal = ({
                 {isEn ? 'Evaluating compliance rubric, computing MFE/MAE and market context' : 'Đối chiếu Rubric tuân thủ, tính toán MFE/MAE và bối cảnh Market Context'}
               </p>
             </div>
-          ) : review ? (
+          ) : error || !review ? (
+            <div className="py-20 text-center space-y-4 px-6">
+              <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mx-auto text-rose-400">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-white font-bold text-sm">
+                  {isEn ? 'Unable to load AI Trade Review' : 'Không thể tải Đánh Giá Lệnh AI'}
+                </p>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  {error || (isEn ? 'No review data available for this trade.' : 'Hệ thống chưa có dữ liệu đánh giá cho lệnh này.')}
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setLoading(true);
+                    setError(null);
+                    aiService.analyzeTrade({ ...tradeData, lang })
+                      .then(res => setReview(res))
+                      .catch(err => setError(err.message || 'Lỗi kết nối'))
+                      .finally(() => setLoading(false));
+                  }}
+                  className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs transition-colors flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {isEn ? 'Retry Review' : 'Thử lại'}
+                </button>
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 rounded-lg bg-[#202533] hover:bg-[#2c3345] text-slate-300 font-semibold text-xs transition-colors"
+                >
+                  {isEn ? 'Close' : 'Đóng'}
+                </button>
+              </div>
+            </div>
+          ) : (
             <>
               {/* ============================================================ */}
               {/* TOP: Process Compliance Score Banner (Rubric 5 tiêu chí)    */}
@@ -828,7 +966,7 @@ export const TradeReviewModal = ({
                         <strong>Nhiệm vụ:</strong> Xác định mục tiêu thanh khoản chính (Draw on Liquidity - DOL) mà giá đang hướng tới (Old Highs/Lows, ERL), các bể thanh khoản chưa bị càn quét (Open Draw) và theo dõi cú quét thanh khoản (Sweep).
                       </p>
                       <div className="pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
-                        <span>DOL Mục tiêu: <span className="text-amber-300 font-medium">{review.summary.takeProfit ? `$${review.summary.takeProfit.toLocaleString('en-US')}` : 'Old High / Old Low'}</span></span>
+                        <span>DOL Mục tiêu: <span className="text-amber-300 font-medium">{review.summary?.takeProfit ? `$${safeFormat(review.summary.takeProfit)}` : 'Old High / Old Low'}</span></span>
                         <span>Sweep: <span className="text-cyan-400 font-medium">Confirmed SSL/BSL</span></span>
                       </div>
                     </div>
@@ -1036,7 +1174,7 @@ export const TradeReviewModal = ({
                       </span>
                       <div className="my-1 font-mono font-bold text-base">
                         {review.riskAnalysis?.hasStopLoss ? (
-                          <span className="text-emerald-400">${review.riskAnalysis.maxPotentialLoss?.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                          <span className="text-emerald-400">${safeMoney(review.riskAnalysis?.maxPotentialLoss)}</span>
                         ) : (
                           <span className="text-rose-400 text-xs font-sans">{isEn ? 'Undefined' : 'Chưa xác định'}</span>
                         )}
@@ -1054,7 +1192,7 @@ export const TradeReviewModal = ({
                       </span>
                       <div className="my-1 font-mono font-bold text-rose-400 text-base">
                         {review.riskAnalysis?.hasStopLoss ? (
-                          <span>${review.riskAnalysis.stopLossDistanceUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })} ({review.riskAnalysis.stopLossDistancePct}%)</span>
+                          <span>${safeMoney(review.riskAnalysis?.stopLossDistanceUsd)} ({safePts(review.riskAnalysis?.stopLossDistancePct)}%)</span>
                         ) : (
                           <span className="text-slate-500 text-xs font-sans italic">{isEn ? 'Not Defined' : 'Chưa xác định'}</span>
                         )}
@@ -1067,7 +1205,7 @@ export const TradeReviewModal = ({
                         {isEn ? 'Position Size' : 'Quy mô vị thế (Position Size)'}
                       </span>
                       <div className="my-1 font-mono font-bold text-cyan-300 text-base">
-                        ${review.riskAnalysis?.positionSizeValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${safeMoney(review.riskAnalysis?.positionSizeValue)}
                       </div>
                       <span className="text-[10px] text-slate-500">
                         {isEn 
@@ -1079,14 +1217,14 @@ export const TradeReviewModal = ({
 
                   {/* Sơ Đồ Quỹ Đạo Biên Độ Giá & Drawdown (MFE / MAE Price Excursion) */}
                   {review.excursionFlow && (() => {
-                    const isShort = tradeData.side?.toLowerCase() === 'sell';
-                    const entryPrice = review.excursionFlow.entry;
-                    const maePrice = review.excursionFlow.maePrice;
-                    const maePts = review.excursionFlow.maePts;
-                    const mfePrice = review.excursionFlow.mfePrice;
-                    const mfePts = review.excursionFlow.mfePts;
-                    const currentOrExitPrice = review.excursionFlow.currentOrExit;
-                    const isLive = review.excursionFlow.isLive;
+                    const isShort = tradeData?.side?.toLowerCase() === 'sell' || tradeData?.side?.toLowerCase() === 'short';
+                    const flowEntry = Number(review.excursionFlow.entry ?? entryPrice ?? 0);
+                    const maePrice = Number(review.excursionFlow.maePrice ?? flowEntry);
+                    const maePts = Number(review.excursionFlow.maePts ?? 0);
+                    const mfePrice = Number(review.excursionFlow.mfePrice ?? flowEntry);
+                    const mfePts = Number(review.excursionFlow.mfePts ?? 0);
+                    const currentOrExitPrice = Number(review.excursionFlow.currentOrExit ?? review.excursionFlow.exitPrice ?? effectiveExitPrice ?? flowEntry);
+                    const isLive = Boolean(review.excursionFlow.isLive ?? isOpenTrade);
 
                     // Point movement in trader's direction (positive = profit, negative = loss)
                     const actualPts = isShort ? (entryPrice - currentOrExitPrice) : (currentOrExitPrice - entryPrice);
@@ -1147,7 +1285,7 @@ export const TradeReviewModal = ({
                               {isEn ? '◀ ADVERSE DRAWDOWN (MAE)' : '◀ VÙNG SỤT GIẢM (MAE DRAWDOWN)'}
                             </span>
                             <span className="text-slate-300 font-mono text-[10px] bg-[#161c28] px-2 py-0.5 rounded border border-slate-700/60">
-                              {isEn ? 'ENTRY BENCHMARK' : 'MỐC VÀO LỆNH'} (ENTRY: ${entryPrice.toLocaleString('en-US')})
+                              {isEn ? 'ENTRY BENCHMARK' : 'MỐC VÀO LỆNH'} (ENTRY: ${safeFormat(flowEntry)})
                             </span>
                             <span className="text-cyan-400 flex items-center gap-1">
                               {isEn ? 'PEAK PROFIT ZONE (MFE) ▶' : 'VÙNG LÃI TỐI ĐA (MFE PROFIT) ▶'}
@@ -1163,7 +1301,7 @@ export const TradeReviewModal = ({
                                   className="h-5 rounded bg-gradient-to-l from-amber-500/40 to-rose-500/60 border border-amber-500/50 flex items-center justify-start px-2 text-[10px] font-mono text-amber-200 font-bold transition-all"
                                   style={{ width: `${maeWidthPct}%` }}
                                 >
-                                  -{maePts.toFixed(2)} pts
+                                  -{safePts(maePts)} pts
                                 </div>
                               ) : (
                                 <div className="text-[10px] text-emerald-400 font-semibold px-2 flex items-center gap-1">
@@ -1182,7 +1320,7 @@ export const TradeReviewModal = ({
                                   className="h-5 rounded bg-gradient-to-r from-cyan-500/40 via-teal-500/50 to-emerald-500/60 border border-cyan-500/50 flex items-center justify-end px-2 text-[10px] font-mono text-cyan-200 font-bold transition-all relative"
                                   style={{ width: `${mfeWidthPct}%` }}
                                 >
-                                  +{mfePts.toFixed(2)} pts ({cleanMfeStr})
+                                  +{safePts(mfePts)} pts ({cleanMfeStr})
 
                                   {/* Pin marker for Current / Exit Price */}
                                   {pinOnFavorable && (
@@ -1208,13 +1346,13 @@ export const TradeReviewModal = ({
                           {/* Gauge Footnotes */}
                           <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
                             <span className="font-mono text-amber-300">
-                              {isEn ? 'Adverse low: ' : 'Đáy giá bất lợi: '}<strong>${maePrice.toLocaleString('en-US')}</strong> ({cleanMaeStr})
+                              {isEn ? 'Adverse low: ' : 'Đáy giá bất lợi: '}<strong>${safeFormat(maePrice)}</strong> ({cleanMaeStr})
                             </span>
                             <span className="text-slate-400">
                               {isEn ? 'Profit retained: ' : 'Mức giữ lãi hiện tại: '}<strong className={capturePct >= 70 ? 'text-emerald-400' : 'text-amber-300'}>{capturePct}% {isEn ? 'of peak MFE' : 'của đỉnh sóng'}</strong>
                             </span>
                             <span className="font-mono text-cyan-300">
-                              {isEn ? 'Favorable high: ' : 'Đỉnh giá có lợi: '}<strong>${mfePrice.toLocaleString('en-US')}</strong> ({cleanMfeStr})
+                              {isEn ? 'Favorable high: ' : 'Đỉnh giá có lợi: '}<strong>${safeFormat(mfePrice)}</strong> ({cleanMfeStr})
                             </span>
                           </div>
                         </div>
@@ -1237,7 +1375,7 @@ export const TradeReviewModal = ({
                                   </span>
                                 </div>
                                 <div className="font-mono text-sm font-bold text-white mt-1.5">
-                                  ${entryPrice.toLocaleString('en-US')}
+                                  ${safeFormat(flowEntry)}
                                 </div>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
@@ -1265,10 +1403,10 @@ export const TradeReviewModal = ({
                                   </span>
                                 </div>
                                 <div className="font-mono text-sm font-bold text-white mt-1.5">
-                                  ${maePrice.toLocaleString('en-US')}
+                                  ${safeFormat(maePrice)}
                                 </div>
                                 <div className="text-[11px] font-mono font-semibold text-amber-400 mt-0.5">
-                                  {maePts > 0 ? `-${maePts.toFixed(2)} pts (${cleanMaeStr})` : '$0.00 Drawdown'}
+                                  {maePts > 0 ? `-${safePts(maePts)} pts (${cleanMaeStr})` : '$0.00 Drawdown'}
                                 </div>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
@@ -1290,10 +1428,10 @@ export const TradeReviewModal = ({
                                   </span>
                                 </div>
                                 <div className="font-mono text-sm font-bold text-white mt-1.5">
-                                  ${mfePrice.toLocaleString('en-US')}
+                                  ${safeFormat(mfePrice)}
                                 </div>
                                 <div className="text-[11px] font-mono font-semibold text-cyan-300 mt-0.5">
-                                  +{mfePts.toFixed(2)} pts ({cleanMfeStr})
+                                  +{safePts(mfePts)} pts ({cleanMfeStr})
                                 </div>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
@@ -1321,10 +1459,10 @@ export const TradeReviewModal = ({
                                   </span>
                                 </div>
                                 <div className="font-mono text-sm font-bold text-white mt-1.5">
-                                  ${currentOrExitPrice.toLocaleString('en-US')}
+                                  ${safeFormat(currentOrExitPrice)}
                                 </div>
                                 <div className={`text-[11px] font-mono font-bold mt-0.5 ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                  {isProfit ? '+' : '-'}${Math.abs(pnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({isProfit ? '+' : ''}{returnPct}%)
+                                  {isProfit ? '+' : '-'}${safeMoney(Math.abs(pnl))} ({isProfit ? '+' : ''}${safePts(returnPct)}%)
                                 </div>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
@@ -1677,8 +1815,6 @@ export const TradeReviewModal = ({
                 </div>
               )}
             </>
-          ) : (
-            <div className="py-16 text-center text-slate-400">{isEn ? 'No review data available for this trade' : 'Không có dữ liệu phân tích lệnh này'}</div>
           )}
         </div>
       </div>

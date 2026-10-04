@@ -126,6 +126,7 @@ export interface ExcursionFlow {
   maePts: number;
   maeR: string;
   currentOrExit: number;
+  exitPrice?: number;
   mfePrice: number;
   mfePts: number;
   mfeR: string;

@@ -123,6 +123,7 @@ class TradeAnalyzer:
             "mfePts": round(mfe_pts, 2),
             "mfeR": f"{mfe_r}R" if has_sl else "Undefined",
             "exitPrice": round(exit_p, 2),
+            "currentOrExit": round(exit_p, 2),
             "isLive": is_open
         }
 
