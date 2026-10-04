@@ -27,7 +27,7 @@ interface SimulationPanelProps {
   onStartSimulation: (config: SimulationConfig) => void;
   onStartReplay?: () => void;
   onSelectStock?: (stock: Stock) => void;
-  onPreviewTPSLChange?: (tpsl: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP' } | null) => void;
+  onPreviewTPSLChange?: (tpsl: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; quantity?: number; lot?: number } | null) => void;
   draggedTPSL?: { tp?: number; sl?: number; orderPrice?: number } | null;
 }
 

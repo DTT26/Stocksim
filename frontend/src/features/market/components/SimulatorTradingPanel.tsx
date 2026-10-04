@@ -7,7 +7,7 @@ import { useI18n } from '../../../contexts/I18nContext';
 interface SimulatorTradingPanelProps {
   selectedStock: Stock;
   onBack?: () => void;
-  onPreviewTPSLChange?: (tpsl: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP' } | null) => void;
+  onPreviewTPSLChange?: (tpsl: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; quantity?: number; lot?: number } | null) => void;
   draggedTPSL?: { tp?: number; sl?: number; orderPrice?: number } | null;
 }
 
@@ -112,6 +112,8 @@ export const SimulatorTradingPanel = ({
         enabled: true,
         orderPrice: priceNum,
         orderType: orderType,
+        quantity: actualQty,
+        lot: finalLot,
       };
     } else if (showTPSL && (tp || sl)) {
       newTpsl = {
@@ -119,6 +121,8 @@ export const SimulatorTradingPanel = ({
         sl: sl ? parseFloat(sl) : undefined,
         side: currentSide,
         enabled: true,
+        quantity: actualQty,
+        lot: finalLot,
       };
     }
 
@@ -127,7 +131,7 @@ export const SimulatorTradingPanel = ({
       prevTpslRef.current = newTpslStr;
       onPreviewTPSLChange?.(newTpsl);
     }
-  }, [showTPSL, tp, sl, orderType, priceStr, priceNum, selectedStock.symbol, onPreviewTPSLChange]);
+  }, [showTPSL, tp, sl, orderType, priceStr, priceNum, selectedStock.symbol, onPreviewTPSLChange, tradeSide, actualQty, finalLot]);
 
   // Clear preview when unmounting
   useEffect(() => {
@@ -264,7 +268,25 @@ export const SimulatorTradingPanel = ({
           {(['LONG', 'SHORT'] as const).map(side => (
             <button
               key={side}
-              onClick={() => setTradeSide(side)}
+              onClick={() => {
+                if (tradeSide !== side) {
+                  setTradeSide(side);
+                  if (showTPSL) {
+                    const refPrice = orderType !== 'MARKET' && parseFloat(priceStr) > 0 ? parseFloat(priceStr) : effectivePrice;
+                    const precision = getPricePrecision(refPrice);
+                    if (tp) {
+                      const tpDist = Math.abs(parseFloat(tp) - refPrice);
+                      const newTp = side === 'LONG' ? refPrice + tpDist : refPrice - tpDist;
+                      setTp(newTp.toFixed(precision));
+                    }
+                    if (sl) {
+                      const slDist = Math.abs(parseFloat(sl) - refPrice);
+                      const newSl = side === 'LONG' ? refPrice - slDist : refPrice + slDist;
+                      setSl(newSl.toFixed(precision));
+                    }
+                  }
+                }
+              }}
               className={`flex-1 py-1.5 rounded transition-colors text-center text-[11px] font-bold uppercase ${
                 tradeSide === side 
                   ? (side === 'LONG' ? 'bg-[#089981] text-white' : 'bg-[#f23645] text-white')

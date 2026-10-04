@@ -318,7 +318,7 @@ export const TradingTerminal = () => {
 
   // Added missing states
   const [activeTab, setActiveTab] = useState<'chart' | 'coin_info' | 'info'>('chart');
-  const [previewTPSL, setPreviewTPSL] = useState<{ tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP' } | null>(null);
+  const [previewTPSL, setPreviewTPSL] = useState<{ tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; quantity?: number; lot?: number } | null>(null);
   const [draggedTPSL, setDraggedTPSL] = useState<{ tp?: number; sl?: number; orderPrice?: number } | null>(null);
 
   const handleToolClick = (toolName: string) => {
@@ -861,12 +861,20 @@ export const TradingTerminal = () => {
     }
   };
 
-  // Keyboard shortcut listener (Ctrl+Z: Undo, Ctrl+Y: Redo)
+  // Keyboard shortcut listener (Ctrl+Z: Undo, Ctrl+Y: Redo, Shift+ArrowRight: Replay Next)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
         return;
       }
+      
+      // Replay Next Step (Shift + ArrowRight)
+      if (e.shiftKey && e.key === 'ArrowRight' && isReplaying) {
+        e.preventDefault();
+        handleReplayNext();
+        return;
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();
         handleUndo();
@@ -880,7 +888,7 @@ export const TradingTerminal = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undoRedoState.canUndo, undoRedoState.canRedo]);
+  }, [undoRedoState.canUndo, undoRedoState.canRedo, isReplaying]);
 
   const handleTPSLDragChange = (type: 'tp' | 'sl' | 'orderPrice', price: number) => {
     setPreviewTPSL(prev => prev ? { ...prev, [type]: price } : { enabled: true, [type]: price });

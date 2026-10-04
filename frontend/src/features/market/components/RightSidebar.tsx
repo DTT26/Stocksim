@@ -41,7 +41,7 @@ interface RightSidebarProps {
   onAddMargin?: (symbol: string, side: 'LONG' | 'SHORT', amount: number) => Promise<{ success: boolean; message: string }>;
   isEditing?: boolean;
   onCancelEdit?: () => void;
-  onPreviewTPSLChange?: (tpsl: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP' } | null) => void;
+  onPreviewTPSLChange?: (tpsl: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; quantity?: number; lot?: number } | null) => void;
   draggedTPSL?: { tp?: number; sl?: number; orderPrice?: number } | null;
   onResetWallet?: () => void;
   totalEquity?: number;
@@ -325,14 +325,16 @@ export const RightSidebar = ({ selectedStock, positions, balance, totalEquity, m
         orderType: orderType === 'limit' ? 'LIMIT' : 'STOP',
         tp: showTPSL && tpNum !== undefined && !isNaN(tpNum) ? tpNum : undefined,
         sl: showTPSL && slNum !== undefined && !isNaN(slNum) ? slNum : undefined,
-        side: currentSide
+        side: currentSide,
+        quantity: held > 0 ? held : undefined
       };
     } else if (showTPSL) {
       newTpsl = {
         enabled: true,
         tp: (tpNum !== undefined && !isNaN(tpNum)) ? tpNum : undefined,
         sl: (slNum !== undefined && !isNaN(slNum)) ? slNum : undefined,
-        side: currentSide
+        side: currentSide,
+        quantity: held > 0 ? held : undefined
       };
     }
 
