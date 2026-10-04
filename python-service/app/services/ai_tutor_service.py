@@ -13,7 +13,8 @@ from app.services.market_context_helper import (
     extract_chart_swings_and_extrema,
     format_detailed_chart_context,
     detect_fair_value_gaps,
-    detect_order_blocks
+    detect_order_blocks,
+    find_order_block_at_candle
 )
 from app.services.prop_firm_risk_tool import (
     extract_trade_intent,
@@ -1434,71 +1435,120 @@ class AiTutorService:
             except:
                 pass
 
-        verdict = "CORRECT" if "ĐÚNG" in analysis.upper() and "SAI" not in analysis[:300].upper() else "PARTIALLY_CORRECT"
+        if is_en:
+            verdict = "CORRECT" if ("CORRECT" in analysis.upper() and "INCORRECT" not in analysis[:300].upper()) else ("INCORRECT" if "INCORRECT" in analysis[:300].upper() else "PARTIALLY_CORRECT")
+        else:
+            verdict = "CORRECT" if "ĐÚNG" in analysis.upper() and "SAI" not in analysis[:300].upper() else "PARTIALLY_CORRECT"
         if "CHƯA ĐÚNG" in analysis[:300].upper() or "SAI" in analysis[:300].upper():
             verdict = "INCORRECT"
 
-                # Bind exact candle timestamps and coordinates to suggested_zone for OB, FVG, and Liquidity!
+        # Robust Unified Timestamp & Boundary Binding for ALL Smart Money Patterns
         if suggested_zone:
             z_high = float(suggested_zone.get("priceHigh", 0))
             z_low = float(suggested_zone.get("priceLow", 0))
             z_type = str(suggested_zone.get("type", "")).upper()
-            first_label = str(first_draw.get("label", "") + " " + first_draw.get("name", "") + " " + first_draw.get("tag", "")).upper()
+            z_name = str(suggested_zone.get("name", "")).upper()
+            first_label = str(first_draw.get("label", "")).upper()
+            first_tag = str(first_draw.get("tag", "")).upper()
+            first_concept = str(first_draw.get("detectedConcept", "")).upper()
+            u_time_start = first_draw.get("timeStart")
+            u_time_end = first_draw.get("timeEnd")
 
-            matched = False
+            # Check concept
+            is_ob = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["ORDER BLOCK", "OB", "BLOCK"])
+            is_fvg = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["FVG", "FAIR VALUE", "IMBALANCE", "GAP"])
 
-            # Case A: If user or AI zone is an Order Block (OB)
-            if "ORDER BLOCK" in z_type or "OB" in z_type or "ORDER BLOCK" in first_label or "OB" in first_label:
+            # Calculate average candle height across recent klines
+            candle_ranges = [abs(k.get("high", 0) - k.get("low", 0)) for k in recent_klines if isinstance(k.get("high"), (int, float)) and isinstance(k.get("low"), (int, float))]
+            avg_candle_h = sum(candle_ranges) / len(candle_ranges) if candle_ranges else 1.0
+
+            # 1. ORDER BLOCK RESOLUTION
+            if is_ob or (not is_fvg and not suggested_zone.get("startTimestamp")):
+                # Sanity check: An Order Block cannot span a massive range (> 2.5 * avg candle height or matching wave_min)
+                is_hallucinated = (z_high - z_low) > (avg_candle_h * 2.5) or (wave_min and abs(z_low - wave_min) < 0.001 * wave_min and z_low < user_p_low * 0.98)
+
                 matched_ob = None
+                # First check localized candidates near user drawing time
                 if detected_obs:
-                    for ob in detected_obs:
-                        ob_h = float(ob.get("priceHigh", 0))
-                        ob_l = float(ob.get("priceLow", 0))
-                        # Match if price ranges overlap within 5% tolerance
-                        if abs(ob_h - z_high) / max(1.0, z_high) < 0.06 and abs(ob_l - z_low) / max(1.0, z_low) < 0.06:
-                            matched_ob = ob
-                            break
-                    if not matched_ob and detected_obs:
-                        # Match closest OB to user drawing center
-                        u_mid = (z_high + z_low) / 2
-                        matched_ob = min(detected_obs, key=lambda o: abs((o['priceHigh'] + o['priceLow'])/2 - u_mid))
+                    if u_time_start:
+                        time_candidates = [o for o in detected_obs if abs(o.get("startTimestamp", 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 3]
+                        if time_candidates:
+                            matched_ob = min(time_candidates, key=lambda o: abs(o.get("startTimestamp", 0) - u_time_start))
+                    if not matched_ob and not is_hallucinated:
+                        # Match candidate close in price
+                        price_candidates = [
+                            o for o in detected_obs
+                            if abs(float(o.get("priceHigh", 0)) - z_high) / max(1.0, z_high) < 0.06
+                            and abs(float(o.get("priceLow", 0)) - z_low) / max(1.0, z_low) < 0.06
+                        ]
+                        if price_candidates:
+                            matched_ob = price_candidates[-1]
+
+                # Fallback to direct localized candle search right at student's drawn coordinates
+                if not matched_ob or is_hallucinated:
+                    loc_ob = find_order_block_at_candle(klines, u_time_start, user_p_high, user_p_low)
+                    if loc_ob:
+                        matched_ob = loc_ob
 
                 if matched_ob:
                     suggested_zone["type"] = matched_ob["type"]
+                    suggested_zone["name"] = matched_ob["type"]
+                    suggested_zone["label"] = f"AI: {matched_ob['type']}"
                     suggested_zone["priceHigh"] = matched_ob["priceHigh"]
                     suggested_zone["priceLow"] = matched_ob["priceLow"]
-                    suggested_zone["startTimestamp"] = matched_ob["startTimestamp"]
-                    u_end = first_draw.get("timeEnd")
-                    suggested_zone["endTimestamp"] = u_end or (klines[-1].get("timestamp") if klines else None)
-                    matched = True
+                    suggested_zone["startTimestamp"] = matched_ob.get("startTimestamp") or u_time_start
+                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
+                    suggested_zone["explanation"] = matched_ob.get("rule", "Cây nến Order Block chuẩn xác theo Smart Money")
 
-            # Case B: If user or AI zone is a Fair Value Gap (FVG)
-            if not matched and ("FVG" in z_type or "FAIR VALUE" in z_type or "FVG" in first_label or "GAP" in first_label):
+                    # If user drew tightly around this exact OB candle, grant high score and CORRECT!
+                    if user_p_high and user_p_low:
+                        h_err = abs(user_p_high - matched_ob["priceHigh"]) / max(1.0, matched_ob["priceHigh"])
+                        l_err = abs(user_p_low - matched_ob["priceLow"]) / max(1.0, matched_ob["priceLow"])
+                        if h_err < 0.05 and l_err < 0.05:
+                            score = max(score, 95)
+                            verdict = "CORRECT"
+
+                elif is_hallucinated and user_p_high and user_p_low:
+                    # Snap to student's exact candle drawing
+                    suggested_zone["priceHigh"] = user_p_high
+                    suggested_zone["priceLow"] = user_p_low
+                    suggested_zone["startTimestamp"] = u_time_start
+                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
+
+            # 2. FAIR VALUE GAP (FVG) RESOLUTION
+            elif is_fvg and detected_fvgs:
+                price_candidates = [
+                    f for f in detected_fvgs
+                    if abs(float(f.get("top", 0)) - z_high) / max(1.0, z_high) < 0.06
+                    and abs(float(f.get("bottom", 0)) - z_low) / max(1.0, z_low) < 0.06
+                ]
                 matched_fvg = None
-                if detected_fvgs:
-                    for fvg in detected_fvgs:
-                        f_top = float(fvg.get("top", 0))
-                        f_bot = float(fvg.get("bottom", 0))
-                        if abs(f_top - z_high) / max(1.0, z_high) < 0.06 and abs(f_bot - z_low) / max(1.0, z_low) < 0.06:
-                            matched_fvg = fvg
-                            break
-                    if not matched_fvg and detected_fvgs:
-                        u_mid = (z_high + z_low) / 2
-                        matched_fvg = min(detected_fvgs, key=lambda f: abs((f['top'] + f['bottom'])/2 - u_mid))
+                if price_candidates:
+                    if u_time_start:
+                        matched_fvg = min(price_candidates, key=lambda f: abs((f.get("startTimestamp") or f.get("c1_timestamp") or 0) - u_time_start))
+                    else:
+                        matched_fvg = price_candidates[-1]
+                else:
+                    if u_time_start:
+                        matched_fvg = min(detected_fvgs, key=lambda f: abs((f.get("startTimestamp") or 0) - u_time_start))
+                    else:
+                        matched_fvg = detected_fvgs[-1]
 
                 if matched_fvg:
                     suggested_zone["type"] = matched_fvg["type"]
+                    suggested_zone["name"] = matched_fvg["type"]
+                    suggested_zone["label"] = f"AI: {matched_fvg['type']}"
                     suggested_zone["priceHigh"] = matched_fvg["top"]
                     suggested_zone["priceLow"] = matched_fvg["bottom"]
-                    suggested_zone["startTimestamp"] = matched_fvg["startTimestamp"]
-                    u_end = first_draw.get("timeEnd")
-                    suggested_zone["endTimestamp"] = u_end or (klines[-1].get("timestamp") if klines else None)
-                    matched = True
+                    c1_ts = matched_fvg.get("startTimestamp") or matched_fvg.get("c1_timestamp")
+                    suggested_zone["startTimestamp"] = c1_ts if c1_ts else u_time_start
+                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else matched_fvg.get("c3_timestamp"))
+                    suggested_zone["explanation"] = matched_fvg.get("rule", "Vùng Fair Value Gap chuẩn xác theo Râu Nến")
 
-            # Case C: Fallback to student's exact drawing anchor timestamps
-            if not suggested_zone.get("startTimestamp") and first_draw.get("timeStart"):
-                suggested_zone["startTimestamp"] = first_draw.get("timeStart")
-                suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else None)
+            # 3. Default anchor timestamps if still missing
+            if not suggested_zone.get("startTimestamp") and u_time_start:
+                suggested_zone["startTimestamp"] = u_time_start
+                suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
 
         return {
             "success": True,
@@ -1729,7 +1779,12 @@ class AiTutorService:
                 f"Mã tài sản: {symbol or 'N/A'}, Khung thời gian: {timeframe or 'N/A'}.\n"
                 f"DỮ LIỆU HÌNH VẼ CỦA HỌC VIÊN TRÊN BIỂU ĐỒ:\n{drawings_str}\n\n"
                 f"CHUỖI NẾN THỰC TẾ TRÊN BIỂU ĐỒ (OHLCV):\n{klines_str}\n\n"
-                f"Đỉnh cao nhất trên biểu đồ: {wave_max}, Đáy thấp nhất: {wave_min}.\n"
+                f"Đỉnh sóng cao nhất: {wave_max}, Đáy sóng thấp nhất: {wave_min}.\n"
+                f"⚠️ NGUYÊN TẮC BẮT BUỘC ĐỐI VỚI VÙNG ORDER BLOCK (OB):\n"
+                f"1. Order Block (Bullish hoặc Bearish) BẮT BUỘC chỉ là DUY NHẤT 1 CÂY NẾN ĐƠN LẺ (Cây nến giảm cuối cùng trước nhịp tăng mạnh Displacement, hoặc cây nến tăng cuối cùng trước nhịp sập mạnh).\n"
+                f"2. TUYỆT ĐỐI KHÔNG ĐƯỢC LẤY ĐÁY CỦA CẢ BIỂU ĐỒ (wave_min) HAY ĐỈNH CẢ BIỂU ĐỒ (wave_max) ĐỂ GỘP THÀNH HỘP KHỔNG LỒ. VÙNG ORDER BLOCK CHỈ CÓ CHIỀU CAO BẰNG ĐÚNG 1 CÂY NẾN ĐÓ!\n"
+                f"3. NẾU HỌC VIÊN ĐÃ KHOANH ĐÚNG CÂY NẾN ĐỎ GIẢM TRƯỚC NHỊP TĂNG MẠNH, BÀI VẼ ĐÃ ĐÚNG 100% CHUẨN XÁC THEO ICT/SMC. KẾT LUẬN: ĐÚNG (Score: 90-100). CẤM BẢO HỌC VIÊN SAI!\n"
+                f"4. Tọa độ JSON priceHigh và priceLow BẮT BUỘC phải lấy theo đúng cây nến OB đơn lẻ đó, không được vượt quá biên độ của cây nến!\n"
                 f"Các Đỉnh đảo chiều gần nhất (Recent Swing Highs): {sh_str}\n"
                 f"Các Đáy đảo chiều gần nhất (Recent Swing Lows): {sl_str}\n\n"
                 f"CÁC VÙNG ORDER BLOCK (OB) THỰC TẾ TRÊN BIỂU ĐỒ (GROUND-TRUTH CHUẨN XÁC THEO NẾN DISPLACEMENT):\n{obs_str}\n\nCÁC KHOẢNG TRỐNG GIÁ FVG THỰC TẾ TRÊN BIỂU ĐỒ (ĐO CHUẨN XÁC 100% THEO RÂU NẾN WICKS):\n{fvgs_str}\n\n"
@@ -1857,69 +1912,7 @@ class AiTutorService:
         if "CHƯA ĐÚNG" in analysis[:300].upper() or "SAI" in analysis[:300].upper():
             verdict = "INCORRECT"
 
-                # Bind exact candle timestamps and coordinates to suggested_zone for OB, FVG, and Liquidity!
-        if suggested_zone:
-            z_high = float(suggested_zone.get("priceHigh", 0))
-            z_low = float(suggested_zone.get("priceLow", 0))
-            z_type = str(suggested_zone.get("type", "")).upper()
-            first_label = str(first_draw.get("label", "") + " " + first_draw.get("name", "") + " " + first_draw.get("tag", "")).upper()
-
-            matched = False
-
-            # Case A: If user or AI zone is an Order Block (OB)
-            if "ORDER BLOCK" in z_type or "OB" in z_type or "ORDER BLOCK" in first_label or "OB" in first_label:
-                matched_ob = None
-                if detected_obs:
-                    for ob in detected_obs:
-                        ob_h = float(ob.get("priceHigh", 0))
-                        ob_l = float(ob.get("priceLow", 0))
-                        # Match if price ranges overlap within 5% tolerance
-                        if abs(ob_h - z_high) / max(1.0, z_high) < 0.06 and abs(ob_l - z_low) / max(1.0, z_low) < 0.06:
-                            matched_ob = ob
-                            break
-                    if not matched_ob and detected_obs:
-                        # Match closest OB to user drawing center
-                        u_mid = (z_high + z_low) / 2
-                        matched_ob = min(detected_obs, key=lambda o: abs((o['priceHigh'] + o['priceLow'])/2 - u_mid))
-
-                if matched_ob:
-                    suggested_zone["type"] = matched_ob["type"]
-                    suggested_zone["priceHigh"] = matched_ob["priceHigh"]
-                    suggested_zone["priceLow"] = matched_ob["priceLow"]
-                    suggested_zone["startTimestamp"] = matched_ob["startTimestamp"]
-                    u_end = first_draw.get("timeEnd")
-                    suggested_zone["endTimestamp"] = u_end or (klines[-1].get("timestamp") if klines else None)
-                    matched = True
-
-            # Case B: If user or AI zone is a Fair Value Gap (FVG)
-            if not matched and ("FVG" in z_type or "FAIR VALUE" in z_type or "FVG" in first_label or "GAP" in first_label):
-                matched_fvg = None
-                if detected_fvgs:
-                    for fvg in detected_fvgs:
-                        f_top = float(fvg.get("top", 0))
-                        f_bot = float(fvg.get("bottom", 0))
-                        if abs(f_top - z_high) / max(1.0, z_high) < 0.06 and abs(f_bot - z_low) / max(1.0, z_low) < 0.06:
-                            matched_fvg = fvg
-                            break
-                    if not matched_fvg and detected_fvgs:
-                        u_mid = (z_high + z_low) / 2
-                        matched_fvg = min(detected_fvgs, key=lambda f: abs((f['top'] + f['bottom'])/2 - u_mid))
-
-                if matched_fvg:
-                    suggested_zone["type"] = matched_fvg["type"]
-                    suggested_zone["priceHigh"] = matched_fvg["top"]
-                    suggested_zone["priceLow"] = matched_fvg["bottom"]
-                    suggested_zone["startTimestamp"] = matched_fvg["startTimestamp"]
-                    u_end = first_draw.get("timeEnd")
-                    suggested_zone["endTimestamp"] = u_end or (klines[-1].get("timestamp") if klines else None)
-                    matched = True
-
-            # Case C: Fallback to student's exact drawing anchor timestamps
-            if not suggested_zone.get("startTimestamp") and first_draw.get("timeStart"):
-                suggested_zone["startTimestamp"] = first_draw.get("timeStart")
-                suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else None)
-
-                # Comprehensive Timestamp & Concept Binding for ALL Smart Money Patterns
+        # Robust Unified Timestamp & Boundary Binding for ALL Smart Money Patterns
         if suggested_zone:
             z_high = float(suggested_zone.get("priceHigh", 0))
             z_low = float(suggested_zone.get("priceLow", 0))
@@ -1931,10 +1924,69 @@ class AiTutorService:
             u_time_start = first_draw.get("timeStart")
             u_time_end = first_draw.get("timeEnd")
 
-            # Priority 1: Match with detected FVGs if user or AI indicates FVG
+            # Check concept
+            is_ob = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["ORDER BLOCK", "OB", "BLOCK"])
             is_fvg = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["FVG", "FAIR VALUE", "IMBALANCE", "GAP"])
-            if is_fvg and detected_fvgs:
-                # Find all candidates matching price range (within 6% tolerance)
+
+            # Calculate average candle height across recent klines
+            candle_ranges = [abs(k.get("high", 0) - k.get("low", 0)) for k in recent_klines if isinstance(k.get("high"), (int, float)) and isinstance(k.get("low"), (int, float))]
+            avg_candle_h = sum(candle_ranges) / len(candle_ranges) if candle_ranges else 1.0
+
+            # 1. ORDER BLOCK RESOLUTION
+            if is_ob or (not is_fvg and not suggested_zone.get("startTimestamp")):
+                # Sanity check: An Order Block cannot span a massive range (> 2.5 * avg candle height or matching wave_min)
+                is_hallucinated = (z_high - z_low) > (avg_candle_h * 2.5) or (wave_min and abs(z_low - wave_min) < 0.001 * wave_min and z_low < user_p_low * 0.98)
+
+                matched_ob = None
+                # First check localized candidates near user drawing time
+                if detected_obs:
+                    if u_time_start:
+                        time_candidates = [o for o in detected_obs if abs(o.get("startTimestamp", 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 3]
+                        if time_candidates:
+                            matched_ob = min(time_candidates, key=lambda o: abs(o.get("startTimestamp", 0) - u_time_start))
+                    if not matched_ob and not is_hallucinated:
+                        # Match candidate close in price
+                        price_candidates = [
+                            o for o in detected_obs
+                            if abs(float(o.get("priceHigh", 0)) - z_high) / max(1.0, z_high) < 0.06
+                            and abs(float(o.get("priceLow", 0)) - z_low) / max(1.0, z_low) < 0.06
+                        ]
+                        if price_candidates:
+                            matched_ob = price_candidates[-1]
+
+                # Fallback to direct localized candle search right at student's drawn coordinates
+                if not matched_ob or is_hallucinated:
+                    loc_ob = find_order_block_at_candle(klines, u_time_start, user_p_high, user_p_low)
+                    if loc_ob:
+                        matched_ob = loc_ob
+
+                if matched_ob:
+                    suggested_zone["type"] = matched_ob["type"]
+                    suggested_zone["name"] = matched_ob["type"]
+                    suggested_zone["label"] = f"AI: {matched_ob['type']}"
+                    suggested_zone["priceHigh"] = matched_ob["priceHigh"]
+                    suggested_zone["priceLow"] = matched_ob["priceLow"]
+                    suggested_zone["startTimestamp"] = matched_ob.get("startTimestamp") or u_time_start
+                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
+                    suggested_zone["explanation"] = matched_ob.get("rule", "Cây nến Order Block chuẩn xác theo Smart Money")
+
+                    # If user drew tightly around this exact OB candle, grant high score and CORRECT!
+                    if user_p_high and user_p_low:
+                        h_err = abs(user_p_high - matched_ob["priceHigh"]) / max(1.0, matched_ob["priceHigh"])
+                        l_err = abs(user_p_low - matched_ob["priceLow"]) / max(1.0, matched_ob["priceLow"])
+                        if h_err < 0.05 and l_err < 0.05:
+                            score = max(score, 95)
+                            verdict = "CORRECT"
+
+                elif is_hallucinated and user_p_high and user_p_low:
+                    # Snap to student's exact candle drawing
+                    suggested_zone["priceHigh"] = user_p_high
+                    suggested_zone["priceLow"] = user_p_low
+                    suggested_zone["startTimestamp"] = u_time_start
+                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
+
+            # 2. FAIR VALUE GAP (FVG) RESOLUTION
+            elif is_fvg and detected_fvgs:
                 price_candidates = [
                     f for f in detected_fvgs
                     if abs(float(f.get("top", 0)) - z_high) / max(1.0, z_high) < 0.06
@@ -1943,13 +1995,10 @@ class AiTutorService:
                 matched_fvg = None
                 if price_candidates:
                     if u_time_start:
-                        # CRITICAL: Pick the candidate closest in time to where the student actually drew!
                         matched_fvg = min(price_candidates, key=lambda f: abs((f.get("startTimestamp") or f.get("c1_timestamp") or 0) - u_time_start))
                     else:
-                        # Otherwise pick the most recent candidate (reversed)
                         matched_fvg = price_candidates[-1]
                 else:
-                    # If prices didn't match directly, find FVG closest in time to user drawing
                     if u_time_start:
                         matched_fvg = min(detected_fvgs, key=lambda f: abs((f.get("startTimestamp") or 0) - u_time_start))
                     else:
@@ -1961,41 +2010,12 @@ class AiTutorService:
                     suggested_zone["label"] = f"AI: {matched_fvg['type']}"
                     suggested_zone["priceHigh"] = matched_fvg["top"]
                     suggested_zone["priceLow"] = matched_fvg["bottom"]
-                    # If user anchored at Candle 2 (displacement), use Candle 1 or userTimeStart so it aligns seamlessly
                     c1_ts = matched_fvg.get("startTimestamp") or matched_fvg.get("c1_timestamp")
                     suggested_zone["startTimestamp"] = c1_ts if c1_ts else u_time_start
                     suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else matched_fvg.get("c3_timestamp"))
+                    suggested_zone["explanation"] = matched_fvg.get("rule", "Vùng Fair Value Gap chuẩn xác theo Râu Nến")
 
-            # Priority 2: Match with detected OBs if user or AI indicates Order Block
-            is_ob = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["ORDER BLOCK", "OB", "BLOCK"])
-            if is_ob and detected_obs and not suggested_zone.get("startTimestamp"):
-                price_candidates = [
-                    o for o in detected_obs
-                    if abs(float(o.get("priceHigh", 0)) - z_high) / max(1.0, z_high) < 0.06
-                    and abs(float(o.get("priceLow", 0)) - z_low) / max(1.0, z_low) < 0.06
-                ]
-                matched_ob = None
-                if price_candidates:
-                    if u_time_start:
-                        matched_ob = min(price_candidates, key=lambda o: abs((o.get("startTimestamp") or 0) - u_time_start))
-                    else:
-                        matched_ob = price_candidates[-1]
-                else:
-                    if u_time_start:
-                        matched_ob = min(detected_obs, key=lambda o: abs((o.get("startTimestamp") or 0) - u_time_start))
-                    else:
-                        matched_ob = detected_obs[-1]
-
-                if matched_ob:
-                    suggested_zone["type"] = matched_ob["type"]
-                    suggested_zone["name"] = matched_ob["type"]
-                    suggested_zone["label"] = f"AI: {matched_ob['type']}"
-                    suggested_zone["priceHigh"] = matched_ob["priceHigh"]
-                    suggested_zone["priceLow"] = matched_ob["priceLow"]
-                    suggested_zone["startTimestamp"] = matched_ob.get("startTimestamp") or u_time_start
-                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
-
-            # Priority 3: Fallback timestamp binding using user drawing coordinates
+            # 3. Default anchor timestamps if still missing
             if not suggested_zone.get("startTimestamp") and u_time_start:
                 suggested_zone["startTimestamp"] = u_time_start
                 suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)

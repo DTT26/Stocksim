@@ -419,6 +419,79 @@ def detect_fair_value_gaps(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]
 # ==========================================
 # 7. NHẬN DIỆN ORDER BLOCK (OB) CHUẨN XÁC THEO ICT/SMC
 # ==========================================
+def find_order_block_at_candle(
+    klines: List[Dict[str, Any]],
+    anchor_timestamp: Optional[int] = None,
+    user_p_high: Optional[float] = None,
+    user_p_low: Optional[float] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Finds the exact single-candle Order Block directly at or nearest to
+    the student's drawn area on the chart.
+    Ensures the OB coordinates match the single real candle wicks/body.
+    """
+    if not klines or len(klines) < 2:
+        return None
+
+    # Step 1: Find candidate candle indices around anchor_timestamp or price range
+    candidate_indices = []
+    if anchor_timestamp:
+        for idx, k in enumerate(klines[:-1]):
+            t = k.get("timestamp")
+            if t and abs(t - anchor_timestamp) <= 1000 * 60 * 60 * 24 * 7: # within 7 days
+                candidate_indices.append(idx)
+        candidate_indices.sort(key=lambda idx: abs(klines[idx].get("timestamp", 0) - anchor_timestamp))
+
+    if not candidate_indices and user_p_high and user_p_low:
+        u_mid = (user_p_high + user_p_low) / 2
+        indexed_klines = list(enumerate(klines[:-1]))
+        indexed_klines.sort(key=lambda item: abs(((item[1].get("high", 0) + item[1].get("low", 0)) / 2) - u_mid))
+        candidate_indices = [item[0] for item in indexed_klines[:5]]
+
+    if not candidate_indices:
+        candidate_indices = list(range(max(0, len(klines) - 10), len(klines) - 1))
+
+    for idx in candidate_indices:
+        c0 = klines[idx]
+        c1 = klines[idx + 1]
+        c0_o, c0_c = c0.get("open"), c0.get("close")
+        c0_h, c0_l = c0.get("high"), c0.get("low")
+        c1_o, c1_c = c1.get("open"), c1.get("close")
+        c1_h, c1_l = c1.get("high"), c1.get("low")
+
+        if not all(isinstance(v, (int, float)) for v in [c0_o, c0_c, c0_h, c0_l, c1_o, c1_c, c1_h, c1_l]):
+            continue
+
+        # Bullish OB: down candle before strong up candle
+        if c0_c <= c0_o and c1_c > c1_o:
+            return {
+                "type": "Bullish Order Block (OB)",
+                "priceHigh": c0_h,
+                "priceLow": c0_l,
+                "bodyHigh": c0_o,
+                "bodyLow": c0_c,
+                "startTimestamp": c0.get("timestamp"),
+                "displacement_timestamp": c1.get("timestamp"),
+                "candle_index": idx,
+                "rule": "Cây nến giảm cuối cùng trước nhịp tăng mạnh Displacement. Tọa độ bao trùm từ Đáy râu đến Đỉnh râu nến đó."
+            }
+
+        # Bearish OB: up candle before strong down candle
+        if c0_c >= c0_o and c1_c < c1_o:
+            return {
+                "type": "Bearish Order Block (OB)",
+                "priceHigh": c0_h,
+                "priceLow": c0_l,
+                "bodyHigh": c0_c,
+                "bodyLow": c0_o,
+                "startTimestamp": c0.get("timestamp"),
+                "displacement_timestamp": c1.get("timestamp"),
+                "candle_index": idx,
+                "rule": "Cây nến tăng cuối cùng trước nhịp sập mạnh Displacement. Tọa độ bao trùm từ Đáy râu đến Đỉnh râu nến đó."
+            }
+
+    return None
+
 def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Nhận diện chính xác 100% các vùng Order Block (OB) theo chuẩn ICT/SMC:
@@ -452,8 +525,10 @@ def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if not all(isinstance(v, (int, float)) for v in [p_o, p_c, p_h, p_l, c_o, c_c, c_h, c_l]):
             continue
 
+        p_body = abs(p_c - p_o)
         c_body = abs(c_c - c_o)
-        is_displacement = c_body >= avg_body * 1.15
+        # Displacement condition: candle body is large relative to avg, OR significantly engulfs previous candle
+        is_displacement = (c_body >= avg_body * 0.85) or (c_body >= p_body * 1.1 and c_body >= avg_body * 0.5)
 
         # 1. Bullish Order Block (nến giảm trước cây nến tăng mạnh)
         if p_c <= p_o and c_c > c_o and is_displacement:

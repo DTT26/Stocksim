@@ -331,7 +331,7 @@ registerOverlay({
       },
       styles: {
         color: '#ffffff',
-        backgroundColor: '#d97706',
+        backgroundColor: overlay?.extendData?.badgeColor || (overlay?.styles?.rect?.borderColor as string) || '#059669',
         borderRadius: 4,
         paddingLeft: 7,
         paddingRight: 7,
@@ -542,6 +542,7 @@ export const drawAiCorrectionOverlay = (suggestedZone: {
         priceText,
         priceHigh: suggestedZone.priceHigh,
         priceLow: suggestedZone.priceLow,
+        badgeColor: borderColor,
         explanation: suggestedZone.explanation
       },
       styles: {
