@@ -7,7 +7,7 @@ import { useI18n } from '../../../contexts/I18nContext';
 interface SimulatorTradingPanelProps {
   selectedStock: Stock;
   onBack?: () => void;
-  onPreviewTPSLChange?: (tpsl: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; quantity?: number; lot?: number } | null) => void;
+  onPreviewTPSLChange?: (tpsl: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; quantity?: number; lot?: number; actualQty?: number } | null) => void;
   draggedTPSL?: { tp?: number; sl?: number; orderPrice?: number } | null;
 }
 
@@ -114,6 +114,7 @@ export const SimulatorTradingPanel = ({
         orderType: orderType,
         quantity: actualQty,
         lot: finalLot,
+        actualQty,
       };
     } else if (showTPSL && (tp || sl)) {
       newTpsl = {
@@ -123,6 +124,7 @@ export const SimulatorTradingPanel = ({
         enabled: true,
         quantity: actualQty,
         lot: finalLot,
+        actualQty,
       };
     }
 
@@ -132,6 +134,38 @@ export const SimulatorTradingPanel = ({
       onPreviewTPSLChange?.(newTpsl);
     }
   }, [showTPSL, tp, sl, orderType, priceStr, priceNum, selectedStock.symbol, onPreviewTPSLChange, tradeSide, actualQty, finalLot]);
+
+  // Reset fields when selected symbol changes
+  const prevSymbolRef = useRef(selectedStock.symbol);
+  useEffect(() => {
+    if (prevSymbolRef.current !== selectedStock.symbol) {
+      prevSymbolRef.current = selectedStock.symbol;
+      setShowTPSL(false);
+      setTp('');
+      setSl('');
+      setPriceStr('');
+      setSetupTag('');
+      onPreviewTPSLChange?.(null);
+    }
+  }, [selectedStock.symbol, onPreviewTPSLChange]);
+
+  // Reset fields when active position for this symbol closes in simulation
+  const hasActiveSimPos = store.positions.some(
+    p => p.symbol?.toUpperCase() === selectedStock.symbol?.toUpperCase()
+  );
+  const prevHasPosRef = useRef(hasActiveSimPos);
+
+  useEffect(() => {
+    if (prevHasPosRef.current && !hasActiveSimPos) {
+      setShowTPSL(false);
+      setTp('');
+      setSl('');
+      setPriceStr('');
+      onPreviewTPSLChange?.(null);
+    }
+    prevHasPosRef.current = hasActiveSimPos;
+  }, [hasActiveSimPos, onPreviewTPSLChange]);
+
 
   // Clear preview when unmounting
   useEffect(() => {
@@ -206,6 +240,11 @@ export const SimulatorTradingPanel = ({
       showToast(`Đã đặt lệnh chờ ${side} ${orderType} ${finalLot} lot (${formattedQty} ${assetUnit}) thành công!`, true);
     }
     setSetupTag('');
+    setShowTPSL(false);
+    setTp('');
+    setSl('');
+    setPriceStr('');
+    onPreviewTPSLChange?.(null);
   };
 
   return (

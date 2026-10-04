@@ -4256,7 +4256,7 @@ interface ChartAreaProps {
   stayInDrawingMode?: boolean;
   lockDrawing?: boolean;
   hideDrawing?: boolean;
-  previewTPSL?: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; quantity?: number; lot?: number } | null;
+  previewTPSL?: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; quantity?: number; lot?: number; actualQty?: number } | null;
   onTPSLChange?: (type: 'tp' | 'sl' | 'orderPrice', price: number) => void;
   simulatorPositions?: any[];
   undoTrigger?: number;

@@ -648,13 +648,12 @@ export const AiTutorDrawer = ({
       login();
       return;
     }
-    let currentDrawings = detectedDrawings;
-    let currentKlines = detectedKlines;
-    if (!currentDrawings || currentDrawings.length === 0) {
-      const currentData = handleScanDrawings();
-      currentDrawings = currentData.drawings;
-      currentKlines = currentData.klines;
-    }
+    // Always rescan live from chart so freshly typed text (e.g. FVG D) or modified coordinates are 100% current!
+    const liveData = getChartDrawingsData();
+    let currentDrawings = liveData.drawings && liveData.drawings.length > 0 ? liveData.drawings : detectedDrawings;
+    let currentKlines = liveData.klines && liveData.klines.length > 0 ? liveData.klines : detectedKlines;
+    setDetectedDrawings(currentDrawings);
+    setDetectedKlines(currentKlines);
     if (!currentDrawings || currentDrawings.length === 0) {
       setInspectError(
         isEn
@@ -1726,7 +1725,7 @@ export const AiTutorDrawer = ({
                     {inspectResult.provider === 'gemini' ? (
                       <span className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-[9px] font-mono text-blue-600 dark:text-blue-400 flex items-center gap-1 shadow-2xs">
                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 animate-pulse" />
-                        Gemini Vision
+                        {inspectResult.drawingsCount ? 'Gemini AI' : 'Gemini Vision'}
                       </span>
                     ) : inspectResult.provider === 'openai' ? (
                       <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1 shadow-2xs">

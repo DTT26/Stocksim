@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChartArea } from './components/ChartArea';
 import { RightSidebar } from './components/RightSidebar';
 import { RightToolbar } from './components/RightToolbar';
@@ -318,7 +318,7 @@ export const TradingTerminal = () => {
 
   // Added missing states
   const [activeTab, setActiveTab] = useState<'chart' | 'coin_info' | 'info'>('chart');
-  const [previewTPSL, setPreviewTPSL] = useState<{ tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; quantity?: number; lot?: number } | null>(null);
+  const [previewTPSL, setPreviewTPSL] = useState<{ tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; quantity?: number; lot?: number; actualQty?: number } | null>(null);
   const [draggedTPSL, setDraggedTPSL] = useState<{ tp?: number; sl?: number; orderPrice?: number } | null>(null);
 
   const handleToolClick = (toolName: string) => {
@@ -356,6 +356,13 @@ export const TradingTerminal = () => {
   });
   const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
   const [isAiTutorOpen, setIsAiTutorOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('challenge') === 'true' || searchParams.get('openChallenge') === 'true') {
+      setIsChallengeModalOpen(true);
+    }
+  }, [searchParams]);
 
   // Store backtest rules when launching Bar Replay from AI Tutor
   const [activeBacktestRules, setActiveBacktestRules] = useState<{
@@ -891,9 +898,50 @@ export const TradingTerminal = () => {
   }, [undoRedoState.canUndo, undoRedoState.canRedo, isReplaying]);
 
   const handleTPSLDragChange = (type: 'tp' | 'sl' | 'orderPrice', price: number) => {
+    if (store.isActive && store.session) {
+      const activeSimPos = store.positions.find(
+        p => p.symbol?.toUpperCase() === selectedStock.symbol?.toUpperCase()
+      );
+      if (activeSimPos) {
+        if (type === 'tp') {
+          store.updateTPSL(activeSimPos.id, activeSimPos.sl, price);
+        } else if (type === 'sl') {
+          store.updateTPSL(activeSimPos.id, price, activeSimPos.tp);
+        }
+        return;
+      }
+    }
     setPreviewTPSL(prev => prev ? { ...prev, [type]: price } : { enabled: true, [type]: price });
     setDraggedTPSL(prev => ({ ...prev, [type]: price }));
   };
+
+  // Clear preview and dragged TP/SL when simulator position closes
+  const prevSimPosRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (store.isActive && store.session) {
+      const hasSimPos = store.positions.some(
+        p => p.symbol?.toUpperCase() === selectedStock.symbol?.toUpperCase()
+      );
+      if (prevSimPosRef.current && !hasSimPos) {
+        setPreviewTPSL(null);
+        setDraggedTPSL(null);
+      }
+      prevSimPosRef.current = hasSimPos;
+    } else {
+      prevSimPosRef.current = false;
+    }
+  }, [store.isActive, store.session, store.positions, selectedStock.symbol]);
+
+  // Clear preview and dragged TP/SL when live position closes
+  const prevLivePosRef = useRef<boolean>(false);
+  useEffect(() => {
+    const hasLivePos = !!positions[selectedStock.symbol] && (positions[selectedStock.symbol]?.quantity || 0) > 0;
+    if (prevLivePosRef.current && !hasLivePos) {
+      setPreviewTPSL(null);
+      setDraggedTPSL(null);
+    }
+    prevLivePosRef.current = hasLivePos;
+  }, [positions, selectedStock.symbol]);
 
   const handlePriceChange = (newPrice: number) => {
     setSelectedStock(prev => prev.price === newPrice ? prev : { ...prev, price: newPrice });
@@ -913,6 +961,8 @@ export const TradingTerminal = () => {
         if (res.success) {
           await fetchPortfolio();
           setTradeCount(c => c + 1);
+          setPreviewTPSL(null);
+          setDraggedTPSL(null);
           addNotification?.({ title: 'Đóng vị thế', message: `Đã chốt vị thế ${pos.side} mã ${selectedStock.symbol} thành công.`, type: 'success' });
           return { success: true, message: `✅ Đã chốt vị thế ${pos.side} thành công` };
         }
@@ -1530,6 +1580,8 @@ export const TradingTerminal = () => {
                       if (res.success) {
                         await fetchPortfolio();
                         setTradeCount(c => c + 1);
+                        setPreviewTPSL(null);
+                        setDraggedTPSL(null);
                         addNotification?.({
                           title: 'Đóng vị thế',
                           message: `Đã chốt vị thế ${side} mã ${symbol} thành công ở giá ${price.toLocaleString('vi-VN')}đ.`,

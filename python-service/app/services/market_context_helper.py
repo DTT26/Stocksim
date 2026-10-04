@@ -419,20 +419,97 @@ def detect_fair_value_gaps(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]
 # ==========================================
 # 7. NHẬN DIỆN ORDER BLOCK (OB) CHUẨN XÁC THEO ICT/SMC
 # ==========================================
+def find_order_block_at_candle(
+    klines: List[Dict[str, Any]],
+    anchor_timestamp: Optional[int] = None,
+    user_p_high: Optional[float] = None,
+    user_p_low: Optional[float] = None,
+    preferred_type: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Nhận diện chính xác 100% cây nến Order Block đơn lẻ tại vị trí học viên đang vẽ.
+    - Bearish OB: Cây nến tăng (hoặc nến cực trị) tại đỉnh trước nhịp giảm Displacement.
+    - Bullish OB: Cây nến giảm (hoặc nến cực trị) tại đáy trước nhịp tăng Displacement.
+    - Tọa độ: Bao trọn từ High đến Low của cây nến đó (kèm timestamp chính xác).
+    """
+    if not klines or len(klines) < 2:
+        return None
+
+    candle_dur = abs(klines[1].get("timestamp", 0) - klines[0].get("timestamp", 0)) if len(klines) >= 2 else 3600000
+
+    # Xác định nến trung tâm (target_idx) theo anchor_timestamp hoặc mức giá vẽ
+    target_idx = None
+    if anchor_timestamp:
+        target_idx = min(range(len(klines)), key=lambda i: abs((klines[i].get("timestamp") or 0) - anchor_timestamp))
+    elif user_p_high and user_p_low:
+        u_mid = (user_p_high + user_p_low) / 2
+        target_idx = min(range(len(klines)), key=lambda i: abs(((klines[i].get("high", 0) + klines[i].get("low", 0)) / 2) - u_mid))
+    else:
+        target_idx = max(0, len(klines) - 2)
+
+    # Phân loại xu hướng: Bearish hay Bullish OB
+    is_bearish = False
+    if preferred_type:
+        is_bearish = "BEARISH" in preferred_type.upper() or "-" in preferred_type
+    elif user_p_high and user_p_low:
+        recent_highs = [k.get("high", 0) for k in klines[-25:] if isinstance(k.get("high"), (int, float))]
+        recent_lows = [k.get("low", 0) for k in klines[-25:] if isinstance(k.get("low"), (int, float))]
+        if recent_highs and recent_lows:
+            mid_val = (max(recent_highs) + min(recent_lows)) / 2
+            is_bearish = ((user_p_high + user_p_low) / 2) >= mid_val
+
+    # Quét trong cửa sổ 3 nến [target_idx - 1, target_idx, target_idx + 1]
+    window = [i for i in [target_idx - 1, target_idx, target_idx + 1] if 0 <= i < len(klines)]
+
+    if is_bearish:
+        # Tìm cây nến đỉnh cao nhất trong cụm này (hoặc nến tăng cuối cùng)
+        best_i = max(window, key=lambda i: klines[i].get("high", -1e9))
+        c_ob = klines[best_i]
+        return {
+            "type": "Bearish Order Block (OB)",
+            "priceHigh": c_ob.get("high"),
+            "priceLow": c_ob.get("low"),
+            "bodyHigh": max(c_ob.get("open", 0), c_ob.get("close", 0)),
+            "bodyLow": min(c_ob.get("open", 0), c_ob.get("close", 0)),
+            "mean_threshold": round((c_ob.get("high", 0) + c_ob.get("low", 0)) / 2, 4),
+            "startTimestamp": c_ob.get("timestamp"),
+            "endTimestamp": c_ob.get("timestamp") + int(candle_dur * 2),
+            "candle_index": best_i,
+            "candles_ago": len(klines) - 1 - best_i,
+            "rule": "Cây nến tăng cuối cùng tại đỉnh trước nhịp sập Displacement. Tọa độ chuẩn bao trùm toàn bộ cây nến từ Đáy râu đến Đỉnh râu."
+        }
+    else:
+        # Tìm cây nến đáy thấp nhất trong cụm này (hoặc nến giảm cuối cùng)
+        best_i = min(window, key=lambda i: klines[i].get("low", 1e9))
+        c_ob = klines[best_i]
+        return {
+            "type": "Bullish Order Block (OB)",
+            "priceHigh": c_ob.get("high"),
+            "priceLow": c_ob.get("low"),
+            "bodyHigh": max(c_ob.get("open", 0), c_ob.get("close", 0)),
+            "bodyLow": min(c_ob.get("open", 0), c_ob.get("close", 0)),
+            "mean_threshold": round((c_ob.get("high", 0) + c_ob.get("low", 0)) / 2, 4),
+            "startTimestamp": c_ob.get("timestamp"),
+            "endTimestamp": c_ob.get("timestamp") + int(candle_dur * 2),
+            "candle_index": best_i,
+            "candles_ago": len(klines) - 1 - best_i,
+            "rule": "Cây nến giảm cuối cùng tại đáy trước nhịp tăng Displacement. Tọa độ chuẩn bao trùm toàn bộ cây nến từ Đáy râu đến Đỉnh râu."
+        }
+
+
 def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Nhận diện chính xác 100% các vùng Order Block (OB) theo chuẩn ICT/SMC:
-    - Bullish OB: Cây nến GIẢM cuối cùng (close < open) trước cú bứt phá tăng mạnh (Displacement / FVG).
-      Tọa độ: Đỉnh râu nến (priceHigh) và Đáy râu nến (priceLow). Timestamp: Cây nến giảm này.
-    - Bearish OB: Cây nến TĂNG cuối cùng (close > open) trước cú bứt phá giảm mạnh (Displacement / FVG).
-      Tọa độ: Đỉnh râu nến (priceHigh) và Đáy râu nến (priceLow). Timestamp: Cây nến tăng này.
+    Nhận diện chính xác các vùng Order Block (OB) thực sự theo chuẩn ICT/SMC:
+    - Bắt buộc có Displacement mạnh (thân nến lớn >= 1.2x trung bình) bứt phá dứt khoát.
+    - Cây nến OB phải nằm tại cực trị cục bộ (Swing High / Swing Low).
+    - Tọa độ: Bao trọn từ Đáy râu (priceLow) đến Đỉnh râu (priceHigh) của cây nến OB đó.
     """
     obs = []
-    if not klines or len(klines) < 3:
+    if not klines or len(klines) < 4:
         return obs
 
     n = len(klines)
-    # Calculate average candle body size to detect strong displacement
+    candle_dur = abs(klines[1].get("timestamp", 0) - klines[0].get("timestamp", 0)) if len(klines) >= 2 else 3600000
     bodies = [
         abs(k.get("close", 0) - k.get("open", 0))
         for k in klines
@@ -440,7 +517,7 @@ def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     ]
     avg_body = sum(bodies) / len(bodies) if bodies else 1.0
 
-    for i in range(1, n - 1):
+    for i in range(2, n - 1):
         prev_c = klines[i - 1]
         curr_c = klines[i]
 
@@ -452,11 +529,16 @@ def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if not all(isinstance(v, (int, float)) for v in [p_o, p_c, p_h, p_l, c_o, c_c, c_h, c_l]):
             continue
 
+        p_body = abs(p_c - p_o)
         c_body = abs(c_c - c_o)
-        is_displacement = c_body >= avg_body * 1.15
 
-        # 1. Bullish Order Block (nến giảm trước cây nến tăng mạnh)
-        if p_c <= p_o and c_c > c_o and is_displacement:
+        # Điều kiện Displacement khắt khe chuẩn ICT (thân nến đẩy mạnh)
+        is_strong_disp = (c_body >= avg_body * 1.25 and c_body >= p_body * 1.2) or (c_body >= avg_body * 1.8)
+        if not is_strong_disp:
+            continue
+
+        # 1. Bullish Order Block (nến giảm tại đáy trước nhịp tăng bứt phá)
+        if p_c <= p_o and c_c > c_o and (p_l <= klines[i - 2].get("low", 1e9)):
             ob_high = p_h
             ob_low = p_l
             ob_mean = round((ob_high + ob_low) / 2, 4)
@@ -468,16 +550,16 @@ def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "bodyLow": p_c,
                 "mean_threshold": ob_mean,
                 "startTimestamp": prev_c.get("timestamp"),
+                "endTimestamp": prev_c.get("timestamp") + int(candle_dur * 2),
                 "c1_timestamp": prev_c.get("timestamp"),
                 "displacement_timestamp": curr_c.get("timestamp"),
                 "candle_index": i - 1,
                 "candles_ago": n - 1 - (i - 1),
-                "info": f"Nến giảm t:{prev_c.get('timestamp')} (High: {ob_high}, Low: {ob_low}, Open: {p_o}) trước cú tăng mạnh t:{curr_c.get('timestamp')}",
-                "rule": "Cây nến giảm cuối cùng trước nhịp tăng mạnh Displacement. Tọa độ bao trùm từ Đáy râu đến Đỉnh râu (hoặc Open)."
+                "rule": "Cây nến giảm cuối cùng trước nhịp tăng mạnh Displacement. Tọa độ bao trùm từ Đáy râu đến Đỉnh râu."
             })
 
-        # 2. Bearish Order Block (nến tăng trước cây nến giảm mạnh)
-        if p_c >= p_o and c_c < c_o and is_displacement:
+        # 2. Bearish Order Block (nến tăng tại đỉnh trước nhịp sập bứt phá)
+        elif p_c >= p_o and c_c < c_o and (p_h >= klines[i - 2].get("high", -1e9)):
             ob_high = p_h
             ob_low = p_l
             ob_mean = round((ob_high + ob_low) / 2, 4)
@@ -489,12 +571,215 @@ def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "bodyLow": p_o,
                 "mean_threshold": ob_mean,
                 "startTimestamp": prev_c.get("timestamp"),
+                "endTimestamp": prev_c.get("timestamp") + int(candle_dur * 2),
                 "c1_timestamp": prev_c.get("timestamp"),
                 "displacement_timestamp": curr_c.get("timestamp"),
                 "candle_index": i - 1,
                 "candles_ago": n - 1 - (i - 1),
-                "info": f"Nến tăng t:{prev_c.get('timestamp')} (High: {ob_high}, Low: {ob_low}, Open: {p_o}) trước cú sập mạnh t:{curr_c.get('timestamp')}",
-                "rule": "Cây nến tăng cuối cùng trước nhịp giảm mạnh Displacement. Tọa độ bao trùm từ Đáy râu (hoặc Open) đến Đỉnh râu."
+                "rule": "Cây nến tăng cuối cùng trước nhịp giảm mạnh Displacement. Tọa độ bao trùm từ Đáy râu đến Đỉnh râu."
             })
 
     return obs
+
+def detect_breaker_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện Breaker Block (BB) theo chuẩn ICT:
+    - Là một Order Block thất bại bị giá đâm xuyên qua dứt khoát làm thay đổi cấu trúc thị trường (MSS).
+    - Lật ngược vai trò hỗ trợ <-> kháng cự (Polarity).
+    """
+    breakers = []
+    if not klines or len(klines) < 4:
+        return breakers
+
+    obs = detect_order_blocks(klines)
+    for ob in obs:
+        c_idx = ob.get("candle_index", 0)
+        ob_high = ob["priceHigh"]
+        ob_low = ob["priceLow"]
+        ob_type = ob["type"]
+
+        # Check subsequent candles if price breaks through the OB
+        for j in range(c_idx + 2, len(klines)):
+            k = klines[j]
+            c_close = k.get("close", 0)
+            if "Bullish" in ob_type and c_close < ob_low:
+                # Broken Bullish OB becomes Bearish Breaker Block
+                breakers.append({
+                    "type": "Bearish Breaker Block",
+                    "priceHigh": ob_high,
+                    "priceLow": ob_low,
+                    "startTimestamp": ob.get("startTimestamp"),
+                    "break_timestamp": k.get("timestamp"),
+                    "rule": "Khối Bullish OB thất bại bị giá đâm thủng xuống dưới kèm phá vỡ cấu trúc (MSS), lật thành Kháng cự Bearish Breaker."
+                })
+                break
+            elif "Bearish" in ob_type and c_close > ob_high:
+                # Broken Bearish OB becomes Bullish Breaker Block
+                breakers.append({
+                    "type": "Bullish Breaker Block",
+                    "priceHigh": ob_high,
+                    "priceLow": ob_low,
+                    "startTimestamp": ob.get("startTimestamp"),
+                    "break_timestamp": k.get("timestamp"),
+                    "rule": "Khối Bearish OB thất bại bị giá đâm thủng lên trên kèm phá vỡ cấu trúc (MSS), lật thành Hỗ trợ Bullish Breaker."
+                })
+                break
+
+    return breakers
+
+
+def detect_mitigation_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện Mitigation Block (MB) theo chuẩn ICT:
+    - Vùng giá thể chế quay lại khớp nốt lệnh dở dang / giảm thiểu rủi ro vị thế.
+    - KHÔNG yêu cầu phá vỡ cấu trúc (Structure Break) trước đó và đóng vai trò tiếp diễn xu hướng (Continuation).
+    - Tọa độ chuẩn: Toàn bộ cây nến hồi thất bại (từ Low đến High của cây nến đó).
+    """
+    mits = []
+    if not klines or len(klines) < 3:
+        return mits
+
+    n = len(klines)
+    for i in range(1, len(klines) - 1):
+        c0 = klines[i - 1]
+        c1 = klines[i]
+        c2 = klines[i + 1]
+
+        c1_h = c1.get("high", 0)
+        c1_l = c1.get("low", 0)
+
+        # Bearish MB: Swing failed to make higher high, then pierced through downwards
+        if c1_h < c0.get("high", 0) and c2.get("close", 0) < c0.get("low", 0):
+            mits.append({
+                "type": "Bearish Mitigation Block",
+                "priceHigh": c1_h,
+                "priceLow": c1_l,
+                "startTimestamp": c1.get("timestamp"),
+                "candles_ago": n - 1 - i,
+                "rule": "Cây nến hồi không tạo đỉnh cao hơn bị đâm xuyên xuống, đóng vai trò giảm thiểu rủi ro tiếp diễn xu hướng giảm."
+            })
+        # Bullish MB: Swing failed to make lower low, then pierced through upwards
+        elif c1_l < c0.get("low", 0) and c2.get("close", 0) > c0.get("high", 0):
+            mits.append({
+                "type": "Bullish Mitigation Block",
+                "priceHigh": c1_h,
+                "priceLow": c1_l,
+                "startTimestamp": c1.get("timestamp"),
+                "candles_ago": n - 1 - i,
+                "rule": "Cây nến hồi không tạo đáy thấp hơn bị đâm xuyên lên, đóng vai trò giảm thiểu rủi ro tiếp diễn xu hướng tăng."
+            })
+
+    return mits
+
+
+def detect_inversion_fvgs(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện Inversion Fair Value Gap (IFVG) theo chuẩn ICT:
+    - Khoảng trống FVG bị nến sau đâm thủng dứt khoát và lật ngược vai trò hỗ trợ <-> kháng cự.
+    """
+    ifvgs = []
+    fvgs = detect_fair_value_gaps(klines)
+    if not fvgs or not klines:
+        return ifvgs
+
+    for f in fvgs:
+        c3_idx = len(klines) - 1 - f.get("candles_ago", 0)
+        f_top = f["top"]
+        f_bot = f["bottom"]
+        f_type = f["type"]
+
+        for j in range(c3_idx + 1, len(klines)):
+            k = klines[j]
+            c_close = k.get("close", 0)
+            if "Bullish" in f_type and c_close < f_bot:
+                ifvgs.append({
+                    "type": "Bearish Inversion FVG (IFVG)",
+                    "priceHigh": f_top,
+                    "priceLow": f_bot,
+                    "startTimestamp": f.get("startTimestamp"),
+                    "rule": "Bullish FVG bị nến đâm thủng dứt khoát qua biên dưới, lật ngược vai trò thành Kháng cự Bearish IFVG."
+                })
+                break
+            elif "Bearish" in f_type and c_close > f_top:
+                ifvgs.append({
+                    "type": "Bullish Inversion FVG (IFVG)",
+                    "priceHigh": f_top,
+                    "priceLow": f_bot,
+                    "startTimestamp": f.get("startTimestamp"),
+                    "rule": "Bearish FVG bị nến đâm thủng dứt khoát qua biên trên, lật ngược vai trò thành Hỗ trợ Bullish IFVG."
+                })
+                break
+
+    return ifvgs
+
+
+def detect_volume_imbalances(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện Volume Imbalance (VI) theo chuẩn ICT:
+    - Khoảng trống hình thành giữa giá Đóng cửa nến trước và giá Mở cửa nến sau (khoảng hở giữa 2 thân nến).
+    """
+    vis = []
+    if not klines or len(klines) < 2:
+        return vis
+
+    for i in range(1, len(klines)):
+        c0 = klines[i - 1]
+        c1 = klines[i]
+        c0_c = c0.get("close", 0)
+        c1_o = c1.get("open", 0)
+
+        # Bullish VI: c1 opens higher than c0 closes with gap
+        if c1_o > c0_c and abs(c1_o - c0_c) / max(1.0, c0_c) > 0.0008:
+            vis.append({
+                "type": "Bullish Volume Imbalance (VI)",
+                "priceHigh": c1_o,
+                "priceLow": c0_c,
+                "startTimestamp": c0.get("timestamp"),
+                "rule": "Khoảng trống giữa giá Đóng cửa Nến 1 và giá Mở cửa Nến 2 (khoảng hở giữa 2 thân nến)."
+            })
+        elif c1_o < c0_c and abs(c0_c - c1_o) / max(1.0, c0_c) > 0.0008:
+            vis.append({
+                "type": "Bearish Volume Imbalance (VI)",
+                "priceHigh": c0_c,
+                "priceLow": c1_o,
+                "startTimestamp": c0.get("timestamp"),
+                "rule": "Khoảng trống giữa giá Đóng cửa Nến 1 và giá Mở cửa Nến 2 (khoảng hở giữa 2 thân nến)."
+            })
+
+    return vis
+
+
+def detect_rejection_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện Rejection Block theo chuẩn ICT:
+    - Vùng râu nến dài thể hiện sự từ chối giá dứt khoát tại đỉnh/đáy cực trị.
+    - Biên độ: Chỉ bao gồm phần râu nến dài bị từ chối đó.
+    """
+    rbs = []
+    if not klines:
+        return rbs
+
+    for k in klines:
+        o, c, h, l = k.get("open", 0), k.get("close", 0), k.get("high", 0), k.get("low", 0)
+        body = abs(c - o)
+        upper_wick = h - max(o, c)
+        lower_wick = min(o, c) - l
+
+        if upper_wick >= max(1.0, body * 2.0) and upper_wick > 0:
+            rbs.append({
+                "type": "Bearish Rejection Block",
+                "priceHigh": h,
+                "priceLow": max(o, c),
+                "startTimestamp": k.get("timestamp"),
+                "rule": "Phần râu nến trên dài thể hiện sự từ chối giá quyết liệt của thể chế tại đỉnh."
+            })
+        if lower_wick >= max(1.0, body * 2.0) and lower_wick > 0:
+            rbs.append({
+                "type": "Bullish Rejection Block",
+                "priceHigh": min(o, c),
+                "priceLow": l,
+                "startTimestamp": k.get("timestamp"),
+                "rule": "Phần râu nến dưới dài thể hiện sự từ chối giá quyết liệt của thể chế tại đáy."
+            })
+
+    return rbs
