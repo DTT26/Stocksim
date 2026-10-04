@@ -1725,7 +1725,7 @@ export const AiTutorDrawer = ({
                     {inspectResult.provider === 'gemini' ? (
                       <span className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-[9px] font-mono text-blue-600 dark:text-blue-400 flex items-center gap-1 shadow-2xs">
                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 animate-pulse" />
-                        Gemini Vision
+                        {inspectResult.drawingsCount ? 'Gemini AI' : 'Gemini Vision'}
                       </span>
                     ) : inspectResult.provider === 'openai' ? (
                       <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1 shadow-2xs">
@@ -1769,7 +1769,11 @@ export const AiTutorDrawer = ({
                           {inspectResult.suggestedZone.name || (isEn ? 'Optimal Swing Order Block' : 'Vùng Order Block Chuẩn Xác')}
                         </span>
                         <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
-                          ${inspectResult.suggestedZone.priceLow?.toLocaleString('en-US')} — ${inspectResult.suggestedZone.priceHigh?.toLocaleString('en-US')}
+                          {inspectResult.suggestedZone.isLine || 
+                           inspectResult.suggestedZone.type?.toUpperCase().includes('CISD') || 
+                           inspectResult.suggestedZone.priceLow === inspectResult.suggestedZone.priceHigh
+                            ? `$${(inspectResult.suggestedZone.price ?? inspectResult.suggestedZone.priceHigh)?.toLocaleString('en-US')}`
+                            : `$${inspectResult.suggestedZone.priceLow?.toLocaleString('en-US')} — ${inspectResult.suggestedZone.priceHigh?.toLocaleString('en-US')}`}
                         </span>
                       </div>
                       {inspectResult.suggestedZone.explanation && (

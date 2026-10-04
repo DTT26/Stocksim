@@ -1,10 +1,91 @@
-import { useState, useEffect } from 'react';
+import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect } from 'react';
+
+// Safe formatting helpers to prevent any runtime exceptions (e.g. undefined.toLocaleString)
+const safeMoney = (val?: number | string | null, decimals: number = 2): string => {
+  if (val === undefined || val === null || val === '') return '0.00';
+  const num = typeof val === 'number' ? val : parseFloat(String(val));
+  if (isNaN(num)) return '0.00';
+  return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+};
+
+const safeFormat = (val?: number | string | null): string => {
+  if (val === undefined || val === null || val === '') return '0.00';
+  const num = typeof val === 'number' ? val : parseFloat(String(val));
+  if (isNaN(num)) return '0.00';
+  return num.toLocaleString('en-US');
+};
+
+const safePts = (val?: number | string | null, digits: number = 2): string => {
+  if (val === undefined || val === null || val === '') return '0.00';
+  const num = typeof val === 'number' ? val : parseFloat(String(val));
+  if (isNaN(num)) return '0.00';
+  return num.toFixed(digits);
+};
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  onClose: () => void;
+  isEn?: boolean;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  errorMessage?: string;
+}
+
+class TradeReviewErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = {
+    hasError: false
+  };
+
+  public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, errorMessage: error?.message || 'Unknown render error' };
+  }
+
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('TradeReviewErrorBoundary caught error:', error, errorInfo);
+  }
+
+  public render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="bg-[#10141d] border border-rose-500/30 text-slate-200 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mx-auto text-rose-400">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white">
+                {this.props.isEn ? 'AI Review Interface Error' : 'Lỗi Giao Diện Đánh Giá AI'}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {this.props.isEn 
+                  ? 'An unexpected error occurred while rendering the review. The window has been prevented from crashing.' 
+                  : 'Đã có lỗi ngoại lệ trong khi kết xuất đánh giá. Hệ thống đã bảo vệ không làm đen màn hình.'}
+              </p>
+            </div>
+            <div className="pt-2 flex justify-center gap-2">
+              <button
+                onClick={this.props.onClose}
+                className="px-5 py-2 bg-[#202533] hover:bg-[#2c3345] text-white font-semibold rounded-lg text-xs transition-colors"
+              >
+                {this.props.isEn ? 'Close Window' : 'Đóng cửa sổ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 import { 
   X, Sparkles, CheckCircle2, AlertTriangle, 
   BookOpen, Target, Compass, Zap,
   TrendingUp, TrendingDown, ShieldAlert, ShieldCheck,
   ArrowRight, Activity, Scale, Clock,
-  AlertCircle, Layers, ExternalLink, PlayCircle
+  AlertCircle, Layers, ExternalLink, PlayCircle, Award, Check, ChevronRight
 } from 'lucide-react';
 import { aiService, type TradeReviewData } from '../../services/aiService';
 import { useI18n } from '../../contexts/I18nContext';
@@ -35,7 +116,17 @@ interface TradeReviewModalProps {
   };
 }
 
-export const TradeReviewModal = ({
+export const TradeReviewModal = (props: TradeReviewModalProps) => {
+  const { lang } = useI18n();
+  if (!props.isOpen) return null;
+  return (
+    <TradeReviewErrorBoundary onClose={props.onClose} isEn={lang === 'en'}>
+      <TradeReviewModalInner {...props} />
+    </TradeReviewErrorBoundary>
+  );
+};
+
+const TradeReviewModalInner = ({
   isOpen,
   onClose,
   tradeData
@@ -44,22 +135,30 @@ export const TradeReviewModal = ({
   const isEn = lang === 'en';
   const [review, setReview] = useState<TradeReviewData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'CONTEXT' | 'RISK' | 'IMPROVEMENTS'>('ALL');
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'ALL' | 'ICT_RUBRIC' | 'TIMEFRAMES' | 'CONTEXT' | 'RISK' | 'IMPROVEMENTS'>('ALL');
 
   useEffect(() => {
     if (!isOpen) return;
     setLoading(true);
+    setError(null);
 
     aiService.analyzeTrade({ ...tradeData, lang })
-      .then(res => setReview(res))
-      .catch(err => console.error('Failed to load trade review', err))
+      .then(res => {
+        if (!res) throw new Error(isEn ? 'Empty response from AI service' : 'Hệ thống AI không phản hồi');
+        setReview(res);
+      })
+      .catch(err => {
+        console.error('Failed to load trade review', err);
+        setError(err.message || (isEn ? 'Failed to analyze trade' : 'Không thể kết nối dịch vụ AI'));
+      })
       .finally(() => setLoading(false));
   }, [isOpen, tradeData, lang]);
 
   if (!isOpen) return null;
 
-  const isBuy = tradeData.side.toUpperCase() === 'BUY' || tradeData.side.toUpperCase() === 'LONG';
-  const isOpenTrade = tradeData.isOpen ?? (tradeData.exitPrice === undefined || tradeData.exitPrice === null);
+  const isBuy = (tradeData?.side || 'BUY').toUpperCase() === 'BUY' || (tradeData?.side || 'BUY').toUpperCase() === 'LONG';
+  const isOpenTrade = tradeData?.isOpen ?? (tradeData?.exitPrice === undefined || tradeData?.exitPrice === null);
 
   const getVerdictBadge = (verdict: string) => {
     switch (verdict) {
@@ -132,13 +231,16 @@ export const TradeReviewModal = ({
     return 'text-rose-400 border-rose-500/30 bg-rose-500/10';
   };
 
-  const entryPrice = review?.summary.entryPrice ?? tradeData.entryPrice;
-  const exitPrice = review?.summary.exitPrice ?? tradeData.exitPrice;
-  const currentPrice = review?.summary.currentPrice ?? tradeData.currentPrice ?? entryPrice;
-  const pnl = review?.summary.pnl ?? tradeData.realPnL ?? 0;
-  const returnPct = review?.summary.returnPct ?? (entryPrice > 0 && tradeData.quantity > 0 ? Number(((pnl / (entryPrice * tradeData.quantity)) * 100).toFixed(2)) : 0);
+  const entryPrice = Number(review?.summary?.entryPrice ?? tradeData?.entryPrice ?? 0);
+  const exitPrice = review?.summary?.exitPrice ?? tradeData?.exitPrice;
+  const currentPrice = Number(review?.summary?.currentPrice ?? tradeData?.currentPrice ?? entryPrice);
+  const pnl = Number(review?.summary?.pnl ?? tradeData?.realPnL ?? 0);
+  const quantity = Number(tradeData?.quantity || 1);
+  const returnPct = review?.summary?.returnPct !== undefined 
+    ? Number(review.summary.returnPct) 
+    : (entryPrice > 0 && quantity > 0 ? Number(((pnl / (entryPrice * quantity)) * 100).toFixed(2)) : 0);
   const isProfit = pnl >= 0;
-  const effectiveExitPrice = isOpenTrade ? currentPrice : (exitPrice ?? entryPrice);
+  const effectiveExitPrice = isOpenTrade ? currentPrice : Number(exitPrice ?? entryPrice);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
@@ -192,8 +294,8 @@ export const TradeReviewModal = ({
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
                 : 'bg-rose-500/15 text-rose-400 border-rose-500/40'
             }`}>
-              <span>{isProfit ? '+' : '-'}${Math.abs(pnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span className="text-[10px] opacity-85">({isProfit ? '+' : ''}{returnPct}%)</span>
+              <span>{isProfit ? '+' : '-'}${safeMoney(Math.abs(pnl))}</span>
+              <span className="text-[10px] opacity-85">({isProfit ? '+' : ''}{safePts(returnPct)}%)</span>
             </div>
 
             <button 
@@ -213,14 +315,14 @@ export const TradeReviewModal = ({
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-slate-400">Entry:</span>
               <span className="font-mono font-bold text-white">
-                ${entryPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${safeMoney(entryPrice)}
               </span>
             </div>
             <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-slate-400">{isOpenTrade ? 'Current:' : 'Exit:'}</span>
               <span className="font-mono font-bold text-white">
-                ${effectiveExitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${safeMoney(effectiveExitPrice)}
               </span>
             </div>
             <div className="h-3.5 w-px bg-slate-700 hidden sm:block"></div>
@@ -234,13 +336,13 @@ export const TradeReviewModal = ({
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-slate-400">Stop Loss:</span>
               <span className={`font-mono font-semibold ${tradeData.stopLoss ? 'text-rose-400' : 'text-slate-500 italic'}`}>
-                {tradeData.stopLoss ? `$${tradeData.stopLoss.toLocaleString('en-US')}` : (isEn ? 'Not Set' : 'Chưa đặt')}
+                {tradeData?.stopLoss ? `$${safeFormat(tradeData.stopLoss)}` : (isEn ? 'Not Set' : 'Chưa đặt')}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-slate-400">Take Profit:</span>
               <span className={`font-mono font-semibold ${tradeData.takeProfit ? 'text-emerald-400' : 'text-slate-500 italic'}`}>
-                {tradeData.takeProfit ? `$${tradeData.takeProfit.toLocaleString('en-US')}` : (isEn ? 'Not Set' : 'Chưa đặt')}
+                {tradeData?.takeProfit ? `$${safeFormat(tradeData.takeProfit)}` : (isEn ? 'Not Set' : 'Chưa đặt')}
               </span>
             </div>
           </div>
@@ -265,9 +367,11 @@ export const TradeReviewModal = ({
         <div className="px-5 py-2 bg-[#121622] border-b border-[#232838] flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
           {[
             { id: 'ALL', label: isEn ? 'All (Comprehensive)' : 'Tất Cả (Toàn Diện)' },
-            { id: 'CONTEXT', label: isEn ? '1. Context & Setup' : '1. Bối Cảnh & Setup' },
-            { id: 'RISK', label: isEn ? '2. Risk & MFE/MAE' : '2. Quản Trị Rủi Ro & MFE/MAE' },
-            { id: 'IMPROVEMENTS', label: isEn ? '3. Evaluation & Takeaways' : '3. Đánh Giá & Bài Học' },
+            { id: 'ICT_RUBRIC', label: isEn ? 'ICT 100-Pt Rubric' : 'Thang Điểm 100 ICT (5 Phần)' },
+            { id: 'TIMEFRAMES', label: isEn ? '4 Timeframe Roles' : 'Bộ 4 Khung Thời Gian' },
+            { id: 'CONTEXT', label: isEn ? 'Setup Checklist' : 'Checklist Kỹ Thuật' },
+            { id: 'RISK', label: isEn ? 'Risk & MFE/MAE' : 'Quản Trị Rủi Ro & MFE/MAE' },
+            { id: 'IMPROVEMENTS', label: isEn ? 'Takeaways & Coach' : 'Đánh Giá & Bài Học' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -299,7 +403,43 @@ export const TradeReviewModal = ({
                 {isEn ? 'Evaluating compliance rubric, computing MFE/MAE and market context' : 'Đối chiếu Rubric tuân thủ, tính toán MFE/MAE và bối cảnh Market Context'}
               </p>
             </div>
-          ) : review ? (
+          ) : error || !review ? (
+            <div className="py-20 text-center space-y-4 px-6">
+              <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mx-auto text-rose-400">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-white font-bold text-sm">
+                  {isEn ? 'Unable to load AI Trade Review' : 'Không thể tải Đánh Giá Lệnh AI'}
+                </p>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  {error || (isEn ? 'No review data available for this trade.' : 'Hệ thống chưa có dữ liệu đánh giá cho lệnh này.')}
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setLoading(true);
+                    setError(null);
+                    aiService.analyzeTrade({ ...tradeData, lang })
+                      .then(res => setReview(res))
+                      .catch(err => setError(err.message || 'Lỗi kết nối'))
+                      .finally(() => setLoading(false));
+                  }}
+                  className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs transition-colors flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {isEn ? 'Retry Review' : 'Thử lại'}
+                </button>
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 rounded-lg bg-[#202533] hover:bg-[#2c3345] text-slate-300 font-semibold text-xs transition-colors"
+                >
+                  {isEn ? 'Close' : 'Đóng'}
+                </button>
+              </div>
+            </div>
+          ) : (
             <>
               {/* ============================================================ */}
               {/* TOP: Process Compliance Score Banner (Rubric 5 tiêu chí)    */}
@@ -336,37 +476,155 @@ export const TradeReviewModal = ({
                       </div>
                     </div>
 
-                    {/* Rubric Breakdown Bar */}
-                    {rubric && (
-                      <div className="pt-2 border-t border-white/10 space-y-1.5">
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
-                          <span>{isEn ? 'Process evaluation rubric breakdown:' : 'Chi tiết Rubric đánh giá quy trình:'}</span>
-                          <span className="text-[10px] text-slate-400 italic">
-                            {isEn ? 'Evaluated independently of trade win/loss outcome' : 'Không đánh giá dựa trên thắng hay thua'}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
-                          <div className="p-2 rounded-lg bg-black/25 border border-white/5 flex items-center justify-between">
-                            <span className="text-slate-400">1. Setup Validation:</span>
-                            <span className="font-mono font-bold text-cyan-300">{rubric.setupValidation.score}/{rubric.setupValidation.max}</span>
-                          </div>
-                          <div className="p-2 rounded-lg bg-black/25 border border-white/5 flex items-center justify-between">
-                            <span className="text-slate-400">2. Risk Management:</span>
-                            <span className={`font-mono font-bold ${rubric.riskManagement.score < 15 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                              {rubric.riskManagement.score}/{rubric.riskManagement.max}
+                    {/* ICT Tier Recommendation Action Callout */}
+                    {(() => {
+                      const tier = review.summary.tier || rubric?.tier || (review.summary.processScore >= 90 ? 'A+' : review.summary.processScore >= 75 ? 'B' : review.summary.processScore >= 60 ? 'C' : 'F');
+                      const tierLabel = review.summary.tierLabel || rubric?.tierLabel || (tier === 'A+' ? '🌟 Hạng A+ (Unicorn Setup)' : tier === 'B' ? '🟢 Hạng B (Standard Setup)' : tier === 'C' ? '🟡 Hạng C (Marginal Setup)' : '🔴 Hạng F (Invalid / Retail Trap)');
+                      const tierAction = review.summary.tierAction || rubric?.tierAction || (
+                        tier === 'A+' ? 'Bấm lệnh ngay (Execution). Lệnh đạt độ hợp lưu hoàn hảo, cho phép đi tối đa 100% Risk tiêu chuẩn (ví dụ: 1% tài khoản).' :
+                        tier === 'B' ? 'Thực thi bình thường. Lệnh đạt chuẩn ICT, đi Risk tiêu chuẩn (0.5%–1%).' :
+                        tier === 'C' ? 'Lệnh xác suất thấp. Thiếu Killzone hoặc R:R chưa tối ưu. Chỉ nên đi 50% Risk hoặc đứng ngoài quan sát.' :
+                        'CẤM VÀO LỆNH (PASS). Lệnh vi phạm các yếu tố cốt lõi (không có DOL, bấm lệnh lơ lửng giữa range, không có Sweep).'
+                      );
+
+                      const tierTheme = tier === 'A+'
+                        ? { border: 'border-amber-400/50', bg: 'bg-gradient-to-r from-amber-500/20 via-emerald-500/10 to-transparent', badge: 'bg-amber-400/20 text-amber-300 border-amber-400/40', tag: 'EXECUTION READY' }
+                        : tier === 'B'
+                        ? { border: 'border-emerald-500/40', bg: 'bg-emerald-500/10', badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40', tag: 'STANDARD SETUP' }
+                        : tier === 'C'
+                        ? { border: 'border-amber-500/40', bg: 'bg-amber-500/10', badge: 'bg-amber-500/20 text-amber-300 border-amber-500/40', tag: 'MARGINAL SETUP' }
+                        : { border: 'border-rose-500/50', bg: 'bg-rose-500/15', badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40', tag: 'PASS - CẤM VÀO LỆNH' };
+
+                      return (
+                        <div className={`p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${tierTheme.bg} ${tierTheme.border}`}>
+                          <div className="flex items-center gap-2.5">
+                            <span className={`px-2.5 py-1 rounded-md text-xs font-bold border tracking-wide shadow-sm flex items-center gap-1.5 ${tierTheme.badge}`}>
+                              <Award className="w-3.5 h-3.5" />
+                              {tierLabel}
+                            </span>
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-black/40 text-slate-300 border border-white/10 hidden sm:inline-block">
+                              {tierTheme.tag}
                             </span>
                           </div>
-                          <div className="p-2 rounded-lg bg-black/25 border border-white/5 flex items-center justify-between">
-                            <span className="text-slate-400">3. Entry Discipline:</span>
-                            <span className="font-mono font-bold text-slate-200">{rubric.entryDiscipline.score}/{rubric.entryDiscipline.max}</span>
+                          <div className="text-xs text-slate-200 font-medium sm:text-right max-w-xl">
+                            <span className="text-amber-300 font-bold mr-1">Khuyến nghị AI:</span>
+                            {tierAction}
                           </div>
-                          <div className="p-2 rounded-lg bg-black/25 border border-white/5 flex items-center justify-between">
-                            <span className="text-slate-400">4. Exit Planning:</span>
-                            <span className="font-mono font-bold text-slate-200">{rubric.exitPlanning.score}/{rubric.exitPlanning.max}</span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* ICT 100-Point 5-Part Rubric Cards Grid */}
+                    {rubric && (
+                      <div className="pt-2 border-t border-white/10 space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+                          <span className="flex items-center gap-1.5 font-semibold text-slate-200">
+                            <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                            {isEn ? 'ICT 100-Point Rubric Evaluation (5 Core Parts):' : 'Bảng Điểm ICT 100 Điểm Trọn Vẹn (5 Phần Cốt Lõi):'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 italic">
+                            Level → Profile → Draw → SMT → Execute
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-[11px]">
+                          {/* Part 1 */}
+                          <div className="p-2.5 rounded-lg bg-[#0f131d]/90 border border-emerald-500/20 flex flex-col justify-between gap-1.5 shadow-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400 font-medium truncate">1. HTF Context & Bias</span>
+                              <span className="font-mono font-bold text-emerald-400">
+                                {rubric.htfContext?.score ?? rubric.setupValidation.score}/25
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className="bg-emerald-400 h-1.5 rounded-full transition-all"
+                                style={{ width: `${((rubric.htfContext?.score ?? rubric.setupValidation.score) / 25) * 100}%` }}
+                              />
+                            </div>
+                            <div className="text-[10px] text-slate-400 flex items-center justify-between">
+                              <span>D1 / H4 Range</span>
+                              <span className="text-slate-300 font-medium">P/D 50% & DOL</span>
+                            </div>
                           </div>
-                          <div className="p-2 rounded-lg bg-black/25 border border-white/5 flex items-center justify-between col-span-2 sm:col-span-1">
-                            <span className="text-slate-400">5. Trade Reasoning:</span>
-                            <span className="font-mono font-bold text-amber-300">{rubric.tradeReasoning.score}/{rubric.tradeReasoning.max}</span>
+
+                          {/* Part 2 */}
+                          <div className="p-2.5 rounded-lg bg-[#0f131d]/90 border border-amber-500/20 flex flex-col justify-between gap-1.5 shadow-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400 font-medium truncate">2. Time & SMT</span>
+                              <span className="font-mono font-bold text-amber-400">
+                                {rubric.timeAndSmt?.score ?? rubric.exitPlanning.score}/20
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className="bg-amber-400 h-1.5 rounded-full transition-all"
+                                style={{ width: `${((rubric.timeAndSmt?.score ?? rubric.exitPlanning.score) / 20) * 100}%` }}
+                              />
+                            </div>
+                            <div className="text-[10px] text-slate-400 flex items-center justify-between">
+                              <span>H1 / Intermarket</span>
+                              <span className="text-slate-300 font-medium">Kill Zone & SMT</span>
+                            </div>
+                          </div>
+
+                          {/* Part 3 */}
+                          <div className="p-2.5 rounded-lg bg-[#0f131d]/90 border border-cyan-500/20 flex flex-col justify-between gap-1.5 shadow-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400 font-medium truncate">3. Sweep & Disp</span>
+                              <span className="font-mono font-bold text-cyan-400">
+                                {rubric.sweepAndDisplacement?.score ?? rubric.entryDiscipline.score}/25
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className="bg-cyan-400 h-1.5 rounded-full transition-all"
+                                style={{ width: `${((rubric.sweepAndDisplacement?.score ?? rubric.entryDiscipline.score) / 25) * 100}%` }}
+                              />
+                            </div>
+                            <div className="text-[10px] text-slate-400 flex items-center justify-between">
+                              <span>H1 / M15</span>
+                              <span className="text-slate-300 font-medium">MSS & PD Array</span>
+                            </div>
+                          </div>
+
+                          {/* Part 4 */}
+                          <div className="p-2.5 rounded-lg bg-[#0f131d]/90 border border-indigo-500/20 flex flex-col justify-between gap-1.5 shadow-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400 font-medium truncate">4. Entry & Risk</span>
+                              <span className={`font-mono font-bold ${(rubric.entryAndRisk?.score ?? rubric.riskManagement.score) < 15 ? 'text-rose-400' : 'text-indigo-400'}`}>
+                                {rubric.entryAndRisk?.score ?? Math.min(20, Math.round(rubric.riskManagement.score * 0.8))}/20
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className="bg-indigo-400 h-1.5 rounded-full transition-all"
+                                style={{ width: `${((rubric.entryAndRisk?.score ?? Math.min(20, Math.round(rubric.riskManagement.score * 0.8))) / 20) * 100}%` }}
+                              />
+                            </div>
+                            <div className="text-[10px] text-slate-400 flex items-center justify-between">
+                              <span>M15 / M5</span>
+                              <span className="text-slate-300 font-medium">R:R $\ge$ 1:2 & SL</span>
+                            </div>
+                          </div>
+
+                          {/* Part 5 */}
+                          <div className="p-2.5 rounded-lg bg-[#0f131d]/90 border border-purple-500/20 flex flex-col justify-between gap-1.5 shadow-sm col-span-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400 font-medium truncate">5. Plan & Rules</span>
+                              <span className="font-mono font-bold text-purple-400">
+                                {rubric.planAndDiscipline?.score ?? rubric.tradeReasoning.score}/10
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className="bg-purple-400 h-1.5 rounded-full transition-all"
+                                style={{ width: `${((rubric.planAndDiscipline?.score ?? rubric.tradeReasoning.score) / 10) * 100}%` }}
+                              />
+                            </div>
+                            <div className="text-[10px] text-slate-400 flex items-center justify-between">
+                              <span>Checklist</span>
+                              <span className="text-slate-300 font-medium">Unicorn Confluence</span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -400,7 +658,7 @@ export const TradeReviewModal = ({
                   <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-start gap-2 text-xs text-amber-200">
                     <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="text-amber-300">{isEn ? 'Actionable Correction:' : 'Hành động khắc phục:'}</strong> {review.aiCoach.actionItem}
+                      <strong className="text-amber-300">{isEn ? 'Actionable Correction:' : 'Hành động khắc phục:'}</strong> {review.aiCoach?.actionItem || (isEn ? 'Stick strictly to your execution plan.' : 'Kiên định tuân thủ kế hoạch giao dịch.')}
                     </div>
                   </div>
                 )}
@@ -408,13 +666,354 @@ export const TradeReviewModal = ({
                   <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/25 flex items-start gap-2 text-xs text-indigo-200">
                     <Scale className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="text-indigo-300">{isEn ? 'Reflection Question:' : 'Câu hỏi gợi mở tư duy (Reflection Question):'}</strong> {review.aiCoach.reflectionQuestion}
+                      <strong className="text-indigo-300">{isEn ? 'Reflection Question:' : 'Câu hỏi gợi mở tư duy (Reflection Question):'}</strong> {review.aiCoach?.reflectionQuestion || (isEn ? 'Did this setup fully align with your trading criteria?' : 'Lệnh này đã đáp ứng đầy đủ điều kiện vào lệnh của bạn chưa?')}
                     </div>
                   </div>
                 )}
               </div>
 
               {/* ============================================================ */}
+              {/* ============================================================ */}
+              {/* TAB ICT_RUBRIC: BẢNG PHÂN CHIA THANG ĐIỂM 100 TRỌN VẸN       */}
+              {/* ============================================================ */}
+              {(activeTab === 'ALL' || activeTab === 'ICT_RUBRIC') && (
+                <div className="rounded-xl border border-cyan-500/25 bg-[#121622] p-4 shadow-lg space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-300">
+                        <Layers className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2">
+                          {isEn ? 'ICT 100-Point Evaluation Rubric' : 'Bảng Phân Chia Thang Điểm 100 Trọn Vẹn Chuẩn ICT'}
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                            {review.summary.processScore}/100 PTS
+                          </span>
+                        </h3>
+                        <p className="text-[11px] text-slate-400">
+                          {isEn
+                            ? '5 Core Pillars: Level → Profile → Draw → SMT → Execute'
+                            : 'Thứ tự gối đầu bắt buộc: Level (Ngưỡng) → Profile (Bối cảnh) → Draw (Thanh khoản) → SMT → Execute (Thực thi)'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-mono px-2.5 py-1 rounded-md bg-[#181d29] text-amber-300 border border-amber-500/20 font-semibold self-start sm:self-auto">
+                      {review.summary.tierLabel || '🌟 Phân Hạng Lệnh'}
+                    </span>
+                  </div>
+
+                  {/* 5 Core Parts Detailed Breakdown */}
+                  <div className="space-y-3">
+                    {/* Phần 1 */}
+                    <div className="rounded-lg border border-emerald-500/20 bg-[#0c1017]/80 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                          <span className="font-bold text-slate-200 text-xs">
+                            PHẦN 1: BỐI CẢNH KHUNG CAO & ĐỊNH HƯỚNG — [D1 / H4]
+                          </span>
+                        </div>
+                        <span className="font-mono font-bold text-emerald-400 text-xs">
+                          {review.rubricScore?.htfContext?.score ?? review.rubricScore?.setupValidation.score}/25 Điểm
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
+                        <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>1.1 Daily Bias & Premium/Discount</span>
+                            <span className="text-emerald-400 font-mono font-bold">10đ</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            MUA ở Discount (nửa dưới 50% Dealing Range), BÁN ở Premium (nửa trên 50% Dealing Range). Thuận Bias & đúng vị trí.
+                          </p>
+                        </div>
+                        <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>1.2 Draw on Liquidity (DOL)</span>
+                            <span className="text-emerald-400 font-mono font-bold">10đ</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Điểm TP hướng thẳng về bể thanh khoản mở (Old High/Low, EQH/EQL, ERL) chưa quét, tránh vùng No Man's Land.
+                          </p>
+                        </div>
+                        <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>1.3 Phản ứng tại HTF POI</span>
+                            <span className="text-emerald-400 font-mono font-bold">5đ</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Giá xuất phát và bật nảy tại trạm đón HTF Key Level (Daily/H4 OB, FVG, Rejection Block).
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Phần 2 */}
+                    <div className="rounded-lg border border-amber-500/20 bg-[#0c1017]/80 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                          <span className="font-bold text-slate-200 text-xs">
+                            PHẦN 2: THỜI GIAN VÀ PHÂN KỲ LIÊN THỊ TRƯỜNG — [H1 / Intermarket]
+                          </span>
+                        </div>
+                        <span className="font-mono font-bold text-amber-400 text-xs">
+                          {review.rubricScore?.timeAndSmt?.score ?? review.rubricScore?.exitPlanning.score}/20 Điểm
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                        <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>2.1 Cửa sổ Khung giờ Vàng (Kill Zone & Macro)</span>
+                            <span className="text-amber-400 font-mono font-bold">10đ</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Lệnh kích hoạt trong London (2–5 AM EST), New York AM (8–11 AM EST) hoặc Silver Bullet windows.
+                          </p>
+                        </div>
+                        <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>2.2 Phân kỳ SMT Divergence</span>
+                            <span className="text-amber-400 font-mono font-bold">10đ</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Phân kỳ tương quan giữa NQ vs ES/YM, BTC vs ETH hoặc EUR vs DXY xác nhận đỉnh/đáy được bảo vệ.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Phần 3 */}
+                    <div className="rounded-lg border border-cyan-500/20 bg-[#0c1017]/80 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                          <span className="font-bold text-slate-200 text-xs">
+                            PHẦN 3: TÍN HIỆU CẤU TRÚC & LỰC ĐẨY THỂ CHẾ — [H1 / M15]
+                          </span>
+                        </div>
+                        <span className="font-mono font-bold text-cyan-400 text-xs">
+                          {review.rubricScore?.sweepAndDisplacement?.score ?? review.rubricScore?.entryDiscipline.score}/25 Điểm
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
+                        <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>3.1 Nhịp Quét Liquidity Sweep</span>
+                            <span className="text-cyan-400 font-mono font-bold">10đ</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Giá thực hiện cú đâm râu quét sạch bể thanh khoản SSL/BSL gần nhất rồi rút chân dứt khoát.
+                          </p>
+                        </div>
+                        <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>3.2 Lực đẩy Displacement & MSS / CISD</span>
+                            <span className="text-cyan-400 font-mono font-bold">10đ</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Chuỗi nến thân lớn dứt khoát xác nhận xung lực thể chế và phá vỡ cấu trúc đỉnh/đáy.
+                          </p>
+                        </div>
+                        <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>3.3 Trạm đón PD Array Chất Lượng</span>
+                            <span className="text-cyan-400 font-mono font-bold">5đ</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Vào lệnh tại FVG M15, Order Block, Breaker Block hoặc iFVG được tạo bởi Displacement.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Phần 4 */}
+                    <div className="rounded-lg border border-indigo-500/20 bg-[#0c1017]/80 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
+                          <span className="font-bold text-slate-200 text-xs">
+                            PHẦN 4: VÀO LỆNH & QUẢN TRỊ RỦI RO — [M15 / M5]
+                          </span>
+                        </div>
+                        <span className="font-mono font-bold text-indigo-400 text-xs">
+                          {review.rubricScore?.entryAndRisk?.score ?? (review.rubricScore?.riskManagement?.score ? Math.min(20, Math.round(review.rubricScore.riskManagement.score * 0.8)) : 0)}/20 Điểm
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
+                        <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>4.1 Tỷ lệ Payoff R:R (&gt;= 1:2)</span>
+                            <span className="text-indigo-400 font-mono font-bold">10đ</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Mức R:R thực tế đo về mốc DOL đạt tối thiểu $\ge$ 1:2 (+10đ). R:R &lt; 1:1.5 bị loại (0đ).
+                          </p>
+                        </div>
+                        <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>4.2 Stop-Loss Invalidation Logic</span>
+                            <span className="text-indigo-400 font-mono font-bold">5đ</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            SL được đặt an toàn phía sau râu nến của cú Sweep (Protected High/Low) thay vì đặt ngẫu nhiên.
+                          </p>
+                        </div>
+                        <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>4.3 Quản lý Khối lượng (0.5%–1%)</span>
+                            <span className="text-indigo-400 font-mono font-bold">5đ</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Khối lượng lệnh cố định rủi ro 0.5%–1% tài khoản dựa trên khoảng cách SL thực tế.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Phần 5 */}
+                    <div className="rounded-lg border border-purple-500/20 bg-[#0c1017]/80 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                          <span className="font-bold text-slate-200 text-xs">
+                            PHẦN 5: KỶ LUẬT & TÍNH HỢP LƯU — [Plan Rules]
+                          </span>
+                        </div>
+                        <span className="font-mono font-bold text-purple-400 text-xs">
+                          {review.rubricScore?.planAndDiscipline?.score ?? review.rubricScore?.tradeReasoning.score}/10 Điểm
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                        <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>5.1 Tuân thủ Guardrails</span>
+                            <span className="text-purple-400 font-mono font-bold">5đ</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Tuân thủ Daily Loss Limit, không vào lệnh trả thù (Revenge) hoặc FOMO cảm xúc.
+                          </p>
+                        </div>
+                        <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>5.2 Hợp lưu Nâng cao (Unicorn Setup)</span>
+                            <span className="text-purple-400 font-mono font-bold">5đ</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Hợp lưu từ 3 công cụ: Mô hình Unicorn = Breaker Block đè chồng FVG + SMT trong Killzone.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ============================================================ */}
+              {/* TAB TIMEFRAMES: BỘ 4 CẤP ĐỘ KHUNG THỜI GIAN GỐI ĐẦU            */}
+              {/* ============================================================ */}
+              {(activeTab === 'ALL' || activeTab === 'TIMEFRAMES') && (
+                <div className="rounded-xl border border-indigo-500/25 bg-[#121622] p-4 shadow-lg space-y-4">
+                  <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+                    <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-100 text-sm">
+                        {isEn ? '4-Level Hierarchical Timeframe Framework' : 'Bộ 4 Cấp Độ Khung Thời Gian Gối Đầu ICT'}
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        {isEn
+                          ? 'D1/W1 (Bias & Range) → H4/H1 (DOL & Sweep) → M15/M5 (Structure) → M1/M3 (Refinement)'
+                          : 'Quy trình soi đa khung thời gian: Khung cao định hướng → Khung trung gian thanh khoản → Khung cấu trúc → Khung tinh chỉnh'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* D1 / W1 */}
+                    <div className="p-3.5 rounded-xl bg-gradient-to-br from-[#181d29] to-[#0f121a] border border-blue-500/25 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                            D1 / W1
+                          </span>
+                          <span className="font-bold text-slate-200 text-xs">HTF Context & Daily Bias</span>
+                        </div>
+                        <span className="text-[10px] text-emerald-400 font-semibold">Khung Cao Nhất</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        <strong>Nhiệm vụ:</strong> Xác định xu hướng chính (Bias: Bullish hay Bearish), khung giá đang giao dịch (Dealing Range), phân vùng Premium/Discount (50% Equilibrium) và các trạm cản HTF POI.
+                      </p>
+                      <div className="pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
+                        <span>Trạng thái: <span className="text-slate-200 font-medium">{review.marketContext?.higherTimeframeTrend || 'Bullish'} Bias</span></span>
+                        <span>Phân vùng: <span className="text-emerald-400 font-medium">Discount / Equilibrium</span></span>
+                      </div>
+                    </div>
+
+                    {/* H4 / H1 */}
+                    <div className="p-3.5 rounded-xl bg-gradient-to-br from-[#181d29] to-[#0f121a] border border-emerald-500/25 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            H4 / H1
+                          </span>
+                          <span className="font-bold text-slate-200 text-xs">Liquidity & Draw on Liquidity (DOL)</span>
+                        </div>
+                        <span className="text-[10px] text-cyan-400 font-semibold">Khung Trung Gian</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        <strong>Nhiệm vụ:</strong> Xác định mục tiêu thanh khoản chính (Draw on Liquidity - DOL) mà giá đang hướng tới (Old Highs/Lows, ERL), các bể thanh khoản chưa bị càn quét (Open Draw) và theo dõi cú quét thanh khoản (Sweep).
+                      </p>
+                      <div className="pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
+                        <span>DOL Mục tiêu: <span className="text-amber-300 font-medium">{review.summary?.takeProfit ? `$${safeFormat(review.summary.takeProfit)}` : 'Old High / Old Low'}</span></span>
+                        <span>Sweep: <span className="text-cyan-400 font-medium">Confirmed SSL/BSL</span></span>
+                      </div>
+                    </div>
+
+                    {/* M15 / M5 */}
+                    <div className="p-3.5 rounded-xl bg-gradient-to-br from-[#181d29] to-[#0f121a] border border-amber-500/25 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            M15 / M5
+                          </span>
+                          <span className="font-bold text-slate-200 text-xs">Structure & Execution</span>
+                        </div>
+                        <span className="text-[10px] text-amber-400 font-semibold">Khung Cấu Trúc</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        <strong>Nhiệm vụ:</strong> Tìm tín hiệu dịch chuyển giá mạnh mẽ (Displacement), xác nhận sự thay đổi cấu trúc (MSS / CHoCH / CISD) và định vị trạm đón PD Array (FVG, Order Block, Breaker, iFVG).
+                      </p>
+                      <div className="pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
+                        <span>Xung lực: <span className="text-amber-300 font-medium">Displacement thân nến lớn</span></span>
+                        <span>Trạm đón: <span className="text-cyan-300 font-medium">PD Array (FVG / OB)</span></span>
+                      </div>
+                    </div>
+
+                    {/* M1 / M3 */}
+                    <div className="p-3.5 rounded-xl bg-gradient-to-br from-[#181d29] to-[#0f121a] border border-purple-500/25 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            M1 / M3
+                          </span>
+                          <span className="font-bold text-slate-200 text-xs">LTF Entry Refinement (Tuỳ chọn)</span>
+                        </div>
+                        <span className="text-[10px] text-purple-400 font-semibold">Khung Tinh Chỉnh</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        <strong>Nhiệm vụ:</strong> Tinh chỉnh điểm cắt lỗ (SL) thắt chặt, kiểm tra tín hiệu phân kỳ SMT Divergence và bắt điểm vào lệnh chính xác trong các cửa sổ giờ Macro / Silver Bullet.
+                      </p>
+                      <div className="pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
+                        <span>Protected SL: <span className="text-rose-400 font-medium">Sau râu nến Sweep</span></span>
+                        <span>Khung giờ: <span className="text-purple-300 font-medium">Macro / Silver Bullet</span></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* TAB 1: BỐI CẢNH & SETUP (Market Context & Setup Validation)   */}
               {/* ============================================================ */}
               {(activeTab === 'ALL' || activeTab === 'CONTEXT') && (
@@ -439,32 +1038,32 @@ export const TradeReviewModal = ({
                       <div className="grid grid-cols-2 gap-2.5 text-xs">
                         <div className="p-2 rounded-lg bg-[#191e2b] border border-[#232838]">
                           <span className="text-[10px] text-slate-400 block">Higher Timeframe (1H/4H):</span>
-                          <span className="font-semibold text-slate-200">{review.marketContext.higherTimeframeTrend || 'Bearish'}</span>
+                          <span className="font-semibold text-slate-200">{review.marketContext?.higherTimeframeTrend || 'Bearish'}</span>
                         </div>
                         <div className="p-2 rounded-lg bg-[#191e2b] border border-[#232838]">
-                          <span className="text-[10px] text-slate-400 block">Current Timeframe ({review.marketContext.timeframe}):</span>
-                          <span className="font-semibold text-slate-200">{review.marketContext.currentTimeframeTrend || 'Bearish'}</span>
+                          <span className="text-[10px] text-slate-400 block">Current Timeframe ({review.marketContext?.timeframe || '15m'}):</span>
+                          <span className="font-semibold text-slate-200">{review.marketContext?.currentTimeframeTrend || 'Bearish'}</span>
                         </div>
                         <div className="p-2 rounded-lg bg-[#191e2b] border border-[#232838]">
                           <span className="text-[10px] text-slate-400 block">Market Structure:</span>
-                          <span className="font-semibold text-slate-200">{review.marketContext.marketStructure || 'Lower High → Lower Low'}</span>
+                          <span className="font-semibold text-slate-200">{review.marketContext?.marketStructure || 'Lower High → Lower Low'}</span>
                         </div>
                         <div className="p-2 rounded-lg bg-[#191e2b] border border-[#232838]">
                           <span className="text-[10px] text-slate-400 block">Trading Session:</span>
-                          <span className="font-semibold text-cyan-300">{review.marketContext.tradingSession || 'London Session'}</span>
+                          <span className="font-semibold text-cyan-300">{review.marketContext?.tradingSession || 'London Session'}</span>
                         </div>
                         <div className="p-2 rounded-lg bg-[#191e2b] border border-[#232838]">
                           <span className="text-[10px] text-slate-400 block">{isEn ? 'Liquidity Context:' : 'Thanh khoản (Liquidity):'}</span>
-                          <span className="font-semibold text-slate-200">{review.marketContext.liquidity || 'Sell-side swept'}</span>
+                          <span className="font-semibold text-slate-200">{review.marketContext?.liquidity || 'Sell-side swept'}</span>
                         </div>
                         <div className="p-2 rounded-lg bg-[#191e2b] border border-[#232838]">
                           <span className="text-[10px] text-slate-400 block">{isEn ? 'Volatility & Volume:' : 'Biến động (Volatility) & Khối lượng:'}</span>
-                          <span className="font-semibold text-slate-200">{review.marketContext.volatility || 'Medium'} • {review.marketContext.volumeContext || 'Above average'}</span>
+                          <span className="font-semibold text-slate-200">{review.marketContext?.volatility || 'Medium'} • {review.marketContext?.volumeContext || 'Above average'}</span>
                         </div>
                       </div>
 
                       <div className="text-[11px] text-slate-400 pt-1.5 border-t border-[#232838] flex items-center justify-between">
-                        <span>{isEn ? 'Key Levels:' : 'Cản then chốt:'} <strong className="text-slate-300">{review.marketContext.supportResistance}</strong></span>
+                        <span>{isEn ? 'Key Levels:' : 'Cản then chốt:'} <strong className="text-slate-300">{review.marketContext?.supportResistance || 'S/R Key Level'}</strong></span>
                       </div>
                     </div>
 
@@ -480,7 +1079,7 @@ export const TradeReviewModal = ({
                       </div>
 
                       <div className="space-y-1.5 text-xs max-h-56 overflow-y-auto custom-scrollbar pr-1">
-                        {review.setupValidation?.checklist.map((item, idx) => (
+                        {review.setupValidation?.checklist?.map((item, idx) => (
                           <div key={idx} className="p-2 rounded-lg bg-[#191e2b] border border-[#232838] flex items-start justify-between gap-2">
                             <div className="space-y-0.5">
                               <div className="font-semibold text-slate-200">{item.condition}</div>
@@ -575,7 +1174,7 @@ export const TradeReviewModal = ({
                       </span>
                       <div className="my-1 font-mono font-bold text-base">
                         {review.riskAnalysis?.hasStopLoss ? (
-                          <span className="text-emerald-400">${review.riskAnalysis.maxPotentialLoss?.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                          <span className="text-emerald-400">${safeMoney(review.riskAnalysis?.maxPotentialLoss)}</span>
                         ) : (
                           <span className="text-rose-400 text-xs font-sans">{isEn ? 'Undefined' : 'Chưa xác định'}</span>
                         )}
@@ -593,7 +1192,7 @@ export const TradeReviewModal = ({
                       </span>
                       <div className="my-1 font-mono font-bold text-rose-400 text-base">
                         {review.riskAnalysis?.hasStopLoss ? (
-                          <span>${review.riskAnalysis.stopLossDistanceUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })} ({review.riskAnalysis.stopLossDistancePct}%)</span>
+                          <span>${safeMoney(review.riskAnalysis?.stopLossDistanceUsd)} ({safePts(review.riskAnalysis?.stopLossDistancePct)}%)</span>
                         ) : (
                           <span className="text-slate-500 text-xs font-sans italic">{isEn ? 'Not Defined' : 'Chưa xác định'}</span>
                         )}
@@ -606,7 +1205,7 @@ export const TradeReviewModal = ({
                         {isEn ? 'Position Size' : 'Quy mô vị thế (Position Size)'}
                       </span>
                       <div className="my-1 font-mono font-bold text-cyan-300 text-base">
-                        ${review.riskAnalysis?.positionSizeValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${safeMoney(review.riskAnalysis?.positionSizeValue)}
                       </div>
                       <span className="text-[10px] text-slate-500">
                         {isEn 
@@ -618,14 +1217,14 @@ export const TradeReviewModal = ({
 
                   {/* Sơ Đồ Quỹ Đạo Biên Độ Giá & Drawdown (MFE / MAE Price Excursion) */}
                   {review.excursionFlow && (() => {
-                    const isShort = tradeData.side?.toLowerCase() === 'sell';
-                    const entryPrice = review.excursionFlow.entry;
-                    const maePrice = review.excursionFlow.maePrice;
-                    const maePts = review.excursionFlow.maePts;
-                    const mfePrice = review.excursionFlow.mfePrice;
-                    const mfePts = review.excursionFlow.mfePts;
-                    const currentOrExitPrice = review.excursionFlow.currentOrExit;
-                    const isLive = review.excursionFlow.isLive;
+                    const isShort = tradeData?.side?.toLowerCase() === 'sell' || tradeData?.side?.toLowerCase() === 'short';
+                    const flowEntry = Number(review.excursionFlow.entry ?? entryPrice ?? 0);
+                    const maePrice = Number(review.excursionFlow.maePrice ?? flowEntry);
+                    const maePts = Number(review.excursionFlow.maePts ?? 0);
+                    const mfePrice = Number(review.excursionFlow.mfePrice ?? flowEntry);
+                    const mfePts = Number(review.excursionFlow.mfePts ?? 0);
+                    const currentOrExitPrice = Number(review.excursionFlow.currentOrExit ?? review.excursionFlow.exitPrice ?? effectiveExitPrice ?? flowEntry);
+                    const isLive = Boolean(review.excursionFlow.isLive ?? isOpenTrade);
 
                     // Point movement in trader's direction (positive = profit, negative = loss)
                     const actualPts = isShort ? (entryPrice - currentOrExitPrice) : (currentOrExitPrice - entryPrice);
@@ -686,7 +1285,7 @@ export const TradeReviewModal = ({
                               {isEn ? '◀ ADVERSE DRAWDOWN (MAE)' : '◀ VÙNG SỤT GIẢM (MAE DRAWDOWN)'}
                             </span>
                             <span className="text-slate-300 font-mono text-[10px] bg-[#161c28] px-2 py-0.5 rounded border border-slate-700/60">
-                              {isEn ? 'ENTRY BENCHMARK' : 'MỐC VÀO LỆNH'} (ENTRY: ${entryPrice.toLocaleString('en-US')})
+                              {isEn ? 'ENTRY BENCHMARK' : 'MỐC VÀO LỆNH'} (ENTRY: ${safeFormat(flowEntry)})
                             </span>
                             <span className="text-cyan-400 flex items-center gap-1">
                               {isEn ? 'PEAK PROFIT ZONE (MFE) ▶' : 'VÙNG LÃI TỐI ĐA (MFE PROFIT) ▶'}
@@ -702,7 +1301,7 @@ export const TradeReviewModal = ({
                                   className="h-5 rounded bg-gradient-to-l from-amber-500/40 to-rose-500/60 border border-amber-500/50 flex items-center justify-start px-2 text-[10px] font-mono text-amber-200 font-bold transition-all"
                                   style={{ width: `${maeWidthPct}%` }}
                                 >
-                                  -{maePts.toFixed(2)} pts
+                                  -{safePts(maePts)} pts
                                 </div>
                               ) : (
                                 <div className="text-[10px] text-emerald-400 font-semibold px-2 flex items-center gap-1">
@@ -721,7 +1320,7 @@ export const TradeReviewModal = ({
                                   className="h-5 rounded bg-gradient-to-r from-cyan-500/40 via-teal-500/50 to-emerald-500/60 border border-cyan-500/50 flex items-center justify-end px-2 text-[10px] font-mono text-cyan-200 font-bold transition-all relative"
                                   style={{ width: `${mfeWidthPct}%` }}
                                 >
-                                  +{mfePts.toFixed(2)} pts ({cleanMfeStr})
+                                  +{safePts(mfePts)} pts ({cleanMfeStr})
 
                                   {/* Pin marker for Current / Exit Price */}
                                   {pinOnFavorable && (
@@ -747,13 +1346,13 @@ export const TradeReviewModal = ({
                           {/* Gauge Footnotes */}
                           <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
                             <span className="font-mono text-amber-300">
-                              {isEn ? 'Adverse low: ' : 'Đáy giá bất lợi: '}<strong>${maePrice.toLocaleString('en-US')}</strong> ({cleanMaeStr})
+                              {isEn ? 'Adverse low: ' : 'Đáy giá bất lợi: '}<strong>${safeFormat(maePrice)}</strong> ({cleanMaeStr})
                             </span>
                             <span className="text-slate-400">
                               {isEn ? 'Profit retained: ' : 'Mức giữ lãi hiện tại: '}<strong className={capturePct >= 70 ? 'text-emerald-400' : 'text-amber-300'}>{capturePct}% {isEn ? 'of peak MFE' : 'của đỉnh sóng'}</strong>
                             </span>
                             <span className="font-mono text-cyan-300">
-                              {isEn ? 'Favorable high: ' : 'Đỉnh giá có lợi: '}<strong>${mfePrice.toLocaleString('en-US')}</strong> ({cleanMfeStr})
+                              {isEn ? 'Favorable high: ' : 'Đỉnh giá có lợi: '}<strong>${safeFormat(mfePrice)}</strong> ({cleanMfeStr})
                             </span>
                           </div>
                         </div>
@@ -776,7 +1375,7 @@ export const TradeReviewModal = ({
                                   </span>
                                 </div>
                                 <div className="font-mono text-sm font-bold text-white mt-1.5">
-                                  ${entryPrice.toLocaleString('en-US')}
+                                  ${safeFormat(flowEntry)}
                                 </div>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
@@ -804,10 +1403,10 @@ export const TradeReviewModal = ({
                                   </span>
                                 </div>
                                 <div className="font-mono text-sm font-bold text-white mt-1.5">
-                                  ${maePrice.toLocaleString('en-US')}
+                                  ${safeFormat(maePrice)}
                                 </div>
                                 <div className="text-[11px] font-mono font-semibold text-amber-400 mt-0.5">
-                                  {maePts > 0 ? `-${maePts.toFixed(2)} pts (${cleanMaeStr})` : '$0.00 Drawdown'}
+                                  {maePts > 0 ? `-${safePts(maePts)} pts (${cleanMaeStr})` : '$0.00 Drawdown'}
                                 </div>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
@@ -829,10 +1428,10 @@ export const TradeReviewModal = ({
                                   </span>
                                 </div>
                                 <div className="font-mono text-sm font-bold text-white mt-1.5">
-                                  ${mfePrice.toLocaleString('en-US')}
+                                  ${safeFormat(mfePrice)}
                                 </div>
                                 <div className="text-[11px] font-mono font-semibold text-cyan-300 mt-0.5">
-                                  +{mfePts.toFixed(2)} pts ({cleanMfeStr})
+                                  +{safePts(mfePts)} pts ({cleanMfeStr})
                                 </div>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
@@ -860,10 +1459,10 @@ export const TradeReviewModal = ({
                                   </span>
                                 </div>
                                 <div className="font-mono text-sm font-bold text-white mt-1.5">
-                                  ${currentOrExitPrice.toLocaleString('en-US')}
+                                  ${safeFormat(currentOrExitPrice)}
                                 </div>
                                 <div className={`text-[11px] font-mono font-bold mt-0.5 ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                  {isProfit ? '+' : '-'}${Math.abs(pnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({isProfit ? '+' : ''}{returnPct}%)
+                                  {isProfit ? '+' : '-'}${safeMoney(Math.abs(pnl))} ({isProfit ? '+' : ''}${safePts(returnPct)}%)
                                 </div>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
@@ -936,85 +1535,95 @@ export const TradeReviewModal = ({
                   })()}
 
                   {/* Plan vs Execution Table */}
-                  {review.planVsExecution && (
-                    <div className="p-4 rounded-xl bg-[#141822] border border-[#232838] space-y-3">
-                      <div className="flex items-center justify-between pb-1 border-b border-[#232838]">
-                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <Layers className="w-4 h-4 text-cyan-400" /> {isEn ? 'Plan vs Execution Audit' : 'Kế Hoạch vs Thực Thi (Plan vs Execution)'}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          review.planVsExecution.status === 'RULE_FOLLOWED' 
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                            : review.planVsExecution.status === 'PARTIALLY_FOLLOWED'
-                            ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                            : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                        }`}>
-                          {review.planVsExecution.description}
-                        </span>
-                      </div>
+                  {review.planVsExecution && (() => {
+                    const pveAny = review.planVsExecution as any;
+                    const planObj = pveAny?.plan || pveAny?.auditSummary || { entry: `$${safeFormat(entryPrice)}`, stopLoss: 'Not Set', takeProfit: 'Not Set', risk: 'Undefined' };
+                    const actualObj = pveAny?.actual || pveAny?.auditSummary || { entry: `$${safeFormat(effectiveExitPrice)}`, stopLoss: 'Not Set', takeProfit: 'Not Set', risk: 'Undefined' };
+                    const pveStatus = pveAny?.status || 'RULE_FOLLOWED';
+                    const pveDesc = pveAny?.description || pveAny?.disciplineRating || (isEn ? 'Disciplined Execution' : 'Tuân thủ quy trình');
 
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-xs">
-                          <thead>
-                            <tr className="border-b border-[#232838] text-slate-400 text-[11px]">
-                              <th className="py-2 px-3">{isEn ? 'Parameter' : 'Tham số'}</th>
-                              <th className="py-2 px-3 text-cyan-300">{isEn ? 'Planned (Plan)' : 'Kế Hoạch (Plan)'}</th>
-                              <th className="py-2 px-3 text-amber-300">{isEn ? 'Actual' : 'Thực Tế (Actual)'}</th>
-                              <th className="py-2 px-3 text-right">{isEn ? 'Audit Verdict' : 'Đánh Giá Tuân Thủ'}</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-[#232838]/60 font-mono">
-                            <tr>
-                              <td className="py-2 px-3 text-slate-400 font-sans">Entry Price</td>
-                              <td className="py-2 px-3 text-white">{review.planVsExecution.plan.entry}</td>
-                              <td className="py-2 px-3 text-white">{review.planVsExecution.actual.entry}</td>
-                              <td className="py-2 px-3 text-right font-sans text-emerald-400 font-semibold">{isEn ? '✓ Matched' : '✓ Khớp chuẩn'}</td>
-                            </tr>
-                            <tr>
-                              <td className="py-2 px-3 text-slate-400 font-sans">Stop Loss</td>
-                              <td className="py-2 px-3 text-slate-300">{review.planVsExecution.plan.stopLoss}</td>
-                              <td className="py-2 px-3 text-slate-300">{review.planVsExecution.actual.stopLoss}</td>
-                              <td className="py-2 px-3 text-right font-sans">
-                                {review.planVsExecution.actual.stopLoss !== 'Not Set' && review.planVsExecution.actual.stopLoss !== 'Chưa đặt' ? (
-                                  <span className="text-emerald-400 font-semibold">{isEn ? '✓ Set' : '✓ Đã cài đặt'}</span>
-                                ) : (
-                                  <span className="text-rose-400 font-semibold">{isEn ? '✗ Missing SL (Violation)' : '✗ Vi phạm (Thiếu SL)'}</span>
-                                )}
-                              </td>
-                            </tr>
-                            <tr>
-                              <td className="py-2 px-3 text-slate-400 font-sans">Take Profit</td>
-                              <td className="py-2 px-3 text-slate-300">{review.planVsExecution.plan.takeProfit}</td>
-                              <td className="py-2 px-3 text-slate-300">{review.planVsExecution.actual.takeProfit}</td>
-                              <td className="py-2 px-3 text-right font-sans">
-                                {review.planVsExecution.actual.takeProfit !== 'Not Set' && review.planVsExecution.actual.takeProfit !== 'Chưa đặt' ? (
-                                  <span className="text-emerald-400 font-semibold">{isEn ? '✓ Set' : '✓ Đã cài đặt'}</span>
-                                ) : (
-                                  <span className="text-amber-400 font-semibold">{isEn ? '⚠ Floating TP (Discretionary)' : '⚠ Chưa đặt TP cố định'}</span>
-                                )}
-                              </td>
-                            </tr>
-                            <tr>
-                              <td className="py-2 px-3 text-slate-400 font-sans">{isEn ? 'Risk Management' : 'Risk Quản Trị'}</td>
-                              <td className="py-2 px-3 text-slate-300">{review.planVsExecution.plan.risk}</td>
-                              <td className="py-2 px-3 text-slate-300">{review.planVsExecution.actual.risk}</td>
-                              <td className="py-2 px-3 text-right font-sans">
-                                {review.planVsExecution.actual.risk !== 'Undefined' && !review.planVsExecution.actual.risk.includes('Chưa') ? (
-                                  <span className="text-emerald-400 font-semibold">{isEn ? '✓ Controlled' : '✓ Kiểm soát tốt'}</span>
-                                ) : (
-                                  <span className="text-rose-400 font-semibold">{isEn ? '✗ Undefined' : '✗ Không thể xác định'}</span>
-                                )}
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
+                    return (
+                      <div className="p-4 rounded-xl bg-[#141822] border border-[#232838] space-y-3">
+                        <div className="flex items-center justify-between pb-1 border-b border-[#232838]">
+                          <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                            <Layers className="w-4 h-4 text-cyan-400" /> {isEn ? 'Plan vs Execution Audit' : 'Kế Hoạch vs Thực Thi (Plan vs Execution)'}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            pveStatus === 'RULE_FOLLOWED' 
+                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                              : pveStatus === 'PARTIALLY_FOLLOWED'
+                              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                              : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                          }`}>
+                            {pveDesc}
+                          </span>
+                        </div>
 
-                      <div className="text-[10px] text-slate-500 italic pt-1 border-t border-[#232838]">
-                        * {review.planVsExecution.auditNote}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="border-b border-[#232838] text-slate-400 text-[11px]">
+                                <th className="py-2 px-3">{isEn ? 'Parameter' : 'Tham số'}</th>
+                                <th className="py-2 px-3 text-cyan-300">{isEn ? 'Planned (Plan)' : 'Kế Hoạch (Plan)'}</th>
+                                <th className="py-2 px-3 text-amber-300">{isEn ? 'Actual' : 'Thực Tế (Actual)'}</th>
+                                <th className="py-2 px-3 text-right">{isEn ? 'Audit Verdict' : 'Đánh Giá Tuân Thủ'}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#232838]/60 font-mono">
+                              <tr>
+                                <td className="py-2 px-3 text-slate-400 font-sans">Entry Price</td>
+                                <td className="py-2 px-3 text-white">{planObj.entry || `$${safeFormat(entryPrice)}`}</td>
+                                <td className="py-2 px-3 text-white">{actualObj.entry || `$${safeFormat(entryPrice)}`}</td>
+                                <td className="py-2 px-3 text-right font-sans text-emerald-400 font-semibold">{isEn ? '✓ Matched' : '✓ Khớp chuẩn'}</td>
+                              </tr>
+                              <tr>
+                                <td className="py-2 px-3 text-slate-400 font-sans">Stop Loss</td>
+                                <td className="py-2 px-3 text-slate-300">{planObj.stopLoss || 'Not Set'}</td>
+                                <td className="py-2 px-3 text-slate-300">{actualObj.stopLoss || 'Not Set'}</td>
+                                <td className="py-2 px-3 text-right font-sans">
+                                  {actualObj.stopLoss && actualObj.stopLoss !== 'Not Set' && actualObj.stopLoss !== 'Chưa đặt' ? (
+                                    <span className="text-emerald-400 font-semibold">{isEn ? '✓ Set' : '✓ Đã cài đặt'}</span>
+                                  ) : (
+                                    <span className="text-rose-400 font-semibold">{isEn ? '✗ Missing SL (Violation)' : '✗ Vi phạm (Thiếu SL)'}</span>
+                                  )}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="py-2 px-3 text-slate-400 font-sans">Take Profit</td>
+                                <td className="py-2 px-3 text-slate-300">{planObj.takeProfit || 'Not Set'}</td>
+                                <td className="py-2 px-3 text-slate-300">{actualObj.takeProfit || 'Not Set'}</td>
+                                <td className="py-2 px-3 text-right font-sans">
+                                  {actualObj.takeProfit && actualObj.takeProfit !== 'Not Set' && actualObj.takeProfit !== 'Chưa đặt' ? (
+                                    <span className="text-emerald-400 font-semibold">{isEn ? '✓ Set' : '✓ Đã cài đặt'}</span>
+                                  ) : (
+                                    <span className="text-amber-400 font-semibold">{isEn ? '⚠ Floating TP (Discretionary)' : '⚠ Chưa đặt TP cố định'}</span>
+                                  )}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="py-2 px-3 text-slate-400 font-sans">{isEn ? 'Risk Management' : 'Risk Quản Trị'}</td>
+                                <td className="py-2 px-3 text-slate-300">{planObj.risk || 'Undefined'}</td>
+                                <td className="py-2 px-3 text-slate-300">{actualObj.risk || 'Undefined'}</td>
+                                <td className="py-2 px-3 text-right font-sans">
+                                  {actualObj.risk && actualObj.risk !== 'Undefined' && !String(actualObj.risk).includes('Chưa') ? (
+                                    <span className="text-emerald-400 font-semibold">{isEn ? '✓ Controlled' : '✓ Kiểm soát tốt'}</span>
+                                  ) : (
+                                    <span className="text-rose-400 font-semibold">{isEn ? '✗ Undefined' : '✗ Không thể xác định'}</span>
+                                  )}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {review.planVsExecution.auditNote && (
+                          <div className="text-[10px] text-slate-500 italic pt-1 border-t border-[#232838]">
+                            * {review.planVsExecution.auditNote}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
 
@@ -1065,7 +1674,7 @@ export const TradeReviewModal = ({
                             <span className="font-bold text-rose-300 flex items-center gap-1 text-[11px]">
                               <ShieldAlert className="w-3 h-3" /> {isEn ? 'A. Rule Violations:' : 'A. Rule Violations (Vi phạm nguyên tắc):'}
                             </span>
-                            {review.categorizedImprovements.ruleViolations.map((v, i) => (
+                            {review.categorizedImprovements?.ruleViolations?.map((v, i) => (
                               <div key={i} className="text-rose-200 text-[11px] pl-3 flex items-start gap-1">
                                 <span>•</span>
                                 <span>{v}</span>
@@ -1080,7 +1689,7 @@ export const TradeReviewModal = ({
                             <span className="font-bold text-amber-300 flex items-center gap-1 text-[11px]">
                               <AlertCircle className="w-3 h-3" /> {isEn ? 'B. Risk Management Issues:' : 'B. Risk Issues (Vấn đề quản trị rủi ro):'}
                             </span>
-                            {review.categorizedImprovements.riskIssues.map((v, i) => (
+                            {review.categorizedImprovements?.riskIssues?.map((v, i) => (
                               <div key={i} className="text-amber-200 text-[11px] pl-3 flex items-start gap-1">
                                 <span>•</span>
                                 <span>{v}</span>
@@ -1095,7 +1704,7 @@ export const TradeReviewModal = ({
                             <span className="font-bold text-slate-300 flex items-center gap-1 text-[11px]">
                               <Activity className="w-3 h-3 text-cyan-400" /> {isEn ? 'C. Execution Issues:' : 'C. Execution Issues (Vấn đề thực thi):'}
                             </span>
-                            {review.categorizedImprovements.executionIssues.map((v, i) => (
+                            {review.categorizedImprovements?.executionIssues?.map((v, i) => (
                               <div key={i} className="text-slate-300 text-[11px] pl-3 flex items-start gap-1">
                                 <span>•</span>
                                 <span>{v}</span>
@@ -1110,7 +1719,7 @@ export const TradeReviewModal = ({
                             <span className="font-bold text-slate-300 flex items-center gap-1 text-[11px]">
                               <Compass className="w-3 h-3 text-indigo-400" /> {isEn ? 'D. Strategy Fit Issues:' : 'D. Strategy Issues (Vấn đề chiến lược):'}
                             </span>
-                            {review.categorizedImprovements.strategyIssues.map((v, i) => (
+                            {review.categorizedImprovements?.strategyIssues?.map((v, i) => (
                               <div key={i} className="text-slate-300 text-[11px] pl-3 flex items-start gap-1">
                                 <span>•</span>
                                 <span>{v}</span>
@@ -1130,7 +1739,7 @@ export const TradeReviewModal = ({
                         {isEn ? 'Student Learning Takeaways' : 'Bài Học Đúc Kết Cho Sinh Viên (Learning Takeaways)'}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        {review.learningTakeaways.map((takeaway, idx) => (
+                        {review.learningTakeaways?.map((takeaway, idx) => (
                           <div key={idx} className="p-2.5 rounded-lg bg-[#191f2d] border border-[#262e42] flex items-start gap-2.5">
                             <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">
                               {idx + 1}
@@ -1162,7 +1771,7 @@ export const TradeReviewModal = ({
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {review.sources.map((s, idx) => {
+                    {review.sources?.map((s, idx) => {
                       const hasLink = s.sourceUrl && s.sourceUrl !== '#' && s.sourceUrl.startsWith('http');
                       const isYouTube = hasLink && (s.sourceUrl.includes('youtube.com') || s.sourceUrl.includes('youtu.be'));
                       return (
@@ -1216,8 +1825,6 @@ export const TradeReviewModal = ({
                 </div>
               )}
             </>
-          ) : (
-            <div className="py-16 text-center text-slate-400">{isEn ? 'No review data available for this trade' : 'Không có dữ liệu phân tích lệnh này'}</div>
           )}
         </div>
       </div>

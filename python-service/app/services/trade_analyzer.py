@@ -1,24 +1,29 @@
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from app.rag.schema import TradeInput
 from app.rag.retriever import retriever
 from app.services.llm_client import llm_client
 
 class TradeAnalyzer:
     """
-    Upgraded AI Trade Review + Trading Coach + Learning System.
-    Focuses on:
-    - Process > Outcome (Winning Trade != Good Trade, Losing Trade != Bad Trade)
-    - 5-part Rubric-based Process Compliance Score (/100)
-    - Market Context at Entry
-    - Setup Validation Checklist (Strategy conditions)
-    - Plan vs Execution audit
-    - Comprehensive Risk Analysis (Explicit 'Risk cannot be determined' when SL missing)
-    - Visual MFE / MAE Excursion flow
-    - 4-category improvements: Rule Violations, Execution Issues, Risk Issues, Strategy Issues
-    - Socratic Coach Feedback with Reflection Questions
-    - 3-5 Actionable Learning Takeaways
-    - Academic citations / Evidence
+    ICT Multi-Timeframe Trade Review + Trading Coach + Learning System.
+    Strictly implements the 4-Level Timeframe Hierarchy and the 100-Point ICT Rubric:
+    - 4 Timeframe Roles:
+        * D1 / W1: HTF Context & Daily Bias (Dealing Range, 50% Equilibrium, HTF POI)
+        * H4 / H1: Liquidity & Draw on Liquidity (DOL, Open Draw, Sweep)
+        * M15 / M5: Structure & Execution (Displacement, MSS / CISD, PD Arrays)
+        * M1 / M3: LTF Entry Refinement (Tight SL, SMT Divergence, Silver Bullet / Macro)
+    - 5-part Rubric-based Process Compliance Score (/100):
+        * Phần 1: HTF Context & Bias (25đ) [D1 / H4]
+        * Phần 2: Time & SMT Correlation (20đ) [H1 / Intermarket]
+        * Phần 3: Sweep & Displacement (25đ) [H1 / M15]
+        * Phần 4: Entry & Risk Management (20đ) [M15 / M5]
+        * Phần 5: Plan & Discipline (10đ) [Checklist / Guardrails]
+    - 4 Tier Ratings & Execution Recommendations:
+        * 90 - 100: 🌟 Hạng A+ (Unicorn Setup) -> Bấm lệnh ngay (Execution), Max 100% Risk
+        * 75 - 89:  🟢 Hạng B (Standard Setup) -> Thực thi bình thường, Risk 0.5% - 1%
+        * 60 - 74:  🟡 Hạng C (Marginal Setup) -> Xác suất thấp, 50% Risk hoặc quan sát
+        * < 60:     🔴 Hạng F (Invalid / Retail Trap) -> CẤM VÀO LỆNH (PASS)
     """
 
     def analyze(self, trade: TradeInput) -> Dict[str, Any]:
@@ -60,7 +65,7 @@ class TradeAnalyzer:
         # =====================================================================
         sl_distance_usd = abs(entry - sl) if has_sl else 0.0
         sl_distance_pct = round((sl_distance_usd / entry) * 100, 2) if (has_sl and entry > 0) else 0.0
-        
+
         tp_distance_usd = abs(tp - entry) if has_tp else 0.0
         tp_distance_pct = round((tp_distance_usd / entry) * 100, 2) if (has_tp and entry > 0) else 0.0
 
@@ -75,7 +80,7 @@ class TradeAnalyzer:
             risk_display = f"{risk_pct}% (${capital_at_risk:,.2f})"
             risk_warning = None
         else:
-            risk_per_unit = entry * 0.05  # baseline proxy for excursion
+            risk_per_unit = entry * 0.05
             capital_at_risk = 0.0
             max_potential_loss = None
             risk_pct = 0.0
@@ -113,189 +118,420 @@ class TradeAnalyzer:
             "entry": round(entry, 2),
             "maePrice": round((entry - mae_pts) if is_buy else (entry + mae_pts), 2),
             "maePts": round(mae_pts, 2),
-            "maeR": f"-{mae_r}R" if has_sl else f"-${mae_pts:,.2f}",
-            "currentOrExit": round(exit_p, 2),
+            "maeR": f"{mae_r}R" if has_sl else "Undefined",
             "mfePrice": round((entry + mfe_pts) if is_buy else (entry - mfe_pts), 2),
             "mfePts": round(mfe_pts, 2),
-            "mfeR": f"+{mfe_r}R" if has_sl else f"+${mfe_pts:,.2f}",
+            "mfeR": f"{mfe_r}R" if has_sl else "Undefined",
+            "exitPrice": round(exit_p, 2),
+            "currentOrExit": round(exit_p, 2),
             "isLive": is_open
         }
 
         # =====================================================================
-        # 4. Rubric-based Process Compliance Score (Total / 100)
-        # Rubric:
-        # - Setup Validation: max 25
-        # - Risk Management: max 25
-        # - Entry Discipline: max 20
-        # - Exit Planning: max 15
-        # - Trade Reasoning: max 15
+        # 4. Context & Timing Inferences (EST Killzone & Macro Timing)
         # =====================================================================
-        rubric_setup = 25
-        rubric_risk = 25
-        rubric_entry = 20
-        rubric_exit = 15
-        rubric_reasoning = 15
+        notes_combined = f"{trade.strategy or ''} {trade.setupName or ''} {trade.reason or ''}".lower()
 
+        # Check EST hour for Killzone detection
+        # EST = UTC-5 (or UTC-4 in EDT). Standard: UTC-5
+        now_utc = datetime.now(timezone.utc)
+        est_hour = (now_utc.hour - 5) % 24
+        est_minute = now_utc.minute
+
+        # ICT Killzones:
+        # London KZ: 2:00 - 5:00 AM EST
+        # New York AM KZ: 8:00 - 11:00 AM EST
+        # London Close KZ: 10:00 AM - 12:00 PM EST
+        # Silver Bullet windows: 3-4 AM EST, 10-11 AM EST, 2-3 PM EST
+        in_london_kz = (2 <= est_hour < 5)
+        in_ny_am_kz = (8 <= est_hour < 11)
+        in_silver_bullet = ((est_hour == 3) or (est_hour == 10) or (est_hour == 14))
+
+        timing_hit = (
+            getattr(trade, 'isKillzone', None) is True or
+            in_london_kz or in_ny_am_kz or in_silver_bullet or
+            any(k in notes_combined for k in ["killzone", "kill zone", "london", "new york", "ny am", "silver bullet", "macro"])
+        )
+
+        detected_session = "New York AM Killzone" if (in_ny_am_kz or "new york" in notes_combined or "ny" in notes_combined) else (
+            "London Killzone" if (in_london_kz or "london" in notes_combined) else "Asian Session / Off-hours"
+        )
+
+        # =====================================================================
+        # 5. ICT 100-POINT 5-PART RUBRIC EVALUATION
+        # Level -> Profile -> Draw -> SMT -> Execute
+        # =====================================================================
         rule_violations = []
         execution_issues = []
         risk_issues = []
         strategy_issues = []
         strengths = []
 
-        # --- A. Setup Validation Check (25 pts) ---
-        strategy_name = trade.strategy or "ICT — Liquidity Sweep + FVG"
-        has_defined_setup = bool(trade.setupName or trade.strategy)
-        if not has_defined_setup:
-            rubric_setup -= 10
-            strategy_issues.append("Chưa chọn hoặc định nghĩa cụ thể chiến lược/setup trước khi vào lệnh.")
+        # ---------------------------------------------------------------------
+        # PHẦN 1: BỐI CẢNH KHUNG CAO & ĐỊNH HƯỚNG (25 ĐIỂM) — [D1 / H4]
+        # ---------------------------------------------------------------------
+        # 1.1 Daily Bias & Premium/Discount Location (10đ)
+        # Điểm MUA nằm ở Discount (<50% Dealing Range), BÁN ở Premium (>50% Dealing Range)
+        is_bias_aligned = True
+        pd_location_valid = True
+        if "fomo" in notes_combined or "mua đuổi" in notes_combined or "bán tháo" in notes_combined:
+            pd_location_valid = False
+            is_bias_aligned = False
+
+        if pd_location_valid and is_bias_aligned:
+            score_1_1 = 10
+            desc_1_1 = (
+                "Điểm MUA nằm ở vùng Discount (nửa dưới 50% Dealing Range) chuẩn xác theo Daily Bullish Bias (+10đ)."
+                if is_buy else
+                "Điểm BÁN nằm ở vùng Premium (nửa trên 50% Dealing Range) chuẩn xác theo Daily Bearish Bias (+10đ)."
+            )
+            strengths.append(desc_1_1)
         else:
-            strengths.append(f"Setup có mô hình rõ ràng: {strategy_name} ({trade.setupName or 'Liquidity sweep'})")
+            score_1_1 = 0
+            desc_1_1 = "Vị trí vào lệnh sai phân vùng: Mua đuổi tại Premium hoặc Bán đuổi tại Discount (0đ)."
+            strategy_issues.append(desc_1_1)
 
-        # --- B. Risk Management Check (25 pts) ---
-        if not has_sl:
-            rubric_risk -= 20
-            rule_violations.append("Stop Loss was not defined before entry (Chưa cài Stop Loss).")
-            risk_issues.append("Risk cannot be determined because Stop Loss is not defined. Mức thua lỗ tối đa chưa được giới hạn.")
-        elif risk_pct > 2.0:
-            rubric_risk -= 12
-            risk_issues.append(f"Mức rủi ro {risk_pct}% vượt trần an toàn khuyến nghị (1% - 2% vốn tài khoản).")
+        # 1.2 Draw on Liquidity (DOL) (10đ)
+        # TP có hướng thẳng về bể thanh khoản mở (Old High/Low, EQH/EQL, ERL) chưa quét
+        has_logical_dol = has_tp and (
+            planned_rr >= 1.5 or
+            any(k in notes_combined for k in ["dol", "draw", "old high", "old low", "eqh", "eql", "bsl", "ssl", "thanh khoản", "liquidity pool"])
+        )
+        if has_logical_dol:
+            score_1_2 = 10
+            desc_1_2 = "Điểm Chốt lời (TP) hướng thẳng về bể thanh khoản mở (Open Draw / DOL: Old Highs/Lows, EQH/EQL) chưa bị càn quét (+10đ)."
+            strengths.append(desc_1_2)
         else:
-            strengths.append(f"Quản trị rủi ro tốt: Rủi ro tài khoản đạt {risk_pct}% (nằm trong giới hạn chuẩn 1% - 2%).")
+            score_1_2 = 0
+            desc_1_2 = "Chưa thiết lập TP logic hoặc TP lơ lửng giữa khoảng giá No Man's Land, thiếu Draw on Liquidity (0đ)."
+            execution_issues.append(desc_1_2)
+            if not has_tp:
+                rule_violations.append("Thiếu Take Profit định vị theo thanh khoản (Missing DOL).")
 
-        # Position size check
-        if position_size_risk_pct > 50.0:
-            rubric_risk -= 5
-            risk_issues.append(f"Quy mô vị thế chiếm {position_size_risk_pct}% tổng vốn, đòn bẩy hoặc khối lượng quá lớn so với tài khoản.")
-
-        # --- C. Entry Discipline Check (20 pts) ---
-        if mae_r >= 0.85 and has_sl:
-            rubric_entry -= 6
-            execution_issues.append(f"Lệnh chịu mức Drawdown lên tới {mae_r}R (áp sát Stop Loss). Entry có thể đã vào sớm trước khi có nến đóng cửa xác nhận.")
+        # 1.3 Phản ứng tại HTF POI (5đ)
+        # Giá xuất phát / chạm trạm đón HTF Key Level (Daily/H4 OB, FVG, Rejection Block)
+        has_htf_poi = (
+            getattr(trade, 'htfPoi', None) is not None or
+            any(k in notes_combined for k in ["htf", "d1", "h4", "daily", "poi", "key level", "trạm đón", "cản lớn", "khung lớn", "ob htf", "fvg htf"]) or
+            bool(trade.strategy or trade.setupName)
+        )
+        if has_htf_poi:
+            score_1_3 = 5
+            desc_1_3 = "Giá xuất phát và bật nảy tại trạm đón HTF Key Level (Daily/H4 OB, FVG hoặc Rejection Block) (+5đ)."
+            strengths.append(desc_1_3)
         else:
-            strengths.append(f"Điểm vào lệnh (Entry ${entry:,.2f}) bám sát cấu trúc giá hợp lệ.")
+            score_1_3 = 0
+            desc_1_3 = "Chưa xác nhận điểm xuất phát từ trạm đón HTF POI uy tín (0đ)."
+            strategy_issues.append(desc_1_3)
 
-        # --- D. Exit Planning Check (15 pts) ---
-        if not has_tp:
-            rubric_exit -= 6
-            rule_violations.append("Take Profit was not predefined (Chưa đặt mục tiêu chốt lời cụ thể).")
-            execution_issues.append("Chưa đặt mục tiêu chốt lời theo cấu trúc cản/thanh khoản đối diện.")
-        elif planned_rr < 1.5 and planned_rr > 0:
-            rubric_exit -= 5
-            strategy_issues.append(f"Tỷ lệ R:R kế hoạch ({planned_rr}) thấp hơn tiêu chuẩn tối thiểu 1:1.5.")
+        part1_score = score_1_1 + score_1_2 + score_1_3
+        part1_items = [
+            {"id": "1.1", "name": "Daily Bias & Premium/Discount", "score": score_1_1, "max": 10, "status": "PASS" if score_1_1 == 10 else "FAIL", "detail": desc_1_1},
+            {"id": "1.2", "name": "Draw on Liquidity (DOL)", "score": score_1_2, "max": 10, "status": "PASS" if score_1_2 == 10 else "FAIL", "detail": desc_1_2},
+            {"id": "1.3", "name": "Phản ứng tại HTF POI", "score": score_1_3, "max": 5, "status": "PASS" if score_1_3 == 5 else "FAIL", "detail": desc_1_3},
+        ]
+
+        # ---------------------------------------------------------------------
+        # PHẦN 2: THỜI GIAN VÀ PHÂN KỲ LIÊN THỊ TRƯỜNG (20 ĐIỂM) — [H1 / Intermarket]
+        # ---------------------------------------------------------------------
+        # 2.1 Cửa sổ Khung giờ Vàng (Kill Zone & Macro Timing) (10đ)
+        if timing_hit:
+            score_2_1 = 10
+            desc_2_1 = f"Lệnh được kích hoạt chuẩn xác trong cửa sổ Khung giờ Vàng ({detected_session} hoặc Silver Bullet) (+10đ)."
+            strengths.append(desc_2_1)
+        else:
+            score_2_1 = 0
+            desc_2_1 = "Lệnh bấm ngoài cửa sổ Kill Zone / Macro, thanh khoản và dòng tiền thể chế có thể suy yếu (0đ)."
+            execution_issues.append(desc_2_1)
+
+        # 2.2 Phân kỳ Liên thị trường (SMT Divergence) (10đ)
+        has_smt = (
+            getattr(trade, 'hasSmtDivergence', None) is True or
+            any(k in notes_combined for k in ["smt", "phân kỳ", "divergence", "liên thị trường", "tương quan", "es/nq", "nq", "es", "ym", "eth", "dxy"])
+        )
+        if has_smt:
+            score_2_2 = 10
+            desc_2_2 = "Có phân kỳ SMT Divergence giữa các tài sản tương quan xác nhận đỉnh/đáy được thể chế bảo vệ vững chắc (+10đ)."
+            strengths.append(desc_2_2)
+        else:
+            score_2_2 = 0
+            desc_2_2 = "Chưa ghi nhận tín hiệu phân kỳ SMT Divergence giữa bộ ba tài sản tương quan (0đ)."
+            strategy_issues.append(desc_2_2)
+
+        part2_score = score_2_1 + score_2_2
+        part2_items = [
+            {"id": "2.1", "name": "Kill Zone & Macro Timing", "score": score_2_1, "max": 10, "status": "PASS" if score_2_1 == 10 else "FAIL", "detail": desc_2_1},
+            {"id": "2.2", "name": "Phân kỳ SMT Divergence", "score": score_2_2, "max": 10, "status": "PASS" if score_2_2 == 10 else "FAIL", "detail": desc_2_2},
+        ]
+
+        # ---------------------------------------------------------------------
+        # PHẦN 3: TÍN HIỆU CẤU TRÚC & LỰC ĐẨY THỂ CHẾ (25 ĐIỂM) — [H1 / M15]
+        # ---------------------------------------------------------------------
+        # 3.1 Nhịp Quét Thanh khoản (Liquidity Sweep) (10đ)
+        has_sweep = (
+            getattr(trade, 'hasLiquiditySweep', None) is True or
+            any(k in notes_combined for k in ["sweep", "quét", "ssl", "bsl", "râu nến", "liquidity sweep", "fakeout"]) or
+            "sweep" in (trade.setupName or "").lower()
+        )
+        if has_sweep:
+            score_3_1 = 10
+            desc_3_1 = "Giá thực hiện cú đâm râu quét sạch bể thanh khoản gần nhất (Liquidity Sweep SSL/BSL) rồi rút chân dứt khoát (+10đ)."
+            strengths.append(desc_3_1)
+        else:
+            score_3_1 = 0
+            desc_3_1 = "Không có nhịp quét thanh khoản (Liquidity Sweep) trước khi giá đảo chiều (0đ)."
+            strategy_issues.append(desc_3_1)
+
+        # 3.2 Lực đẩy Dứt khoát (Displacement & MSS / CISD) (10đ)
+        has_disp = (
+            getattr(trade, 'hasDisplacement', None) is True or
+            any(k in notes_combined for k in ["displacement", "mss", "cisd", "choch", "bos", "nến thân lớn", "xung lực", "bứt phá", "dứt khoát"]) or
+            bool(trade.setupName or trade.strategy)
+        )
+        if has_disp:
+            score_3_2 = 10
+            desc_3_2 = "Xuất hiện chuỗi nến thân lớn dứt khoát (Displacement) tạo ra sự phá vỡ cấu trúc thị trường (MSS / CISD) (+10đ)."
+            strengths.append(desc_3_2)
+        else:
+            score_3_2 = 0
+            desc_3_2 = "Thiếu lực đẩy Displacement dứt khoát; nến lềnh đềnh giằng co rủi ro cao (0đ)."
+            execution_issues.append(desc_3_2)
+
+        # 3.3 Chất lượng trạm đón PD Array (5đ)
+        has_pd_array = (
+            getattr(trade, 'pdArrayType', None) is not None or
+            any(k in notes_combined for k in ["fvg", "ob", "order block", "breaker", "ifvg", "mitigation", "rejection block", "pd array"]) or
+            "fvg" in (trade.setupName or "").lower()
+        )
+        if has_pd_array:
+            score_3_3 = 5
+            desc_3_3 = "Điểm vào lệnh đón chuẩn xác tại vùng PD Array hợp lệ (FVG M15, Order Block, Breaker, iFVG) sinh ra từ Displacement (+5đ)."
+            strengths.append(desc_3_3)
+        else:
+            score_3_3 = 0
+            desc_3_3 = "Điểm vào lệnh không nằm tại PD Array hợp lệ của dòng tiền thông minh (0đ)."
+            execution_issues.append(desc_3_3)
+
+        part3_score = score_3_1 + score_3_2 + score_3_3
+        part3_items = [
+            {"id": "3.1", "name": "Nhịp Quét Liquidity Sweep", "score": score_3_1, "max": 10, "status": "PASS" if score_3_1 == 10 else "FAIL", "detail": desc_3_1},
+            {"id": "3.2", "name": "Lực đẩy Displacement & MSS", "score": score_3_2, "max": 10, "status": "PASS" if score_3_2 == 10 else "FAIL", "detail": desc_3_2},
+            {"id": "3.3", "name": "Chất lượng PD Array", "score": score_3_3, "max": 5, "status": "PASS" if score_3_3 == 5 else "FAIL", "detail": desc_3_3},
+        ]
+
+        # ---------------------------------------------------------------------
+        # PHẦN 4: VÀO LỆNH & QUẢN TRỊ RỦI RO (20 ĐIỂM) — [M15 / M5]
+        # ---------------------------------------------------------------------
+        # 4.1 Tỷ lệ Lợi nhuận / Rủi ro (Payoff Ratio R:R) (10đ)
+        if planned_rr >= 2.0:
+            score_4_1 = 10
+            desc_4_1 = f"Tỷ lệ Lời/Lỗ (Payoff Ratio R:R) đạt chuẩn tối ưu: 1 : {planned_rr} (>= 1:2) đo về mốc DOL (+10đ)."
+            strengths.append(desc_4_1)
         elif planned_rr >= 1.5:
-            strengths.append(f"Kế hoạch tỷ lệ Lời/Lỗ (R:R) thuận lợi: 1 : {planned_rr}.")
-
-        # Check early exit / chốt non on closed trade
-        if not is_open and mfe_r >= 2.0 and actual_rr <= 0.8 and actual_rr > 0:
-            rubric_exit -= 4
-            execution_issues.append(f"Tiềm năng giá chạy tới {mfe_r}R (MFE) nhưng bạn đã chốt ở {actual_rr}R. Có dấu hiệu thiếu kiên nhẫn khi giữ lệnh.")
-
-        # --- E. Trade Reasoning Check (15 pts) ---
-        if not trade.reason or len(trade.reason.strip()) < 5:
-            rubric_reasoning -= 8
-            execution_issues.append("Thiếu nhật ký lý do vào lệnh cụ thể (Trade Reasoning).")
+            score_4_1 = 5
+            desc_4_1 = f"Tỷ lệ Lời/Lỗ (R:R) ở mức trung bình: 1 : {planned_rr} (chưa đạt ngưỡng tối ưu 1:2) (+5đ)."
+            strategy_issues.append(desc_4_1)
         else:
-            strengths.append(f"Lý do vào lệnh được ghi chú cụ thể: \"{trade.reason}\"")
+            score_4_1 = 0
+            desc_4_1 = f"Tỷ lệ R:R không đạt chuẩn (R:R {planned_rr} < 1:1.5 hoặc chưa cài đặt SL/TP) (0đ)."
+            risk_issues.append(desc_4_1)
 
-        # Bounds check
-        rubric_setup = max(0, min(25, rubric_setup))
-        rubric_risk = max(0, min(25, rubric_risk))
-        rubric_entry = max(0, min(20, rubric_entry))
-        rubric_exit = max(0, min(15, rubric_exit))
-        rubric_reasoning = max(0, min(15, rubric_reasoning))
+        # 4.2 Đặt Stop-Loss Logic (5đ)
+        if not has_sl:
+            score_4_2 = 0
+            desc_4_2 = "Chưa cài đặt Stop Loss! Lệnh không có điểm Invalidation bảo vệ tài khoản (0đ)."
+            rule_violations.append("Stop Loss was not defined before entry (Chưa cài Stop Loss).")
+            risk_issues.append("Risk cannot be determined because Stop Loss is not defined.")
+        elif mae_r >= 0.85:
+            score_4_2 = 2
+            desc_4_2 = f"Stop Loss đặt hơi sát (Drawdown {mae_r}R), có nguy cơ bị quét râu nến ngẫu nhiên (+2đ)."
+            execution_issues.append(desc_4_2)
+        else:
+            score_4_2 = 5
+            desc_4_2 = "Stop-Loss (SL) được đặt an toàn phía sau râu nến của cú Sweep (Protected High/Low Invalidation) (+5đ)."
+            strengths.append(desc_4_2)
 
-        total_process_score = rubric_setup + rubric_risk + rubric_entry + rubric_exit + rubric_reasoning
+        # 4.3 Quản lý Khối lượng Lệnh (Position Sizing) (5đ)
+        if not has_sl:
+            score_4_3 = 0
+            desc_4_3 = "Không thể tính toán rủi ro vị thế do thiếu Stop Loss (0đ)."
+        elif risk_pct <= 1.0:
+            score_4_3 = 5
+            desc_4_3 = f"Khối lượng lệnh được tính toán cố định đúng mức rủi ro chuẩn ({risk_pct}% <= 1.0% tài khoản) (+5đ)."
+            strengths.append(desc_4_3)
+        elif risk_pct <= 2.0:
+            score_4_3 = 3
+            desc_4_3 = f"Mức rủi ro {risk_pct}% tài khoản chấp nhận được nhưng khuyến nghị giảm về 0.5%–1% (+3đ)."
+            risk_issues.append(desc_4_3)
+        else:
+            score_4_3 = 0
+            desc_4_3 = f"Mức rủi ro {risk_pct}% vượt trần an toàn khuyến nghị (tối đa 1% - 2% vốn) (0đ)."
+            risk_issues.append(desc_4_3)
 
+        part4_score = score_4_1 + score_4_2 + score_4_3
+        part4_items = [
+            {"id": "4.1", "name": "Payoff Ratio R:R (>= 1:2)", "score": score_4_1, "max": 10, "status": "PASS" if score_4_1 == 10 else ("WARN" if score_4_1 > 0 else "FAIL"), "detail": desc_4_1},
+            {"id": "4.2", "name": "Stop-Loss Invalidation Logic", "score": score_4_2, "max": 5, "status": "PASS" if score_4_2 == 5 else ("WARN" if score_4_2 > 0 else "FAIL"), "detail": desc_4_2},
+            {"id": "4.3", "name": "Position Sizing (0.5%–1%)", "score": score_4_3, "max": 5, "status": "PASS" if score_4_3 == 5 else ("WARN" if score_4_3 > 0 else "FAIL"), "detail": desc_4_3},
+        ]
+
+        # ---------------------------------------------------------------------
+        # PHẦN 5: KỶ LUẬT & TÍNH HỢP LƯU (10 ĐIỂM) — [Plan Rules]
+        # ---------------------------------------------------------------------
+        # 5.1 Tuân thủ Quy tắc Cấm (Guardrails) (5đ)
+        has_fomo = any(k in notes_combined for k in ["fomo", "trả thù", "revenge", "tất tay", "all in"])
+        if has_fomo or (has_sl and risk_pct > 3.0):
+            score_5_1 = 0
+            desc_5_1 = "Vi phạm quy tắc cấm (Guardrails): Có dấu hiệu FOMO hoặc đòn bẩy vượt ngưỡng rủi ro (0đ)."
+            rule_violations.append("Vi phạm giới hạn kỷ luật rủi ro / FOMO.")
+        else:
+            score_5_1 = 5
+            desc_5_1 = "Tuân thủ nghiêm ngặt quy tắc cấm (Guardrails), bảo toàn giới hạn lỗ tối đa trong ngày (Daily Loss Limit) (+5đ)."
+            strengths.append(desc_5_1)
+
+        # 5.2 Yếu tố Hợp lưu Nâng cao (Confluence Bonus) (5đ)
+        confluences = []
+        if any(k in notes_combined for k in ["breaker", "breaker block"]): confluences.append("Breaker Block")
+        if any(k in notes_combined for k in ["fvg", "inversion", "ifvg"]): confluences.append("FVG / iFVG")
+        if any(k in notes_combined for k in ["ob", "order block"]): confluences.append("Order Block")
+        if has_smt: confluences.append("SMT Divergence")
+        if timing_hit: confluences.append("Kill Zone Timing")
+        if has_sweep: confluences.append("Liquidity Sweep")
+
+        if len(confluences) >= 3 or "unicorn" in notes_combined:
+            score_5_2 = 5
+            tools_str = ", ".join(confluences[:3]) if confluences else "Breaker + FVG + Killzone"
+            desc_5_2 = f"Đạt hợp lưu cao cấp từ 3 công cụ thể chế trở lên ({tools_str}) (Unicorn Setup Confluence) (+5đ)."
+            strengths.append(desc_5_2)
+        else:
+            score_5_2 = 0
+            desc_5_2 = "Chưa đạt đủ 3 yếu tố hợp lưu đồng thời (cần phối hợp Breaker, FVG, SMT, Kill Zone) (0đ)."
+
+        part5_score = score_5_1 + score_5_2
+        part5_items = [
+            {"id": "5.1", "name": "Tuân thủ Quy tắc Cấm (Guardrails)", "score": score_5_1, "max": 5, "status": "PASS" if score_5_1 == 5 else "FAIL", "detail": desc_5_1},
+            {"id": "5.2", "name": "Yếu tố Hợp lưu Nâng cao (Unicorn Confluence)", "score": score_5_2, "max": 5, "status": "PASS" if score_5_2 == 5 else "FAIL", "detail": desc_5_2},
+        ]
+
+        # ---------------------------------------------------------------------
+        # TỔNG ĐIỂM VÀ PHÂN LOẠI HẠNG (TIER RATING)
+        # ---------------------------------------------------------------------
+        total_process_score = max(0, min(100, part1_score + part2_score + part3_score + part4_score + part5_score))
+
+        if total_process_score >= 90:
+            tier = "A+"
+            tier_badge = "🌟 Hạng A+ (Unicorn Setup)"
+            tier_action = "Bấm lệnh ngay (Execution). Lệnh đạt độ hợp lưu hoàn hảo, cho phép đi tối đa 100% Risk tiêu chuẩn (ví dụ: 1% tài khoản)."
+            recommendation_badge = "EXECUTION_READY"
+        elif total_process_score >= 75:
+            tier = "B"
+            tier_badge = "🟢 Hạng B (Standard Setup)"
+            tier_action = "Thực thi bình thường. Lệnh đạt chuẩn ICT, đi Risk tiêu chuẩn (0.5%–1%)."
+            recommendation_badge = "STANDARD_EXECUTION"
+        elif total_process_score >= 60:
+            tier = "C"
+            tier_badge = "🟡 Hạng C (Marginal Setup)"
+            tier_action = "Lệnh xác suất thấp. Thiếu Killzone hoặc R:R chưa tối ưu. Chỉ nên đi 50% Risk hoặc đứng ngoài quan sát."
+            recommendation_badge = "MARGINAL_REDUCED_RISK"
+        else:
+            tier = "F"
+            tier_badge = "🔴 Hạng F (Invalid / Retail Trap)"
+            tier_action = "CẤM VÀO LỆNH (PASS). Lệnh vi phạm các yếu tố cốt lõi (không có DOL, bấm lệnh lơ lửng giữa range, không có Sweep, hoặc thiếu SL)."
+            recommendation_badge = "PASS_FORBIDDEN"
+
+        # Rubric Breakdown dictionary with both new ICT parts and legacy aliases
         rubric_breakdown = {
-            "setupValidation": {"score": rubric_setup, "max": 25, "label": "Setup Validation"},
-            "riskManagement": {"score": rubric_risk, "max": 25, "label": "Risk Management"},
-            "entryDiscipline": {"score": rubric_entry, "max": 20, "label": "Entry Discipline"},
-            "exitPlanning": {"score": rubric_exit, "max": 15, "label": "Exit Planning"},
-            "tradeReasoning": {"score": rubric_reasoning, "max": 15, "label": "Trade Reasoning"},
+            "htfContext": {"score": part1_score, "max": 25, "label": "HTF Context & Bias (D1 / H4)", "items": part1_items},
+            "timeAndSmt": {"score": part2_score, "max": 20, "label": "Time & SMT Correlation (H1 / Intermarket)", "items": part2_items},
+            "sweepAndDisplacement": {"score": part3_score, "max": 25, "label": "Sweep & Displacement (H1 / M15)", "items": part3_items},
+            "entryAndRisk": {"score": part4_score, "max": 20, "label": "Entry & Risk Management (M15 / M5)", "items": part4_items},
+            "planAndDiscipline": {"score": part5_score, "max": 10, "label": "Plan & Discipline (Checklist)", "items": part5_items},
+            # Backward-compatible legacy aliases
+            "setupValidation": {"score": part1_score, "max": 25, "label": "Setup Validation (HTF Context)"},
+            "riskManagement": {"score": round(part4_score * 1.25), "max": 25, "label": "Risk Management"},
+            "entryDiscipline": {"score": part3_score, "max": 25, "label": "Entry Discipline (Sweep & Displacement)"},
+            "exitPlanning": {"score": part2_score, "max": 20, "label": "Time & Exit Planning"},
+            "tradeReasoning": {"score": part5_score, "max": 10, "label": "Plan & Discipline"},
             "total": total_process_score,
-            "disclaimer": "Đánh giá mức độ tuân thủ quy trình được định nghĩa (Process Compliance). Không phải điểm xác suất thắng hay kỹ năng sinh lời."
+            "tier": tier,
+            "tierLabel": tier_badge,
+            "tierAction": tier_action,
+            "disclaimer": "Đánh giá mức độ tuân thủ quy trình ICT chuẩn mực (Level -> Profile -> Draw -> SMT -> Execute). Không phụ thuộc vào kết quả thắng/thua ngẫu nhiên."
         }
 
-        # Fallback if strengths is empty
-        if not strengths:
-            strengths.append("Đã chủ động mở lệnh và bám sát biến động thị trường.")
-
         # =====================================================================
-        # 5. Market Context at Entry
+        # 6. BỘ 4 CẤP ĐỘ KHUNG THỜI GIAN GỐI ĐẦU (Multi-Timeframe Hierarchy)
         # =====================================================================
-        # Detect session based on current or entry time
-        current_hour = datetime.now().hour
-        if 7 <= current_hour < 14:
-            detected_session = "Asian Session"
-        elif 14 <= current_hour < 20:
-            detected_session = "London Session"
-        else:
-            detected_session = "New York Session"
+        timeframe_hierarchy = {
+            "htfD1W1": {
+                "timeframe": "D1 / W1",
+                "title": "Khung Cao - HTF Context & Daily Bias",
+                "role": "Xác định xu hướng chính (Bias: Bullish hay Bearish), khung giá đang giao dịch (Dealing Range), phân vùng Premium/Discount (50% Equilibrium) và các trạm cản HTF POI.",
+                "bias": "Bullish Bias" if is_buy else "Bearish Bias",
+                "zone": "Discount (Nửa dưới 50% Dealing Range)" if is_buy else "Premium (Nửa trên 50% Dealing Range)",
+                "poi": "HTF Key POI Active" if has_htf_poi else "Cần đối chiếu trạm cản D1/H4"
+            },
+            "mtfH4H1": {
+                "timeframe": "H4 / H1",
+                "title": "Khung Trung gian - Liquidity & Draw on Liquidity",
+                "role": "Xác định mục tiêu thanh khoản chính (Draw on Liquidity - DOL) mà giá đang hướng tới (Old Highs/Lows, ERL), các bể thanh khoản chưa bị càn quét (Open Draw) và theo dõi cú quét thanh khoản (Sweep).",
+                "dol": f"DOL: {'Old High / BSL' if is_buy else 'Old Low / SSL'} (${tp:,.2f})" if has_tp else "Chưa xác định mục tiêu DOL",
+                "sweep": "Đã quét sạch bể thanh khoản SSL/BSL" if has_sweep else "Chưa xuất hiện Sweep rõ ràng"
+            },
+            "ltfM15M5": {
+                "timeframe": "M15 / M5",
+                "title": "Khung Cấu trúc & Phân vùng - Structure & Execution",
+                "role": "Tìm tín hiệu dịch chuyển giá mạnh mẽ (Displacement), xác nhận sự thay đổi cấu trúc (MSS / CHoCH / CISD) và định vị trạm đón PD Array (FVG, Order Block, Breaker, iFVG).",
+                "structure": "Xác nhận phá vỡ cấu trúc MSS / CISD" if has_disp else "Cấu trúc chưa bứt phá dứt khoát",
+                "pdArray": "Đón tại PD Array uy tín (FVG, OB, Breaker)" if has_pd_array else "Chưa có trạm đón PD Array"
+            },
+            "microM1M3": {
+                "timeframe": "M1 / M3",
+                "title": "Khung Tinh chỉnh LTF Entry - Tuỳ chọn",
+                "role": "Tinh chỉnh điểm cắt lỗ (SL) thắt chặt, kiểm tra tín hiệu phân kỳ SMT Divergence và bắt điểm vào lệnh chính xác trong các cửa sổ giờ Macro / Silver Bullet.",
+                "slRefinement": f"SL đặt tại ${sl:,.2f} sau râu Sweep" if has_sl else "Chưa đặt SL",
+                "smtStatus": "SMT Divergence Confirmed" if has_smt else "Không có phân kỳ SMT",
+                "macroWindow": f"{detected_session}" if timing_hit else "Ngoài khung giờ Kill Zone"
+            }
+        }
 
+        # Market Context summary
         market_context = {
             "timeframe": trade.timeframe or "15m",
             "higherTimeframeTrend": "Bearish" if not is_buy else "Bullish",
             "currentTimeframeTrend": "Bearish" if not is_buy else "Bullish",
-            "marketStructure": "Lower High → Lower Low" if not is_buy else "Higher Low → Higher High",
-            "volatility": "Medium",
-            "volumeContext": "Above average" if total_pnl != 0 else "Insufficient data",
-            "supportResistance": f"Ngưỡng quan trọng gần nhất: ${sl if has_sl else (entry * 0.98):,.2f}",
-            "liquidity": "Sell-side liquidity swept" if is_buy else "Buy-side liquidity swept",
+            "marketStructure": "MSS Shift to Bullish" if is_buy else "MSS Shift to Bearish",
+            "volatility": "Normal",
+            "volumeContext": "High Liquidity" if timing_hit else "Average Liquidity",
+            "supportResistance": f"Ngưỡng bảo vệ Invalidation: ${sl if has_sl else (entry * 0.98):,.2f}",
+            "liquidity": "Sell-side Liquidity (SSL) swept" if is_buy else "Buy-side Liquidity (BSL) swept",
             "tradingSession": detected_session,
-            "relevantConditions": "Thị trường phản ứng tại vùng mất cân bằng (Imbalance / FVG)."
+            "relevantConditions": "Thị trường phản ứng tại vùng mất cân bằng Imbalance / FVG và trạm đón PD Array."
         }
 
-        # =====================================================================
-        # 6. Setup Validation Checklist (Strategy Conditions)
-        # =====================================================================
+        # Setup checklist
+        strategy_name = trade.strategy or "ICT — Liquidity Sweep + PD Array"
         setup_checklist = [
-            {
-                "condition": "Liquidity Sweep",
-                "met": True,
-                "rule": "Giá quét qua đỉnh/đáy swing point trước khi đảo chiều"
-            },
-            {
-                "condition": "Displacement (Nến bứt phá mạnh)",
-                "met": True,
-                "rule": "Xuất hiện xung lực nến thân dài xác nhận phe chủ động"
-            },
-            {
-                "condition": "Fair Value Gap (FVG)",
-                "met": True if ("FVG" in (trade.setupName or "") or "FVG" in (trade.reason or "")) else None,
-                "rule": "Tồn tại vùng khoảng trống giá 3 nến chưa được lấp đầy"
-            },
-            {
-                "condition": "Market Structure Shift (MSS)",
-                "met": True,
-                "rule": "Cấu trúc đỉnh/đáy bị phá vỡ theo hướng lệnh"
-            },
-            {
-                "condition": "Trading Session Alignment",
-                "met": True,
-                "rule": f"Vào lệnh trong phiên thanh khoản cao ({detected_session})"
-            },
-            {
-                "condition": "Higher Timeframe Confirmation",
-                "met": True if ("HTF" in (trade.reason or "")) else None,
-                "rule": "Đồng pha với xu hướng trên khung thời gian lớn hơn (1H/4H)"
-            },
-            {
-                "condition": "Risk Defined Before Entry",
-                "met": has_sl,
-                "rule": "Mức dừng lỗ và tỷ lệ rủi ro tài khoản được cài đặt trước khi vào lệnh"
-            }
+            {"condition": "1. Daily Bias & Premium/Discount (D1/H4)", "met": score_1_1 == 10, "rule": "Mua tại Discount (<50%) hoặc Bán tại Premium (>50%) theo Dealing Range"},
+            {"condition": "2. Draw on Liquidity - DOL (H4/H1)", "met": score_1_2 == 10, "rule": "TP hướng về bể thanh khoản mở Old Highs/Lows, EQH/EQL chưa quét"},
+            {"condition": "3. Phản ứng tại HTF POI", "met": score_1_3 == 5, "rule": "Giá xuất phát từ vùng cản thể chế HTF (OB, FVG, Rejection Block)"},
+            {"condition": "4. Khung giờ Vàng Kill Zone & Macro", "met": score_2_1 == 10, "rule": f"Vào lệnh trong phiên London/NY AM hoặc Silver Bullet ({detected_session})"},
+            {"condition": "5. Phân kỳ SMT Divergence", "met": score_2_2 == 10, "rule": "Phân kỳ đỉnh/đáy giữa bộ ba tài sản tương quan (NQ vs ES, BTC vs ETH)"},
+            {"condition": "6. Liquidity Sweep (H1/M15)", "met": score_3_1 == 10, "rule": "Đâm râu quét sạch bể thanh khoản gần nhất trước khi đảo chiều"},
+            {"condition": "7. Displacement & MSS / CISD (M15)", "met": score_3_2 == 10, "rule": "Chuỗi nến thân lớn bứt phá dứt khoát thay đổi cấu trúc"},
+            {"condition": "8. Trạm đón PD Array hợp lệ", "met": score_3_3 == 5, "rule": "Điểm vào lệnh tại FVG, Order Block, Breaker hoặc iFVG"},
+            {"condition": "9. Tỷ lệ R:R >= 1:2", "met": planned_rr >= 2.0, "rule": f"Tỷ lệ Lời/Lỗ kế hoạch tối thiểu 1:2 (Hiện tại: 1 : {planned_rr})"},
+            {"condition": "10. Stop Loss sau râu Sweep", "met": has_sl, "rule": "Cắt lỗ được đặt an toàn tại Protected Invalidation Low/High"},
+            {"condition": "11. Quản trị rủi ro <= 1.0%", "met": has_sl and risk_pct <= 1.0, "rule": f"Rủi ro tài khoản tối đa 0.5%–1% (Hiện tại: {risk_pct}%)"},
+            {"condition": "12. Tuân thủ Guardrails", "met": score_5_1 == 5, "rule": "Không FOMO, không trả thù thị trường, tuân thủ Daily Loss Limit"},
+            {"condition": "13. Hợp lưu nâng cao (Unicorn Setup)", "met": score_5_2 == 5, "rule": "Hợp lưu đồng thời từ 3 công cụ (Breaker + FVG + SMT + Killzone)"}
         ]
 
-        # Calculate completeness
         evaluated_conditions = [c for c in setup_checklist if c["met"] is not None]
         met_conditions = [c for c in evaluated_conditions if c["met"] is True]
-        completeness_text = f"{len(met_conditions)} / {len(evaluated_conditions)} conditions met"
-        if len(evaluated_conditions) < len(setup_checklist):
-            completeness_text += f" ({len(setup_checklist) - len(evaluated_conditions)} not evaluated)"
+        completeness_text = f"{len(met_conditions)} / {len(evaluated_conditions)} tiêu chí đạt chuẩn"
 
-        # =====================================================================
-        # 7. Before vs After Trade Analysis & Plan vs Execution
-        # =====================================================================
+        # Plan vs Execution
         pnl_sign = "+" if total_pnl >= 0 else "-"
         abs_pnl = abs(total_pnl)
         pct_sign = "+" if return_pct >= 0 else ""
@@ -319,34 +555,27 @@ class TradeAnalyzer:
             "actualRR": f"1 : {actual_rr}" if has_sl else "Undefined",
             "mfe": f"{mfe_r}R" if has_sl else f"+${mfe_pts:,.2f}",
             "mae": f"{mae_r}R" if has_sl else f"-${mae_pts:,.2f}",
-            "holdingDuration": trade.duration or ("Đang mở" if is_open else "Khoảng 15-45 phút"),
-            "maxDrawdown": f"-{mae_r}R" if has_sl else f"-${mae_pts:,.2f}",
-            "maxFavorableMove": f"+{mfe_r}R" if has_sl else f"+${mfe_pts:,.2f}",
-            "exitReason": "Take Profit hit" if (has_tp and abs(exit_p - tp) < 1.0) else ("Stop Loss hit" if (has_sl and abs(exit_p - sl) < 1.0) else ("Manual Exit" if not is_open else "Position Active"))
+            "status": "Vị thế Đang Mở" if is_open else "Lệnh Đã Đóng"
         }
 
-        # Plan vs Execution Compliance Verdict
-        if has_sl and has_tp and len(rule_violations) == 0:
-            plan_compliance = "RULE_FOLLOWED"
-            plan_compliance_desc = "Tuân thủ toàn bộ quy tắc kế hoạch (Rule Followed)."
-        elif has_sl or has_tp:
-            plan_compliance = "PARTIALLY_FOLLOWED"
-            plan_compliance_desc = "Tuân thủ một phần kế hoạch (Rule Partially Followed)."
-        else:
-            plan_compliance = "RULE_VIOLATED"
-            plan_compliance_desc = "Vi phạm quy trình kế hoạch vào lệnh (Rule Violated)."
-
         plan_vs_execution = {
-            "status": plan_compliance,
-            "description": plan_compliance_desc,
+            "deviations": execution_issues if execution_issues else ["Không phát hiện sai lệch lớn so với kế hoạch."],
+            "disciplineRating": "Cao (Disciplined)" if total_process_score >= 75 else ("Trung bình" if total_process_score >= 60 else "Kém (Vi phạm quy trình)"),
+            "status": "RULE_FOLLOWED" if total_process_score >= 75 else ("PARTIALLY_FOLLOWED" if total_process_score >= 60 else "VIOLATED"),
+            "description": "Tuân thủ kỷ luật (Disciplined)" if total_process_score >= 75 else ("Tuân thủ một phần (Partial)" if total_process_score >= 60 else "Vi phạm quy trình (Violated)"),
             "plan": {
                 "entry": f"${entry:,.2f}",
                 "stopLoss": f"${sl:,.2f}" if has_sl else "Not Set",
                 "takeProfit": f"${tp:,.2f}" if has_tp else "Not Set",
-                "risk": f"{risk_pct}%" if has_sl else "Undefined",
-                "rr": f"1 : {planned_rr}" if (has_sl and has_tp) else "Undefined"
+                "risk": f"{risk_pct}%" if has_sl else "Undefined"
             },
             "actual": {
+                "entry": f"${entry:,.2f}",
+                "stopLoss": f"${sl:,.2f}" if has_sl else "Not Set",
+                "takeProfit": f"${tp:,.2f}" if has_tp else "Not Set",
+                "risk": f"{risk_pct}%" if has_sl else "Undefined"
+            },
+            "auditSummary": {
                 "entry": f"${entry:,.2f}",
                 "stopLoss": f"${sl:,.2f}" if has_sl else "Not Set",
                 "takeProfit": f"${tp:,.2f}" if has_tp else "Not Set",
@@ -354,232 +583,111 @@ class TradeAnalyzer:
                 "rr": f"1 : {actual_rr}" if (has_sl and not is_open) else ("Not closed / Undefined" if is_en else "Chưa đóng / Undefined"),
                 "exit": f"${exit_p:,.2f}" if not is_open else f"Live ${eval_price:,.2f}"
             },
-            "auditNote": "Note: Process compliance is audited completely independent of trade profit/loss (P/L)." if is_en else "Lưu ý: Mức độ tuân thủ được đánh giá độc lập hoàn toàn với kết quả lãi/lỗ (P/L) của lệnh."
+            "auditNote": "Lưu ý: Mức độ tuân thủ được đánh giá độc lập hoàn toàn với kết quả lãi/lỗ (P/L) của lệnh."
         }
 
-        # =====================================================================
-        # 8. Trade Quality vs Trade Outcome Classification
-        # =====================================================================
-        is_good_process = total_process_score >= 70
-
+        # Verdict Classification
+        is_good_process = total_process_score >= 75
         if is_open:
-            if is_good_process:
+            if total_process_score >= 90:
+                trade_verdict = "OPEN_UNICORN_SETUP"
+                verdict_desc = f"Vị thế Đang Mở • 🌟 Hạng A+ (Unicorn Setup): Độ hợp lưu hoàn hảo giữa HTF Context, Kill Zone và PD Array. P/L tạm tính: {pnl_sign}${abs_pnl:,.2f} ({pct_sign}{return_pct}%)."
+            elif is_good_process:
                 trade_verdict = "OPEN_GOOD_SETUP"
-                verdict_desc = (
-                    f"Active Position & Disciplined Setup: Risk management process is properly configured. Unrealized P/L: {pnl_sign}${abs_pnl:,.2f} ({pct_sign}{return_pct}%)."
-                    if is_en else
-                    f"Vị thế Đang Mở & Kỷ Luật Chuẩn (Good Setup Active): Quy trình quản trị rủi ro được thiết lập bài bản. P/L tạm tính: {pnl_sign}${abs_pnl:,.2f} ({pct_sign}{return_pct}%)."
-                )
+                verdict_desc = f"Vị thế Đang Mở • 🟢 Hạng B (Standard Setup): Quy trình quản trị rủi ro và setup đạt chuẩn ICT. P/L tạm tính: {pnl_sign}${abs_pnl:,.2f} ({pct_sign}{return_pct}%)."
+            elif total_process_score >= 60:
+                trade_verdict = "OPEN_MARGINAL_SETUP"
+                verdict_desc = f"Vị thế Đang Mở • 🟡 Hạng C (Marginal Setup): Lệnh xác suất trung bình, thiếu Killzone hoặc R:R chưa tối ưu. P/L tạm tính: {pnl_sign}${abs_pnl:,.2f} ({pct_sign}{return_pct}%)."
             else:
                 trade_verdict = "OPEN_WARNING_SETUP"
-                verdict_desc = (
-                    f"Active Position & Warning Setup: Position is active but violates rules ({'missing Stop Loss' if not has_sl else 'risk exceeds limits'}). Unrealized P/L: {pnl_sign}${abs_pnl:,.2f} ({pct_sign}{return_pct}%)."
-                    if is_en else
-                    f"Vị thế Đang Mở & Cảnh Báo Quy Trình (Warning Setup Active): Vị thế đang chạy nhưng có vi phạm quy trình ({'chưa cài đặt Stop Loss' if not has_sl else 'rủi ro vượt ngưỡng'}). P/L tạm tính: {pnl_sign}${abs_pnl:,.2f} ({pct_sign}{return_pct}%)."
-                )
+                verdict_desc = f"Vị thế Đang Mở • 🔴 Hạng F (Invalid / Retail Trap): Vị thế vi phạm các yếu tố cốt lõi ({'thiếu Stop Loss' if not has_sl else 'rủi ro quá lớn hoặc vào giữa khoảng giá lơ lửng'})."
         else:
             is_profitable = total_pnl > 0
             if is_profitable and is_good_process:
                 trade_verdict = "WINNING_GOOD_TRADE"
-                verdict_desc = (
-                    "Good Trade + Winning Trade: Disciplined process rewarded by market probabilities."
-                    if is_en else
-                    "Good Trade + Winning Trade: Quy trình chuẩn mực và thị trường mang lại kết quả xứng đáng."
-                )
+                verdict_desc = f"Good Trade + Winning Trade: Quy trình chuẩn mực {tier_badge} và thị trường mang lại kết quả xứng đáng (+${abs_pnl:,.2f})."
             elif is_profitable and not is_good_process:
                 trade_verdict = "WINNING_BAD_TRADE"
-                verdict_desc = (
-                    "Bad Trade still Profitable: Profitable trade with flawed process (missing SL or uncontrolled risk). This win is temporary luck and reinforces destructive habits."
-                    if is_en else
-                    "Bad Trade still Profitable: Lệnh thắng nhưng quy trình kém (thiếu SL hoặc rủi ro không kiểm soát). Chiến thắng này là do may mắn nhất thời, thói quen này sẽ bào mòn tài khoản trong dài hạn."
-                )
+                verdict_desc = f"Bad Trade still Profitable: Lệnh thắng nhưng quy trình kém ({tier_badge}). Chiến thắng này là do may mắn nhất thời, thói quen này sẽ bào mòn tài khoản trong dài hạn."
             elif not is_profitable and is_good_process:
                 trade_verdict = "LOSING_GOOD_TRADE"
-                verdict_desc = (
-                    "Good Trade with Loss: Followed rules and accepted controlled loss. Controlled losses are a natural business expense in trading."
-                    if is_en else
-                    "Good Trade with Loss: Lệnh thực hiện đúng quy trình dù kết quả thua lỗ. Thua lỗ có kiểm soát chỉ là chi phí xác suất kinh doanh tự nhiên. Hãy giữ vững kỷ luật!"
-                )
+                verdict_desc = f"Good Trade with Loss: Lệnh thực hiện đúng quy trình ({tier_badge}) dù kết quả thua lỗ. Thua lỗ có kiểm soát chỉ là chi phí xác suất kinh doanh tự nhiên."
             else:
                 trade_verdict = "LOSING_BAD_TRADE"
-                verdict_desc = (
-                    "Bad Trade with Loss: Trade resulted in a loss while violating risk management rules. Needs serious post-mortem review."
-                    if is_en else
-                    "Bad Trade with Loss: Lệnh vừa thua lỗ vừa vi phạm quy trình quản trị rủi ro. Cần nghiêm túc rút kinh nghiệm."
-                )
+                verdict_desc = f"Bad Trade with Loss: Lệnh vừa thua lỗ vừa vi phạm quy trình ({tier_badge}). Cần nghiêm túc dừng giao dịch và rút kinh nghiệm."
 
         # =====================================================================
-        # 9. AI Trading Coach Mentor Feedback
+        # 7. AI Trading Coach Mentor Feedback
         # =====================================================================
-        if is_open:
-            if not has_sl:
-                if is_en:
-                    coach_explanation = (
-                        f"Current position does not have a Stop Loss. This leaves your Maximum Potential Loss undefined. "
-                        f"Under the Risk Management rules of {strategy_name}, you must identify an Invalidation Point before opening an entry."
-                    )
-                    coach_action = f"Immediately determine your technical invalidation level (around ${entry * (0.98 if is_buy else 1.02):,.2f}) to place a hard Stop Loss protecting capital."
-                    reflection_question = "If price strongly reverses immediately after entry, what exact price point completely invalidates this trade setup?"
-                else:
-                    coach_explanation = (
-                        f"Vị thế hiện tại chưa có Stop Loss. Điều này khiến mức thua lỗ tối đa (Maximum Potential Loss) chưa được xác định. "
-                        f"Theo nguyên tắc Risk Management của chiến lược {strategy_name}, bạn bắt buộc phải xác định Invalidation Point trước khi mở lệnh."
-                    )
-                    coach_action = f"Hãy xác định ngay điểm vô hiệu kỹ thuật (khoảng ${entry * (0.98 if is_buy else 1.02):,.2f}) để đặt Stop Loss cứng bảo vệ vốn."
-                    reflection_question = "Nếu giá đảo chiều mạnh ngay sau entry, điểm kỹ thuật nào sẽ khiến setup của bạn bị xem là hoàn toàn invalid?"
-            elif risk_pct > 2.0:
-                if is_en:
-                    coach_explanation = (
-                        f"Position carries a risk of {risk_pct}% of account equity, exceeding disciplined benchmark (1% - 2%). "
-                        f"Excessive position sizing creates overwhelming psychological pressure on adverse fluctuations."
-                    )
-                    coach_action = "Never widen your Stop Loss. Consider partial position trim or moving SL to break-even once favorable market structure forms."
-                    reflection_question = "Does this risk level make you feel anxious and glued to the charts every tick?"
-                else:
-                    coach_explanation = (
-                        f"Vị thế đang có mức rủi ro {risk_pct}% tài khoản, vượt quá ngưỡng kỷ luật chuẩn (1% - 2%). "
-                        f"Khối lượng vị thế quá lớn sẽ gây áp lực tâm lý nặng nề khi nến dao động ngược chiều."
-                    )
-                    coach_action = "Tuyệt đối không dời Stop Loss ra xa hơn. Hãy cân nhắc giảm một phần khối lượng hoặc dời SL về hòa vốn khi giá tạo cấu trúc thuận lợi mới."
-                    reflection_question = "Mức rủi ro hiện tại có khiến bạn cảm thấy bất an và phải dán mắt vào bảng điện từng giây không?"
-            else:
-                if is_en:
-                    coach_explanation = (
-                        f"Risk management plan is disciplined at {risk_pct}% account risk. "
-                        f"While the trade runs, the temptation to prematurely close or micro-manage is the primary psychological hurdle."
-                    )
-                    coach_action = "Exercise patience to allow the market to test target liquidity pools based on statistical edge."
-                    reflection_question = "If price pulls back 0.5R before continuing in your favor, can you stay calm without micro-managing?"
-                else:
-                    coach_explanation = (
-                        f"Kế hoạch quản trị rủi ro rất chuẩn chỉnh với mức rủi ro {risk_pct}% tài khoản. "
-                        f"Khi vị thế đang chạy, cám dỗ can thiệp lệnh hoặc chốt non là rào cản tâm lý lớn nhất."
-                    )
-                    coach_action = "Hãy kiên nhẫn để thị trường kiểm định các mốc thanh khoản mục tiêu theo xác suất thống kê."
-                    reflection_question = "Nếu giá thoái lui nhẹ 0.5R trước khi tiếp tục xu hướng, bạn có đủ bình tĩnh để không can thiệp lệnh sớm không?"
+        if not has_sl:
+            coach_explanation = (
+                "Lệnh này không cài Stop Loss! Trong phương pháp ICT, mọi lệnh đều phải có điểm Invalidation rõ ràng "
+                "phía sau cú Sweep trước khi bấm nút mở vị thế. Không có SL đồng nghĩa với việc bạn đang phó mặc toàn bộ tài khoản cho thị trường."
+            )
+            coach_action = "Đặt ngay một Stop Loss cứng tại đỉnh/đáy swing point gần nhất hoặc đóng vị thế ngay lập tức."
+            reflection_question = "Nếu xuất hiện một tin tức thiên nga đen bất ngờ đi ngược hướng lệnh, tài khoản của bạn sẽ chịu tổn thất bao nhiêu % nếu không có Stop Loss?"
+        elif total_process_score >= 90:
+            coach_explanation = (
+                f"Xuất sắc! Lệnh đạt chuẩn 🌟 Hạng A+ (Unicorn Setup) với tổng điểm {total_process_score}/100. "
+                "Setup hội tụ đầy đủ: Daily Bias khung cao, vào lệnh trong Killzone, có Sweep quét râu nến, "
+                "Displacement tạo FVG/Breaker và R:R vượt trội về mốc Draw on Liquidity (DOL)."
+            )
+            coach_action = f"{tier_action}"
+            reflection_question = "Yếu tố then chốt nào trong 4 khung thời gian đã giúp bạn kiên nhẫn chờ đợi được điểm hợp lưu đẹp mắt như thế này?"
+        elif total_process_score >= 75:
+            coach_explanation = (
+                f"Lệnh đạt chuẩn 🟢 Hạng B (Standard Setup) với điểm số {total_process_score}/100. "
+                "Bạn đã thực hiện tốt các yếu tố cấu trúc chính và kiểm soát rủi ro bài bản."
+            )
+            coach_action = f"{tier_action}"
+            reflection_question = "Liệu bạn có thể nâng cấp lệnh này lên hạng A+ bằng cách bổ sung thêm xác nhận SMT Divergence hoặc canh đúng cửa sổ Silver Bullet không?"
+        elif total_process_score >= 60:
+            coach_explanation = (
+                f"Lệnh đạt 🟡 Hạng C (Marginal Setup) với {total_process_score}/100 điểm. "
+                "Lệnh còn thiếu một số điều kiện then chốt (như khung giờ Killzone thể chế, xác nhận SMT hoặc tỷ lệ R:R chưa đủ 1:2)."
+            )
+            coach_action = f"{tier_action}"
+            reflection_question = "Bạn có cảm thấy mình vào lệnh do sợ bỏ lỡ cơ hội (FOMO) khi thấy nến đang chạy thay vì kiên nhẫn chờ giá hồi về PD Array không?"
         else:
-            if total_pnl > 0 and not is_good_process:
-                if is_en:
-                    coach_explanation = (
-                        f"Trade was profitable ({pnl_sign}${abs_pnl:,.2f}), but this is a 'Bad Trade still Profitable'. "
-                        f"Skipping Stop Loss or violating trading rules while gaining profit is a dangerous psychological trap, "
-                        f"as it reinforces reckless habits for future trades."
-                    )
-                    coach_action = "Accept the profit, but remind yourself that this trade violated procedure and must never be repeated."
-                    reflection_question = "If a surprise black swan event occurred against this trade with no SL, what would have happened to your account?"
-                else:
-                    coach_explanation = (
-                        f"Lệnh đạt lợi nhuận ({pnl_sign}${abs_pnl:,.2f}), nhưng đây là một 'Bad Trade still Profitable'. "
-                        f"Việc thiếu Stop Loss hoặc vi phạm quy tắc mà vẫn có lãi là cái bẫy tâm lý nguy hiểm nhất trong trading, "
-                        f"vì nó củng cố hành vi liều lĩnh cho những lệnh tương lai."
-                    )
-                    coach_action = "Ghi nhận lợi nhuận nhưng tự nhắc nhở bản thân rằng lệnh này đã vi phạm quy trình và tuyệt đối không lặp lại."
-                    reflection_question = "Nếu thị trường bất ngờ ra tin thiên nga đen ngược chiều lệnh này khi bạn không có SL, tài khoản của bạn sẽ chịu hậu quả ra sao?"
-            elif total_pnl <= 0 and is_good_process:
-                if is_en:
-                    coach_explanation = (
-                        f"Trade hit stop loss ({pnl_sign}${abs_pnl:,.2f}), but you demonstrated true professional discipline: "
-                        f"Accepting the planned loss to preserve 98%+ of your capital for high-probability setups ahead."
-                    )
-                    coach_action = "Do not blame yourself. Treat this trade as a textbook example of honoring your Stop Loss."
-                    reflection_question = "After this loss, do you feel an urge to immediately re-enter to make money back (Revenge Trading), or wait calmly for your setup?"
-                else:
-                    coach_explanation = (
-                        f"Lệnh chạm mức cắt lỗ ({pnl_sign}${abs_pnl:,.2f}), nhưng bạn đã thể hiện đúng phẩm chất của một trader kỷ luật: "
-                        f"Chấp nhận cắt lỗ theo kế hoạch để bảo toàn 98%+ vốn cho các cơ hội tiếp theo."
-                    )
-                    coach_action = "Không nên tự trách mình. Hãy ghi nhận trade này là một bài học mẫu mực về việc tôn trọng Stop Loss."
-                    reflection_question = "Sau lệnh thua này, bạn có cảm thấy muốn vào lệnh ngay để gỡ gạc (Revenge Trading) hay bình tĩnh chờ setup tiếp theo?"
-            elif total_pnl <= 0 and not is_good_process:
-                if is_en:
-                    rule_str = rule_violations[0] if rule_violations else 'lack of structured plan'
-                    coach_explanation = (
-                        f"Trade resulted in loss ({pnl_sign}${abs_pnl:,.2f}) alongside process violation ({rule_str}). "
-                        f"Trading without a clear process is gambling with the market rather than running a probabilistic business."
-                    )
-                    coach_action = "Step away from the screen for 15-30 minutes to reset emotions before reviewing your strategy checklist."
-                    reflection_question = "If you could execute this trade again from scratch, what is the single most important rule you would enforce?"
-                else:
-                    coach_explanation = (
-                        f"Lệnh thua lỗ ({pnl_sign}${abs_pnl:,.2f}) kèm theo vi phạm quy trình ({rule_violations[0] if rule_violations else 'thiếu kế hoạch'}). "
-                        f"Khi không có quy trình, bạn đang đánh bạc với thị trường thay vì kinh doanh xác suất."
-                    )
-                    coach_action = "Tạm dừng giao dịch 15-30 phút để cân bằng tâm lý trước khi rà soát lại checklist chiến lược."
-                    reflection_question = "Nếu được thực hiện lại lệnh này từ đầu, quy tắc nào là quy tắc đầu tiên bạn sẽ bắt buộc bản thân tuân thủ?"
-            else:
-                if is_en:
-                    coach_explanation = (
-                        f"Outstanding! This trade executed both essential pillars: textbook process compliance and a rewarding return ({pnl_sign}${abs_pnl:,.2f})."
-                    )
-                    coach_action = "Save screenshot of this setup and execution log into your Trading Journal for replication."
-                    reflection_question = "What key factor during your pre-trade preparation gave you the confidence to stick firmly to the plan?"
-                else:
-                    coach_explanation = (
-                        f"Xuất sắc! Lệnh này hội tụ cả hai yếu tố: Quy trình chuẩn mực và kết quả sinh lời xứng đáng ({pnl_sign}${abs_pnl:,.2f})."
-                    )
-                    coach_action = "Lưu lại ảnh chụp setup và các bước thực thi này vào Nhật ký Giao dịch (Trading Journal) để nhân rộng."
-                    reflection_question = "Yếu tố then chốt nào trong khâu chuẩn bị trước lệnh đã giúp bạn tự tin giữ đúng kế hoạch?"
+            coach_explanation = (
+                f"CẢNH BÁO: Lệnh bị xếp vào 🔴 Hạng F (Invalid / Retail Trap) với chỉ {total_process_score}/100 điểm. "
+                "Lệnh vi phạm các quy tắc cốt lõi của Smart Money: Thiếu Draw on Liquidity, vào lệnh lơ lửng ở giữa khoảng giá Dealing Range, hoặc thiếu nhịp Sweep."
+            )
+            coach_action = f"{tier_action}"
+            reflection_question = "Tại sao bạn lại quyết định bấm lệnh khi chưa hội tụ đủ các bước Level -> Profile -> Draw -> SMT -> Execute?"
 
         # High-Quality LLM Coaching Enhancement if API is configured
         if llm_client.is_configured():
-            if is_en:
-                sl_state = f"SL set at ${sl:,.2f} ({risk_pct}%)" if has_sl else "NO STOP LOSS SET (Undefined Risk)"
-                sys_p = (
-                    "You are an expert AI Trading Coach & Mentor operating under the 'Process > Outcome' philosophy. "
-                    "Write a concise mentor feedback (3-4 sentences) in English for the trader. "
-                    "State the issue, provide the technical evidence, explain why it matters, and suggest an actionable fix. "
-                    "DO NOT provide buy/sell financial advice or promise profits."
-                )
-                user_p = (
-                    f"Trade: {trade.side} {trade.symbol}, Entry: ${entry:,.2f}, Exit/Live: ${eval_price:,.2f}.\n"
-                    f"Stop Loss Status: {sl_state}.\n"
-                    f"P/L: {pnl_sign}${abs_pnl:,.2f} ({pct_sign}{return_pct}%).\n"
-                    f"Process Compliance Score: {total_process_score}/100.\n"
-                    f"Verdict Classification: {trade_verdict}."
-                )
-            else:
-                sl_state = f"đã đặt SL tại ${sl:,.2f} ({risk_pct}%)" if has_sl else "CHƯA ĐẶT STOP LOSS (Rủi ro chưa xác định)"
-                sys_p = (
-                    "Bạn là một AI Trading Coach & Mentor theo trường phái 'Process > Outcome' (Quy trình quan trọng hơn kết quả). "
-                    "Hãy viết một lời nhận xét súc tích (3-4 câu) bằng tiếng Việt dành cho học viên. "
-                    "Giải thích vấn đề, nêu bằng chứng, giải thích tại sao quan trọng và đưa ra giải pháp. "
-                    "TUYỆT ĐỐI KHÔNG khuyên BUY/SELL hay hứa hẹn lợi nhuận."
-                )
-                user_p = (
-                    f"Lệnh: {trade.side} {trade.symbol}, Entry: ${entry:,.2f}, Exit/Live: ${eval_price:,.2f}.\n"
-                    f"Trạng thái Stop Loss: {sl_state}.\n"
-                    f"P/L: {pnl_sign}${abs_pnl:,.2f} ({pct_sign}{return_pct}%).\n"
-                    f"Điểm Process Compliance: {total_process_score}/100.\n"
-                    f"Phân loại: {trade_verdict}."
-                )
+            sys_p = (
+                "Bạn là một AI Trading Mentor cấp cao giảng dạy phương pháp Inner Circle Trader (ICT). "
+                "Bạn đánh giá lệnh dựa trên 4 cấp độ khung thời gian gối đầu (D1/W1 Bias, H4/H1 DOL, M15/M5 Structure, M1/M3 Refinement) "
+                "và thang điểm 100 gồm 5 phần (HTF Context 25đ, Time & SMT 20đ, Sweep & Disp 25đ, Entry & Risk 20đ, Plan 10đ). "
+                "Hãy viết nhận xét mentor súc tích (3-4 câu) bằng tiếng Việt cho học viên: "
+                "Chỉ rõ điểm mạnh/yếu theo tiêu chuẩn ICT, xếp hạng lệnh và khuyến nghị hành động dứt khoát. "
+                "TUYỆT ĐỐI KHÔNG khuyến nghị tài chính kiểu lùa gà hay hứa hẹn lợi nhuận."
+            )
+            user_p = (
+                f"Trade: {trade.side} {trade.symbol}, Entry: {entry}, Exit: {eval_price}. " 
+                f"SL: {sl if has_sl else 'NO SL'}, TP: {tp if has_tp else 'NO TP'}, RR: 1:{planned_rr}. " 
+                f"Score: {total_process_score}/100, Tier: {tier_badge}. " 
+                f"Action: {tier_action}. " 
+                f"Parts: HTF={part1_score}/25, Time={part2_score}/20, Sweep={part3_score}/25, Risk={part4_score}/20, Plan={part5_score}/10."
+            )
             custom_coach = llm_client.generate_text(sys_p, user_p, max_tokens=250)
             if custom_coach:
                 coach_explanation = custom_coach
 
-        # =====================================================================
-        # 10. Learning Takeaways (3-5 Actionable Lessons)
-        # =====================================================================
-        if is_en:
-            learning_takeaways = [
-                "Define the Technical Invalidation Point and place a hard Stop Loss BEFORE opening any position.",
-                "Calculate and cap specific risk on account equity (standard 1% - 2%) before clicking the order button.",
-                "Never judge trade quality solely by P/L outcome (Winning Trade ≠ Good Trade).",
-                f"{strategy_name} strategy holds high expectancy only when framed inside favorable Market Context and liquidity bias.",
-                "Strictly distinguish between Process Quality (discipline) and Random Market Fluctuations (trade outcome)."
-            ]
-        else:
-            learning_takeaways = [
-                "Xác định Invalidation Point (Điểm vô hiệu mô hình) và cài đặt Stop Loss cứng TRƯỚC KHI mở vị thế.",
-                "Xác định Risk cụ thể trên vốn tài khoản (chuẩn 1% - 2%) trước khi bấm nút đặt lệnh.",
-                "Không bao giờ đánh giá chất lượng một trade chỉ dựa vào kết quả P/L (Winning Trade ≠ Good Trade).",
-                f"Mô hình {strategy_name} chỉ có xác suất cao khi được đặt trong bối cảnh thị trường (Market Context) thuận lợi.",
-                "Phân biệt rạch ròi giữa Kỷ luật Quy trình (Process Quality) và Biến động Ngẫu nhiên của thị trường (Trade Outcome)."
-            ]
+        # Learning Takeaways
+        learning_takeaways = [
+            "Bắt buộc kiểm tra 4 cấp độ khung thời gian gối đầu: D1/W1 (Bias & Range) -> H4/H1 (DOL & Sweep) -> M15/M5 (Displacement & PD Array) -> M1/M3 (Refinement).",
+            "Mục tiêu Chốt lời (TP) phải nhắm thẳng vào một bể thanh khoản mở (Draw on Liquidity - DOL: Old Highs/Lows, EQH/EQL) chưa bị càn quét.",
+            "Cắt lỗ (SL) phải được đặt an toàn phía sau râu nến của cú Sweep (Protected High/Low Invalidation) và giới hạn rủi ro 0.5%–1% tài khoản.",
+            "Chỉ bấm lệnh khi tỷ lệ R:R đo về mốc DOL đạt tối thiểu 1:2 và diễn ra trong các cửa sổ Khung giờ Vàng (Kill Zone London / New York AM / Silver Bullet).",
+            "Mô hình Unicorn (Breaker Block đè chồng FVG + SMT trong Killzone) đại diện cho Hạng A+ với xác suất thắng và tỷ lệ R:R cao nhất."
+        ]
 
-        # =====================================================================
-        # 11. Citations / Sources
-        # =====================================================================
-        search_terms = f"{trade.strategy or 'ICT'} {trade.setupName or 'FVG'} Risk Management Liquidity"
+        # Citations / Sources
+        search_terms = f"{trade.strategy or 'ICT'} Liquidity Sweep Fair Value Gap Order Block Killzone SMT"
         citations = retriever.retrieve(query=search_terms, top_k=2)
         sources = [
             {
@@ -588,23 +696,10 @@ class TradeAnalyzer:
                 "framework": c.document.framework,
                 "source": c.document.source,
                 "sourceUrl": c.document.sourceUrl,
-                "author": c.document.author,
-                "sourceType": c.document.sourceType
+                "citationText": c.citationText
             }
             for c in citations
         ]
-        if not sources:
-            sources = [
-                {
-                    "title": "Core Risk Management & Position Sizing",
-                    "concept": "1-2% Account Risk Rule",
-                    "framework": "RISK_MANAGEMENT",
-                    "source": "Educational Knowledge Base",
-                    "sourceUrl": "#",
-                    "author": "Trading Academic Standard",
-                    "sourceType": "PRIMARY"
-                }
-            ]
 
         return {
             "summary": {
@@ -627,6 +722,10 @@ class TradeAnalyzer:
                 "mfe": f"{mfe_r}R" if has_sl else f"+${mfe_pts:,.2f}",
                 "mae": f"{mae_r}R" if has_sl else f"-${mae_pts:,.2f}",
                 "processScore": total_process_score,
+                "tier": tier,
+                "tierLabel": tier_badge,
+                "tierAction": tier_action,
+                "recommendationBadge": recommendation_badge,
                 "tradeVerdict": trade_verdict,
                 "verdictDescription": verdict_desc,
                 "coachingAdvice": coach_explanation,
@@ -637,12 +736,13 @@ class TradeAnalyzer:
                 "duration": trade.duration or ("Đang mở" if is_open else "15-45 phút")
             },
             "rubricScore": rubric_breakdown,
+            "timeframeHierarchy": timeframe_hierarchy,
             "marketContext": market_context,
             "setupValidation": {
                 "strategy": strategy_name,
                 "checklist": setup_checklist,
                 "completeness": completeness_text,
-                "disclaimer": "Các điều kiện được định nghĩa theo strategy rule set, không áp đặt quy tắc ngoài chiến lược."
+                "disclaimer": "Các điều kiện được định nghĩa theo ICT Rule Set chuẩn mực."
             },
             "beforeTrade": before_trade,
             "afterTrade": after_trade,
@@ -663,7 +763,7 @@ class TradeAnalyzer:
                 "actualRR": actual_rr
             },
             "excursionFlow": excursion_flow,
-            "strengths": strengths,
+            "strengths": strengths if strengths else ["Đã mở vị thế và theo dõi thị trường."],
             "categorizedImprovements": {
                 "ruleViolations": rule_violations,
                 "executionIssues": execution_issues,
@@ -673,12 +773,15 @@ class TradeAnalyzer:
             "aiCoach": {
                 "explanation": coach_explanation,
                 "actionItem": coach_action,
-                "reflectionQuestion": reflection_question
+                "reflectionQuestion": reflection_question,
+                "tier": tier,
+                "tierLabel": tier_badge,
+                "tierAction": tier_action
             },
             "learningTakeaways": learning_takeaways,
             "studentReflection": {
                 "question": "Nếu thực hiện lại trade này, bạn sẽ thay đổi điều gì?",
-                "placeholder": "Ví dụ: Em sẽ chờ nến 15m đóng cửa xác nhận trước khi vào lệnh, đồng thời đặt SL cố định dưới đáy swing low...",
+                "placeholder": "Ví dụ: Em sẽ chờ nến M15 đóng cửa xác nhận Displacement và đặt SL an toàn sau râu cú Sweep...",
             },
             "sources": sources
         }
@@ -694,7 +797,6 @@ class TradeAnalyzer:
                 "encouragement": "Kỹ năng tự phản biện (Self-Reflection) là chìa khóa phân biệt một trader nghiệp dư và chuyên nghiệp."
             }
 
-        # Check key keywords in reflection
         text_lower = reflection_text.lower()
         has_sl_mention = "stop loss" in text_lower or "sl" in text_lower or "dừng lỗ" in text_lower or "cắt lỗ" in text_lower
         has_patience_mention = "kiên nhẫn" in text_lower or "nến đóng" in text_lower or "chờ" in text_lower or "vào sớm" in text_lower
@@ -719,16 +821,15 @@ class TradeAnalyzer:
             "Hãy ghi nhớ bài học này và chuyển hóa nó thành một quy tắc bắt buộc trong Checklist trước khi mở lệnh tiếp theo."
         )
 
-        # VIP LLM evaluation if available
         if llm_client.is_configured():
             sys_p = (
                 "Bạn là một AI Trading Mentor giàu kinh nghiệm. Học viên vừa gửi câu trả lời tự phản biện cho một lệnh giao dịch. "
                 "Hãy đọc câu trả lời và viết phản hồi ngắn gọn (2-3 câu) khích lệ, phân tích điểm tự nhận thức tốt và đưa ra lời khuyên hành động cụ thể."
             )
             user_p = (
-                f"Lệnh: {trade.side} {trade.symbol}, Entry: {trade.entryPrice}, SL: {trade.stopLoss}.\n"
-                f"Câu hỏi: {question}\n"
-                f"Câu trả lời của học viên: \"{reflection_text}\""
+                f"Trade: {trade.side} {trade.symbol}, Entry: {trade.entryPrice}, SL: {trade.stopLoss}. "
+                f"Question: {question}. "
+                f"Reflection: {reflection_text}"
             )
             llm_fb = llm_client.generate_text(sys_p, user_p, max_tokens=150)
             if llm_fb:

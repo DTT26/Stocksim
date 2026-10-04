@@ -296,13 +296,13 @@ export const BottomPanel = ({
                               return;
                             }
                             setReviewTradeData({
-                              symbol: p.symbol,
-                              side: p.side === 'LONG' ? 'BUY' : 'SELL',
-                              entryPrice: p.averagePrice,
-                              currentPrice: markPrice,
-                              stopLoss: p.sl,
-                              takeProfit: p.tp,
-                              quantity: p.quantity,
+                              symbol: p.symbol || selectedSymbol || 'BTCUSDT',
+                              side: (p.side === 'LONG' ? 'BUY' : 'SELL') as any,
+                              entryPrice: Number(p.averagePrice ?? markPrice ?? currentPrice ?? 0),
+                              currentPrice: Number(markPrice ?? p.averagePrice ?? currentPrice ?? 0),
+                              stopLoss: p.sl ? Number(p.sl) : undefined,
+                              takeProfit: p.tp ? Number(p.tp) : undefined,
+                              quantity: Number(p.quantity ?? 1),
                               isOpen: true,
                               timeframe: '15m'
                             });
@@ -870,7 +870,20 @@ export const BottomPanel = ({
                               return;
                             }
                             const payload = getTradeReviewPayload();
-                            setReviewTradeData(payload);
+                            if (payload) {
+                              setReviewTradeData({
+                                ...payload,
+                                symbol: payload.symbol || selectedSymbol || 'BTCUSDT',
+                                side: (payload.side || 'BUY') as any,
+                                entryPrice: Number(payload.entryPrice ?? currentPrice ?? 0),
+                                currentPrice: Number(payload.currentPrice ?? payload.entryPrice ?? currentPrice ?? 0),
+                                exitPrice: payload.exitPrice !== undefined ? Number(payload.exitPrice) : undefined,
+                                quantity: Number(payload.quantity || 1),
+                                realPnL: Number(payload.realPnL || 0),
+                                isOpen: payload.isOpen ?? false,
+                                timeframe: payload.timeframe || '15m'
+                              });
+                            }
                           }}
                           className={isChallengeActive
                             ? "px-2 py-0.5 rounded bg-gray-500/10 text-gray-400 border border-gray-500/20 text-[10px] font-semibold inline-flex items-center gap-1 cursor-pointer opacity-60 hover:opacity-100"

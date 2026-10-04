@@ -14,7 +14,13 @@ from app.services.market_context_helper import (
     format_detailed_chart_context,
     detect_fair_value_gaps,
     detect_order_blocks,
-    find_order_block_at_candle
+    find_order_block_at_candle,
+    detect_breaker_blocks,
+    detect_mitigation_blocks,
+    detect_inversion_fvgs,
+    detect_volume_imbalances,
+    detect_rejection_blocks,
+    detect_cisd
 )
 from app.services.prop_firm_risk_tool import (
     extract_trade_intent,
@@ -61,7 +67,8 @@ Khi giải thích hoặc chấm bài bất kỳ khái niệm nào về ICT / SMC
      + Bearish Order Block (-OB): CÂY NẾN TĂNG CUỐI CÙNG (Last Up-close Candle, close >= open) trước nhịp sập giảm tạo Displacement, FVG và phá vỡ cấu trúc đáy (BOS / MSS).
    - BẢN CHẤT: Đánh dấu vùng giá mà các thể chế tích lũy vị thế trước khi bứt phá. Khi giá quay trở lại OB, các thể chế có xu hướng bảo vệ vị thế khiến giá bật nảy.
    - BIÊN ĐỘ & TỌA ĐỘ CHUẨN: Lấy toàn bộ cây nến bao gồm cả râu nến (High đến Low). Mốc 50% Mean Threshold (M.T) là điểm cân bằng trọng yếu.
-   - QUY TẮC CHẤM BÀI: Nếu học viên khoanh đúng cây nến giảm cuối cùng (Bullish OB) hoặc nến tăng cuối cùng (Bearish OB) trước nhịp Displacement, học viên đã vẽ HOÀN TOÀN ĐÚNG 100% THEO ICT (Kết luận: ĐÚNG, Score: 90 - 100). CẤM TUYỆT ĐỐI không được bảo học viên sai!
+   - HÌNH THỨC VẼ CHUẨN XÁC: Học viên có thể khoanh DUY NHẤT 1 CÂY NẾN CỰC TRỊ HOẶC khoanh TOÀN BỘ CỤM NẾN CÙNG MÀU LIÊN TIẾP (consecutive candle cluster) tạo đáy/đỉnh trước sóng Displacement trong CÙNG 1 HÌNH HỘP ("vẽ chung 1 hình"). CẢ HAI CÁCH VẼ ĐỀU HOÀN TOÀN ĐÚNG 100% THEO ICT!
+   - QUY TẮC CHẤM BÀI: Nếu học viên khoanh đúng cây nến cực trị hoặc cụm nến đáy/đỉnh đó trong 1 hình, học viên đã vẽ HOÀN TOÀN ĐÚNG 100% THEO ICT (Kết luận: ĐÚNG, Score: 90 - 100). CẤM TUYỆT ĐỐI bắt học viên phải 'chỉ được vẽ 1 cây nến đơn lẻ' hay trừ điểm!
 
 2. FAIR VALUE GAP (FVG - Khoảng Trống Giá Giá Trị Hợp Lý):
    - ĐỊNH NGHĨA: Là khoảng trống mất cân bằng giá tạo bởi chuỗi 3 cây nến liên tiếp khi cây nến thứ 2 đẩy dốc quá nhanh.
@@ -72,7 +79,16 @@ Khi giải thích hoặc chấm bài bất kỳ khái niệm nào về ICT / SMC
 
 3. BREAKER BLOCK (Khối Phá Vỡ / Khối Lật Polarity):
    - ĐỊNH NGHĨA: Là một khối Order Block thất bại bị giá đâm xuyên qua dứt khoát, làm thay đổi cấu trúc thị trường (MSS / Structure Break).
-   - BẢN CHẤT: Sau khi bị phá vỡ, khối này bị lật ngược vai trò (từ Hỗ trợ chuyển thành Kháng cự hoặc ngược lại). Thường xuất hiện sau khi giá đã quét sạch thanh khoản BSL/SSL và báo hiệu đảo chiều xu hướng.
+   - BEARISH BREAKER BLOCK (Breaker Giảm - KHÁNG CỰ):
+     + Hình thành khi giá tạo High -> Intermediate Low (đáy trung gian gồm nến/cụm nến giảm) -> Higher High (quét đỉnh) -> Sập mạnh đâm thủng đáy trung gian.
+     + TỌA ĐỘ VẼ CHUẨN: CHỈ ĐƯỢC ĐO BẰNG CÂY NẾN GIẢM (HOẶC CỤM NẾN ĐỎ) TẠO THÀNH ĐÁY TRUNG GIAN ĐÓ.
+     + TUYỆT ĐỐI KHÔNG ĐƯỢC KÉO CẠNH TRÊN HỘP LÊN ĐỈNH CÂY NẾN XANH HIGHER HIGH!
+     + NHÃN DÁN BẮT BUỘC: "Bearish Breaker Block", KHÔNG ĐƯỢC DÁN NHẦM "Bullish Breaker Block"!
+   - BULLISH BREAKER BLOCK (Breaker Tăng - HỖ TRỢ):
+     + Hình thành khi giá tạo Low -> Intermediate High (đỉnh trung gian gồm nến/cụm nến tăng) -> Lower Low (quét đáy) -> Tăng mạnh đâm xuyên đỉnh trung gian.
+     + TỌA ĐỘ VẼ CHUẨN: CHỈ ĐƯỢC ĐO BẰNG CÂY NẾN TĂNG (HOẶC CỤM NẾN XANH) TẠO THÀNH ĐỈNH TRUNG GIAN ĐÓ.
+     + TUYỆT ĐỐI KHÔNG ĐƯỢC KÉO CẠNH DƯỚI HỘP XUỐNG ĐÁY CÂY NẾN ĐỎ LOWER LOW!
+     + NHÃN DÁN BẮT BUỘC: "Bullish Breaker Block"!
 
 4. MITIGATION BLOCK (Khối Giảm Thải / Giảm Thừa):
    - ĐỊNH NGHĨA: Là vùng giá mà các thể chế quay trở lại để khớp nốt các lệnh dở dang hoặc giảm thiểu rủi ro cho vị thế cũ.
@@ -82,6 +98,7 @@ Khi giải thích hoặc chấm bài bất kỳ khái niệm nào về ICT / SMC
 ### 2. CÁC DẠNG PD ARRAY BỔ TRỢ & NÂNG CAO (ADVANCED PD ARRAYS)
 
 • INVERSION FAIR VALUE GAP (IFVG): Khoảng trống FVG bị giá đâm thủng dứt khoát và lật ngược vai trò từ hỗ trợ sang kháng cự (hoặc ngược lại).
+  LƯU Ý SỐNG CÒN KHI CHẤM BÀI: Việc nến đâm thủng FVG ban đầu CHÍNH LÀ ĐIỀU KIỆN ĐỂ TẠO RA INVERSION FVG. TUYỆT ĐỐI KHÔNG ĐƯỢC COI VIỆC GIÁ ĐÂM THỦNG LÀ FVG BỊ HỎNG HAY BÀI VẼ BỊ SAI! Nếu học viên khoanh đúng khoảng trống FVG đã bị đâm thủng, BÀI VẼ ĐÃ ĐÚNG 100% (Điểm: 90 - 100).
 • BALANCED PRICE RANGE (BPR): Vùng giá cân bằng hình thành khi hai khoảng trống FVG ngược chiều đè chồng lên nhau, thường là vùng nén giá rất mạnh.
 • VOLUME IMBALANCE (VI): Khoảng trống hình thành giữa giá Đóng cửa của nến trước và giá Mở cửa của nến sau (khoảng hở giữa 2 thân nến, râu nến có thể chồng lấn).
 • REJECTION BLOCK: Vùng râu nến dài thể hiện sự từ chối giá dứt khoát tại đỉnh/đáy cực trị.
@@ -102,6 +119,11 @@ Khi giải thích hoặc chấm bài bất kỳ khái niệm nào về ICT / SMC
 3. LIQUIDITY SWEEP (Săn / Quét thanh khoản - Raid / Turtle Soup):
    - Giá chỉ đâm râu nến (Wick) qua đỉnh BSL hoặc đáy SSL rồi lập tức rút chân đóng nến quay ngược lại bên trong (SFP) -> Chuẩn bị đảo chiều.
    - Phân biệt với LIQUIDITY RUN (Expansion): Thân nến đóng cửa vượt đỉnh/đáy kèm nến Displacement dài -> Bứt phá tiếp diễn.
+
+5. CISD (Change In State of Delivery - Đổi trạng thái giao hàng giá):
+   - ĐỊNH NGHĨA: Là tín hiệu sớm nhất của thuật toán IPDA khi chuyển trạng thái giao hàng từ Mua sang Bán (hoặc Bán sang Mua).
+   - Bearish CISD: Sau khi quét đỉnh BSL / tạo nhịp tăng, xuất hiện nến giảm dứt khoát đóng cửa (close) DƯỚI GIÁ MỞ CỬA (open) của cây nến tăng đầu tiên trong chuỗi nến tăng cuối cùng. Tọa độ bao trùm chuỗi nến tăng đó xuống đến giá Mở cửa. Đóng vai trò là KHÁNG CỰ (Resistance). TUYỆT ĐỐI KHÔNG ĐƯỢC NHẦM VỚI FVG BEARISH!
+   - Bullish CISD: Sau khi quét đáy SSL / tạo nhịp giảm, xuất hiện nến tăng dứt khoát đóng cửa (close) TRÊN GIÁ MỞ CỬA (open) của cây nến giảm đầu tiên trong chuỗi nến giảm cuối cùng. Tọa độ bao trùm chuỗi nến giảm đó lên đến giá Mở cửa. Đóng vai trò là HỖ TRỢ (Support).
 
 4. CẤU TRÚC THỊ TRƯỜNG:
    - BOS (Break of Structure): Phá vỡ cấu trúc tiếp diễn xu hướng cũ.
@@ -1454,120 +1476,51 @@ class AiTutorService:
             except:
                 pass
 
-        if is_en:
-            verdict = "CORRECT" if ("CORRECT" in analysis.upper() and "INCORRECT" not in analysis[:300].upper()) else ("INCORRECT" if "INCORRECT" in analysis[:300].upper() else "PARTIALLY_CORRECT")
-        else:
-            verdict = "CORRECT" if "ĐÚNG" in analysis.upper() and "SAI" not in analysis[:300].upper() else "PARTIALLY_CORRECT"
-        if "CHƯA ĐÚNG" in analysis[:300].upper() or "SAI" in analysis[:300].upper():
+        has_fail_signal = (score <= 55 or "CHƯA ĐÚNG" in analysis[:350].upper() or "SAI" in analysis[:350].upper() or "INCORRECT" in analysis[:350].upper())
+        has_correct_signal = (score >= 80 and not has_fail_signal and ("ĐÚNG" in analysis[:350].upper() or "CORRECT" in analysis[:350].upper()))
+
+        if has_correct_signal:
+            verdict = "CORRECT"
+        elif has_fail_signal:
             verdict = "INCORRECT"
+        else:
+            verdict = "PARTIALLY_CORRECT"
 
-        # Robust Unified Timestamp & Boundary Binding for ALL Smart Money Patterns
-        if suggested_zone:
-            z_high = float(suggested_zone.get("priceHigh", 0))
-            z_low = float(suggested_zone.get("priceLow", 0))
-            z_type = str(suggested_zone.get("type", "")).upper()
-            z_name = str(suggested_zone.get("name", "")).upper()
-            first_label = str(first_draw.get("label", "")).upper()
-            first_tag = str(first_draw.get("tag", "")).upper()
-            first_concept = str(first_draw.get("detectedConcept", "")).upper()
-            u_time_start = first_draw.get("timeStart")
-            u_time_end = first_draw.get("timeEnd")
+        # Check if vision LLM returned a JSON zone correction block
+        suggested_zone = None
+        zone_match = re.search(r'```(?:json:zone|json)?\s*(\{[\s\S]*?\})\s*```', analysis)
+        if not zone_match:
+            zone_match = re.search(r'(\{[\s\S]*?"priceHigh"[\s\S]*?"priceLow"[\s\S]*?\})', analysis)
+        if zone_match:
+            try:
+                raw_str = zone_match.group(1).strip()
+                raw_str = re.sub(r',(\s*[\}\]])', r'\1', raw_str)
+                raw_zone = json.loads(raw_str)
+                if isinstance(raw_zone, dict) and "priceHigh" in raw_zone and "priceLow" in raw_zone:
+                    z_high = float(raw_zone.get("priceHigh", 0))
+                    z_low = float(raw_zone.get("priceLow", 0))
+                    if z_high > 0 and z_low > 0 and z_high >= z_low:
+                        suggested_zone = {
+                            "type": raw_zone.get("type", "Vùng Cấu Trúc SMC"),
+                            "name": raw_zone.get("name", "Vùng Chuẩn Tối Ưu"),
+                            "label": raw_zone.get("label", f"AI: {raw_zone.get('name', 'Vùng Chuẩn')}"),
+                            "priceHigh": round(z_high, 4),
+                            "priceLow": round(z_low, 4),
+                            "explanation": raw_zone.get("explanation", ""),
+                            "startTimestamp": raw_zone.get("startTimestamp"),
+                            "endTimestamp": raw_zone.get("endTimestamp")
+                        }
+                analysis = analysis[:zone_match.start()].strip()
+            except Exception as e:
+                pass
 
-            # Check concept
-            is_ob = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["ORDER BLOCK", "OB", "BLOCK"])
-            is_fvg = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["FVG", "FAIR VALUE", "IMBALANCE", "GAP"])
-
-            # Calculate average candle height across recent klines
-            candle_ranges = [abs(k.get("high", 0) - k.get("low", 0)) for k in recent_klines if isinstance(k.get("high"), (int, float)) and isinstance(k.get("low"), (int, float))]
-            avg_candle_h = sum(candle_ranges) / len(candle_ranges) if candle_ranges else 1.0
-
-            # 1. ORDER BLOCK RESOLUTION
-            if is_ob or (not is_fvg and not suggested_zone.get("startTimestamp")):
-                # Sanity check: An Order Block cannot span a massive range (> 2.5 * avg candle height or matching wave_min)
-                is_hallucinated = (z_high - z_low) > (avg_candle_h * 2.5) or (wave_min and abs(z_low - wave_min) < 0.001 * wave_min and z_low < user_p_low * 0.98)
-
-                matched_ob = None
-                # First check localized candidates near user drawing time
-                if detected_obs:
-                    if u_time_start:
-                        time_candidates = [o for o in detected_obs if abs(o.get("startTimestamp", 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 3]
-                        if time_candidates:
-                            matched_ob = min(time_candidates, key=lambda o: abs(o.get("startTimestamp", 0) - u_time_start))
-                    if not matched_ob and not is_hallucinated:
-                        # Match candidate close in price
-                        price_candidates = [
-                            o for o in detected_obs
-                            if abs(float(o.get("priceHigh", 0)) - z_high) / max(1.0, z_high) < 0.06
-                            and abs(float(o.get("priceLow", 0)) - z_low) / max(1.0, z_low) < 0.06
-                        ]
-                        if price_candidates:
-                            matched_ob = price_candidates[-1]
-
-                # Fallback to direct localized candle search right at student's drawn coordinates
-                if not matched_ob or is_hallucinated:
-                    loc_ob = find_order_block_at_candle(klines, u_time_start, user_p_high, user_p_low)
-                    if loc_ob:
-                        matched_ob = loc_ob
-
-                if matched_ob:
-                    suggested_zone["type"] = matched_ob["type"]
-                    suggested_zone["name"] = matched_ob["type"]
-                    suggested_zone["label"] = f"AI: {matched_ob['type']}"
-                    suggested_zone["priceHigh"] = matched_ob["priceHigh"]
-                    suggested_zone["priceLow"] = matched_ob["priceLow"]
-                    suggested_zone["startTimestamp"] = matched_ob.get("startTimestamp") or u_time_start
-                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
-                    suggested_zone["explanation"] = matched_ob.get("rule", "Cây nến Order Block chuẩn xác theo Smart Money")
-
-                    # If user drew tightly around this exact OB candle, grant high score and CORRECT!
-                    if user_p_high and user_p_low:
-                        h_err = abs(user_p_high - matched_ob["priceHigh"]) / max(1.0, matched_ob["priceHigh"])
-                        l_err = abs(user_p_low - matched_ob["priceLow"]) / max(1.0, matched_ob["priceLow"])
-                        if h_err < 0.05 and l_err < 0.05:
-                            score = max(score, 95)
-                            verdict = "CORRECT"
-
-                elif is_hallucinated and user_p_high and user_p_low:
-                    # Snap to student's exact candle drawing
-                    suggested_zone["priceHigh"] = user_p_high
-                    suggested_zone["priceLow"] = user_p_low
-                    suggested_zone["startTimestamp"] = u_time_start
-                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
-
-            # 2. FAIR VALUE GAP (FVG) RESOLUTION
-            elif is_fvg and detected_fvgs:
-                price_candidates = [
-                    f for f in detected_fvgs
-                    if abs(float(f.get("top", 0)) - z_high) / max(1.0, z_high) < 0.06
-                    and abs(float(f.get("bottom", 0)) - z_low) / max(1.0, z_low) < 0.06
-                ]
-                matched_fvg = None
-                if price_candidates:
-                    if u_time_start:
-                        matched_fvg = min(price_candidates, key=lambda f: abs((f.get("startTimestamp") or f.get("c1_timestamp") or 0) - u_time_start))
-                    else:
-                        matched_fvg = price_candidates[-1]
-                else:
-                    if u_time_start:
-                        matched_fvg = min(detected_fvgs, key=lambda f: abs((f.get("startTimestamp") or 0) - u_time_start))
-                    else:
-                        matched_fvg = detected_fvgs[-1]
-
-                if matched_fvg:
-                    suggested_zone["type"] = matched_fvg["type"]
-                    suggested_zone["name"] = matched_fvg["type"]
-                    suggested_zone["label"] = f"AI: {matched_fvg['type']}"
-                    suggested_zone["priceHigh"] = matched_fvg["top"]
-                    suggested_zone["priceLow"] = matched_fvg["bottom"]
-                    c1_ts = matched_fvg.get("startTimestamp") or matched_fvg.get("c1_timestamp")
-                    suggested_zone["startTimestamp"] = c1_ts if c1_ts else u_time_start
-                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else matched_fvg.get("c3_timestamp"))
-                    suggested_zone["explanation"] = matched_fvg.get("rule", "Vùng Fair Value Gap chuẩn xác theo Râu Nến")
-
-            # 3. Default anchor timestamps if still missing
-            if not suggested_zone.get("startTimestamp") and u_time_start:
-                suggested_zone["startTimestamp"] = u_time_start
-                suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
+        # CRITICAL: Keep Section 5 score synchronized with final score
+        analysis = re.sub(
+            r'((?:Điểm\s*(?:đánh giá|số)?|Score)[:\s*]+)\d{1,3}(\s*(?:/\s*100)?)',
+            rf'\g<1>{score}\g<2>',
+            analysis,
+            flags=re.IGNORECASE
+        )
 
         return {
             "success": True,
@@ -1668,26 +1621,50 @@ class AiTutorService:
         sh_str = ", ".join([f"${sh['price']:,.2f} ({sh['candles_ago']} nến trước)" for sh in reversed(recent_sh)]) if recent_sh else "N/A"
         sl_str = ", ".join([f"${sl['price']:,.2f} ({sl['candles_ago']} nến trước)" for sl in reversed(recent_sl)]) if recent_sl else "N/A"
 
-        # Detect factual FVGs strictly based on candle wicks (Râu nến)
+        # Detect factual SMC / PD Array patterns
         detected_fvgs = detect_fair_value_gaps(klines)
         detected_obs = detect_order_blocks(klines)
+        detected_breakers = detect_breaker_blocks(klines)
+        detected_mitigations = detect_mitigation_blocks(klines)
+        detected_ifvgs = detect_inversion_fvgs(klines)
+        detected_vis = detect_volume_imbalances(klines)
+        detected_rbs = detect_rejection_blocks(klines)
+        detected_cisds = detect_cisd(klines)
+
         recent_obs = detected_obs[-4:] if detected_obs else []
-        obs_summary = []
-        for ob in recent_obs:
-            obs_summary.append(
-                f"- {ob['type']}: Vùng giá chuẩn [${ob['priceLow']:,.2f} -> ${ob['priceHigh']:,.2f}] "
-                f"(Mốc 50% Mean Threshold = ${ob['mean_threshold']:,.2f}, Nến xuất hiện lúc t:{ob['startTimestamp']}, cách đây {ob['candles_ago']} nến)"
-            )
-        obs_str = "\n".join(obs_summary) if obs_summary else "Không có Order Block lớn chưa test gần đây" 
+        obs_summary = [
+            f"- {ob['type']}: Vùng giá chuẩn [${ob['priceLow']:,.2f} -> ${ob['priceHigh']:,.2f}] "
+            f"(Mốc 50% Mean Threshold = ${ob['mean_threshold']:,.2f}, Nến xuất hiện lúc t:{ob['startTimestamp']}, cách đây {ob['candles_ago']} nến)"
+            for ob in recent_obs
+        ]
+        obs_str = "\n".join(obs_summary) if obs_summary else "Không có Order Block lớn chưa test gần đây"
+
         recent_fvgs = detected_fvgs[-4:] if detected_fvgs else []
-        fvgs_summary = []
-        for fvg in recent_fvgs:
-            fvgs_summary.append(
-                f"- {fvg['type']}: Vùng giá chuẩn [${fvg['bottom']:,.2f} -> ${fvg['top']:,.2f}] "
-                f"(Đo theo RÂU NẾN Wicks: {fvg.get('c1_info', '')}; {fvg.get('c3_info', '')}; "
-                f"Mốc 50% C.E = ${fvg['midpoint_ce']:,.2f}, xuất hiện cách đây {fvg['candles_ago']} nến)"
-            )
+        fvgs_summary = [
+            f"- {fvg['type']}: Vùng giá chuẩn [${fvg['bottom']:,.2f} -> ${fvg['top']:,.2f}] "
+            f"(Đo theo RÂU NẾN Wicks: {fvg.get('c1_info', '')}; {fvg.get('c3_info', '')}; "
+            f"Mốc 50% C.E = ${fvg['midpoint_ce']:,.2f}, xuất hiện cách đây {fvg['candles_ago']} nến)"
+            for fvg in recent_fvgs
+        ]
         fvgs_str = "\n".join(fvgs_summary) if fvgs_summary else "Không có FVG lớn chưa lấp trong các nến gần nhất"
+
+        recent_bb = detected_breakers[-3:] if detected_breakers else []
+        bb_str = "\n".join([f"- {b['type']}: [${b['priceLow']:,.2f} -> ${b['priceHigh']:,.2f}] (Nến gốc t:{b['startTimestamp']}, phá vỡ lúc t:{b.get('break_timestamp')}, {b['rule']})" for b in recent_bb]) if recent_bb else "Không có Breaker Block gần đây"
+
+        recent_mb = detected_mitigations[-3:] if detected_mitigations else []
+        mb_str = "\n".join([f"- {m['type']}: [${m['priceLow']:,.2f} -> ${m['priceHigh']:,.2f}] (Nến thất bại t:{m['startTimestamp']}, {m['rule']})" for m in recent_mb]) if recent_mb else "Không có Mitigation Block gần đây"
+
+        recent_ifvg = detected_ifvgs[-3:] if detected_ifvgs else []
+        ifvg_str = "\n".join([f"- {f['type']}: [${f['priceLow']:,.2f} -> ${f['priceHigh']:,.2f}] (FVG gốc t:{f['startTimestamp']}, {f['rule']})" for f in recent_ifvg]) if recent_ifvg else "Không có Inversion FVG gần đây"
+
+        recent_vi = detected_vis[-3:] if detected_vis else []
+        vi_str = "\n".join([f"- {v['type']}: [${v['priceLow']:,.2f} -> ${v['priceHigh']:,.2f}] (Hở thân nến lúc t:{v['startTimestamp']}, {v['rule']})" for v in recent_vi]) if recent_vi else "Không có Volume Imbalance gần đây"
+
+        recent_rb = detected_rbs[-3:] if detected_rbs else []
+        rb_str = "\n".join([f"- {r['type']}: [${r['priceLow']:,.2f} -> ${r['priceHigh']:,.2f}] (Râu nến từ chối lúc t:{r['startTimestamp']}, {r['rule']})" for r in recent_rb]) if recent_rb else "Không có Rejection Block gần đây"
+
+        recent_cisd = detected_cisds[-3:] if detected_cisds else []
+        cisd_str = "\n".join([f"- {c['type']}: [${c['priceLow']:,.2f} -> ${c['priceHigh']:,.2f}] ({c['rule']})" for c in recent_cisd]) if recent_cisd else "Không có tín hiệu CISD gần đây"
 
         # Summarize recent candles (last 40 candles for LLM prompt context)
         recent_klines = klines[-40:] if len(klines) > 40 else klines
@@ -1716,13 +1693,48 @@ class AiTutorService:
         wave_mid = (wave_max + wave_min) / 2 if (wave_max and wave_min) else user_mid
 
         # Determine STRICT target concept chosen by user
-        is_user_fvg = any(k in first_label or k in first_tag or k in first_concept or k in first_user_label for k in ["FVG", "FAIR VALUE", "IMBALANCE", "GAP", "KHOẢNG TRỐNG"])
-        is_user_ob = any(k in first_label or k in first_tag or k in first_concept or k in first_user_label for k in ["OB", "ORDER BLOCK", "BLOCK", "KHỐI LỆNH"])
-        is_user_bos = any(k in first_label or k in first_tag or k in first_concept or k in first_user_label for k in ["BOS", "BREAK OF STRUCTURE", "PHÁ VỠ CẤU TRÚC"])
-        is_user_liq = any(k in first_label or k in first_tag or k in first_concept or k in first_user_label for k in ["LIQ", "LIQUIDITY", "BSL", "SSL", "THANH KHOẢN"])
+        all_text = f"{first_label} {first_tag} {first_concept} {first_user_label} {user_notes.upper()}"
+
+        is_user_cisd = any(k in all_text for k in ["CISD", "CHANGE IN STATE OF DELIVERY", "STATE OF DELIVERY", "ĐỔI TRẠNG THÁI GIAO HÀNG"])
+        is_user_ifvg = any(k in all_text for k in ["IFVG", "INVERSION", "INVERSION FVG", "FVG ĐẢO", "KHOẢNG TRỐNG ĐẢO"])
+        is_user_vi = any(k in all_text for k in ["VI", "VOLUME IMBALANCE", "HỞ THÂN NẾN", "GAP THÂN"])
+        is_user_rejection = any(k in all_text for k in ["REJECTION", "RB", "RÂU TỪ CHỐI", "REJECTION BLOCK"])
+        is_user_breaker = any(k in all_text for k in ["BREAKER", "BB", "KHỐI PHÁ VỠ", "LẬT POLARITY"])
+        is_user_mitigation = any(k in all_text for k in ["MITIGATION", "MB", "GIẢM THẢI", "GIẢM THIỂU RỦI RO"])
+        is_user_bos = any(k in all_text for k in ["BOS", "BREAK OF STRUCTURE", "PHÁ VỠ CẤU TRÚC"])
+        is_user_liq = any(k in all_text for k in ["LIQ", "LIQUIDITY", "BSL", "SSL", "THANH KHOẢN"])
+
+        is_user_fvg = any(k in all_text for k in ["FVG", "FAIR VALUE", "IMBALANCE", "GAP", "KHOẢNG TRỐNG"]) and not (is_user_ifvg or is_user_cisd or is_user_vi)
+        is_user_ob = any(k in all_text for k in ["OB", "ORDER BLOCK", "BLOCK", "KHỐI LỆNH"]) and not (is_user_breaker or is_user_mitigation or is_user_rejection or is_user_ifvg or is_user_cisd or is_user_vi)
 
         # Concept-specific dynamic JSON instruction for the LLM
-        if is_user_fvg:
+        if is_user_cisd:
+            is_cisd_bearish = ("BEARISH" in all_text or "GIẢM" in all_text or (user_p_high and user_p_low and ((user_p_high + user_p_low)/2) >= wave_mid))
+            cisd_name = "Bearish CISD" if is_cisd_bearish else "Bullish CISD"
+            cisd_role = "Kháng cự (Resistance)" if is_cisd_bearish else "Hỗ trợ (Support)"
+            concept_directive = f"""🎯 KHÁI NIỆM HỌC VIÊN ĐANG VẼ: CHANGE IN STATE OF DELIVERY (CISD - ĐỔI TRẠNG THÁI GIAO HÀNG GIÁ)!
+⚠️ YÊU CẦU BẮT BUỘC KHI CHẤM:
+1. Bạn BẮT BUỘC phải chấm bài theo định nghĩa CHANGE IN STATE OF DELIVERY (CISD). TUYỆT ĐỐI CẤM chấm nhầm thành Fair Value Gap (FVG) hay Order Block!
+2. CISD đánh dấu sự chuyển đổi trạng thái giao hàng giá của thuật toán IPDA:
+   - Bearish CISD: Sau khi quét đỉnh BSL / tạo nhịp tăng, xuất hiện nến giảm đóng cửa (close) DƯỚI GIÁ MỞ CỬA (open) của cây nến tăng đầu tiên trong chuỗi nến tăng cuối cùng. Tọa độ bao trùm chuỗi nến tăng đó xuống đến giá Mở cửa. Đóng vai trò là Kháng cự ({cisd_role}).
+   - Bullish CISD: Sau khi quét đáy SSL / tạo nhịp giảm, xuất hiện nến tăng đóng cửa (close) TRÊN GIÁ MỞ CỬA (open) của cây nến giảm đầu tiên trong chuỗi nến giảm cuối cùng. Tọa độ bao trùm chuỗi nến giảm đó lên đến giá Mở cửa. Đóng vai trò là Hỗ trợ.
+3. Nếu học viên khoanh đúng vùng CISD này, BÀI VẼ ĐÃ ĐÚNG HOÀN TOÀN CHUẨN XÁC 100% THEO ICT (Kết luận: ĐÚNG, Điểm: 90 - 100)."""
+            json_example_type = "CISD"
+            json_example_name = cisd_name
+            json_example_label = f"AI: {cisd_name}"
+            json_example_exp = f"Vùng Change In State of Delivery ({cisd_name}) lật trạng thái giao hàng giá thành {cisd_role}"
+        elif is_user_ifvg:
+            concept_directive = """🎯 KHÁI NIỆM HỌC VIÊN ĐANG VẼ: INVERSION FAIR VALUE GAP (IFVG - KHOẢNG TRỐNG ĐẢO VAI TRÒ)!
+⚠️ YÊU CẦU BẮT BUỘC KHI CHẤM:
+1. Inversion FVG là một khoảng trống FVG ban đầu bị nến sau đâm thủng hoàn toàn và lật ngược vai trò hỗ trợ <-> kháng cự.
+2. ⚠️ LƯU Ý SỐNG CÒN: Việc nến đâm thủng FVG ban đầu CHÍNH LÀ ĐIỀU KIỆN TIÊN QUYẾT ĐỂ TẠO RA INVERSION FVG! TUYỆT ĐỐI KHÔNG ĐƯỢC COI VIỆC BỊ THỦNG LÀ FVG HỎNG HAY BÀI VẼ SAI!
+3. Tọa độ biên độ đo CHUẨN XÁC theo khoảng trống Râu nến Wicks ban đầu của FVG đó.
+4. Nếu học viên khoanh đúng khoảng trống FVG bị đâm thủng này, BÀI VẼ ĐÃ ĐÚNG HOÀN TOÀN 100% (Kết luận: ĐÚNG, Điểm: 90 - 100)."""
+            json_example_type = "Inversion FVG (IFVG)"
+            json_example_name = "Bullish Inversion FVG" if ("BULLISH" in all_text or "TĂNG" in all_text) else "Bearish Inversion FVG"
+            json_example_label = f"AI: {json_example_name}"
+            json_example_exp = "Khoảng trống FVG bị đâm thủng hoàn toàn và lật vai trò hỗ trợ <-> kháng cự"
+        elif is_user_fvg:
             concept_directive = """🎯 KHÁI NIỆM HỌC VIÊN ĐANG VẼ: FAIR VALUE GAP (FVG / KHOẢNG TRỐNG GIÁ)!
 ⚠️ YÊU CẦU BẮT BUỘC KHI CHẤM:
 1. Bạn BẮT BUỘC phải chấm hình vẽ này theo định nghĩa FAIR VALUE GAP (FVG). TUYỆT ĐỐI CẤM chấm nhầm thành Order Block hay bắt học viên chỉ được vẽ 1 cây nến!
@@ -1732,23 +1744,76 @@ class AiTutorService:
             json_example_label = "AI: Bullish FVG"
             json_example_exp = "Khoảng trống giá mất cân bằng đo theo Râu Nến 1 và Râu Nến 3"
         elif is_user_ob:
-            concept_directive = """🎯 KHÁI NIỆM HỌC VIÊN ĐANG VẼ: ORDER BLOCK (OB / KHỐI LỆNH)!
+            concept_directive = """🎯 KHÁI NIỆM HỌC VIÊN ĐANG VẼ: ORDER BLOCK (OB / KHỐI LỆNH THỂ CHẾ)!
 ⚠️ YÊU CẦU BẮT BUỘC KHI CHẤM:
-1. Order Block chỉ là DUY NHẤT 1 CÂY NẾN ĐƠN LẺ (Cây nến giảm cuối cùng trước nhịp tăng mạnh, hoặc nến tăng cuối cùng trước nhịp sập mạnh).
-2. Nếu học viên khoanh đúng cây nến cực trị này, học viên đã vẽ HOÀN TOÀN ĐÚNG (Kết luận: ĐÚNG, Điểm: 90 - 100).
-3. TUYỆT ĐỐI không lấy đáy cả biểu đồ (wave_min) làm Order Block."""
+1. Theo chuẩn ICT, Order Block có thể được vẽ theo 2 cách ĐỀU ĐÚNG 100%:
+   - Cách 1: DUY NHẤT 1 CÂY NẾN CỰC TRỊ cuối cùng (nến giảm cuối cùng trước nhịp tăng, hoặc nến tăng cuối cùng trước nhịp sập).
+   - Cách 2: TOÀN BỘ CỤM NẾN CÙNG MÀU LIÊN TIẾP (Consecutive Candle Cluster) tạo đáy/đỉnh trước sóng Displacement trong CÙNG 1 HÌNH HỘP ("vẽ chung 1 hình", ví dụ cả cụm 2-3 cây nến đỏ tạo đáy).
+2. CẢ 2 CÁCH VẼ TRÊN ĐỀU HOÀN TOÀN ĐÚNG CHUẨN XÁC 100% THEO ICT! TUYỆT ĐỐI CẤM bảo học viên vẽ sai hoặc bắt học viên 'chỉ được vẽ 1 cây nến đơn lẻ'!
+3. Nếu học viên khoanh đúng cây nến cực trị hoặc cụm nến đáy/đỉnh đó trong 1 hình, BÀI VẼ ĐÃ ĐÚNG 100% (Kết luận: ĐÚNG, Điểm: 90 - 100).
+4. TUYỆT ĐỐI không lấy đáy cả biểu đồ (wave_min) làm Order Block."""
             json_example_type = "Order Block (OB)"
-            json_example_name = "Bullish Order Block"
-            json_example_label = "AI: Bullish Order Block"
-            json_example_exp = "Cây nến giảm cuối cùng trước nhịp tăng mạnh Displacement"
+            json_example_name = "Bearish Order Block" if ("BEARISH" in all_text or "GIẢM" in all_text or "-" in all_text) else "Bullish Order Block"
+            json_example_label = f"AI: {json_example_name}"
+            json_example_exp = "Cây nến hoặc cụm nến cùng màu trước nhịp tăng/giảm mạnh Displacement"
+        elif is_user_breaker:
+            is_bb_bearish = ("BEARISH" in all_text or "GIẢM" in all_text or (user_p_high and user_p_low and ((user_p_high + user_p_low)/2) >= wave_mid))
+            bb_name = "Bearish Breaker Block" if is_bb_bearish else "Bullish Breaker Block"
+            bb_role = "Kháng cự (Resistance)" if is_bb_bearish else "Hỗ trợ (Support)"
+            bb_desc = "Cụm nến giảm đáy trung gian bị nến sập mạnh đâm thủng sau Higher High, lật thành Kháng cự Bearish Breaker" if is_bb_bearish else "Cụm nến tăng đỉnh trung gian bị nến tăng mạnh đâm xuyên sau Lower Low, lật thành Hỗ trợ Bullish Breaker"
+            concept_directive = f"""🎯 KHÁI NIỆM HỌC VIÊN ĐANG VẼ: BREAKER BLOCK (BB - KHỐI LỆNH THẤT BẠI ĐỔI VAI TRÒ)!
+⚠️ YÊU CẦU BẮT BUỘC KHI CHẤM:
+1. Breaker Block là một Order Block thất bại bị giá đâm xuyên qua dứt khoát làm thay đổi cấu trúc thị trường (MSS).
+2. ĐỊNH DANH VÀ NHÃN DÁN CHUẨN XÁC:
+   - Khi nhịp đâm thủng là một nhịp sập giá mạnh xuống dưới qua đáy trung gian: Khối này BẮT BUỘC gọi là 'Bearish Breaker Block' (Breaker Giảm - {bb_role}). TUYỆT ĐỐI CẤM dán nhãn 'Bullish Breaker Block'!
+   - Khi nhịp đâm xuyên là một nhịp tăng giá mạnh lên trên qua đỉnh trung gian: Khối này BẮT BUỘC gọi là 'Bullish Breaker Block' (Breaker Tăng - Hỗ trợ).
+3. BIÊN ĐỘ VẼ CHUẨN:
+   - Bearish Breaker CHỈ ĐƯỢC ĐO BẰNG CÂY NẾN GIẢM (HOẶC CỤM NẾN ĐỎ) TẠO THÀNH ĐÁY TRUNG GIAN ĐÓ.
+   - TUYỆT ĐỐI KHÔNG ĐƯỢC KÉO CẠNH TRÊN HỘP LÊN ĐỈNH CÂY NẾN XANH HIGHER HIGH!
+   - Bullish Breaker CHỈ ĐƯỢC ĐO BẰNG CÂY NẾN TĂNG (HOẶC CỤM NẾN XANH) TẠO THÀNH ĐỈNH TRUNG GIAN ĐÓ, TUYỆT ĐỐI KHÔNG KÉO CẠNH DƯỚI HỘP XUỐNG ĐÁY CÂY NẾN ĐỎ LOWER LOW!
+4. Nếu học viên khoanh đúng vùng nến của khối Order Block thất bại này, BÀI VẼ ĐÃ ĐÚNG HOÀN TOÀN (Kết luận: ĐÚNG, Điểm: 90 - 100)."""
+            json_example_type = "Breaker Block"
+            json_example_name = bb_name
+            json_example_label = f"AI: {bb_name}"
+            json_example_exp = bb_desc
+        elif is_user_mitigation:
+            concept_directive = """🎯 KHÁI NIỆM HỌC VIÊN ĐANG VẼ: MITIGATION BLOCK (MB - KHỐI GIẢM THIỂU RỦI RO / GIẢM THẢI)!
+⚠️ YÊU CẦU BẮT BUỘC KHI CHẤM:
+1. Mitigation Block hình thành khi giá hồi nhưng THẤT BẠI trong việc tạo đỉnh/đáy mới (Failure Swing: Lower High hoặc Higher Low), sau đó giá đâm xuyên qua khối nến này.
+2. KHÔNG YÊU CẦU xuất hiện phá vỡ cấu trúc (MSS) trước đó và đóng vai trò tiếp diễn xu hướng (Continuation).
+3. Nếu học viên khoanh đúng cây nến của nhịp hồi thất bại này, học viên đã vẽ HOÀN TOÀN ĐÚNG (Kết luận: ĐÚNG, Điểm: 90 - 100)."""
+            json_example_type = "Mitigation Block"
+            json_example_name = "Bearish Mitigation Block"
+            json_example_label = "AI: Bearish Mitigation Block"
+            json_example_exp = "Khối nến hồi thất bại bị đâm xuyên, đóng vai trò giảm thiểu rủi ro tiếp diễn xu hướng"
         elif is_user_bos:
             concept_directive = """🎯 KHÁI NIỆM HỌC VIÊN ĐANG VẼ: BREAK OF STRUCTURE (BOS - PHÁ VỠ CẤU TRÚC TIẾP DIỄN)!"""
             json_example_type = "Break of Structure (BOS)"
             json_example_name = "Bullish BOS"
             json_example_label = "AI: Bullish BOS"
             json_example_exp = "Đường phá vỡ đỉnh tiếp diễn xu hướng tăng"
+        elif is_user_vi:
+            concept_directive = """🎯 KHÁI NIỆM HỌC VIÊN ĐANG VẼ: VOLUME IMBALANCE (VI - KHOẢNG TRỐNG THÂN NẾN)!
+⚠️ YÊU CẦU BẮT BUỘC KHI CHẤM:
+1. Volume Imbalance là khoảng trống hình thành giữa giá Đóng cửa Nến 1 và giá Mở cửa Nến 2 (khoảng hở giữa 2 thân nến, râu nến có thể chồng lấn).
+2. Tọa độ đo CHUẨN XÁC khoảng hở giữa 2 thân nến này.
+3. Nếu học viên khoanh đúng khoảng hở thân nến này, học viên đã vẽ HOÀN TOÀN ĐÚNG (Kết luận: ĐÚNG, Điểm: 90 - 100)."""
+            json_example_type = "Volume Imbalance (VI)"
+            json_example_name = "Bullish Volume Imbalance"
+            json_example_label = "AI: Bullish VI"
+            json_example_exp = "Khoảng trống giữa giá Đóng cửa Nến 1 và giá Mở cửa Nến 2 (hở thân nến)"
+        elif is_user_rejection:
+            concept_directive = """🎯 KHÁI NIỆM HỌC VIÊN ĐANG VẼ: REJECTION BLOCK (RB - RÂU NẾN TỪ CHỐI GIÁ CỰC TRỊ)!
+⚠️ YÊU CẦU BẮT BUỘC KHI CHẤM:
+1. Rejection Block là vùng râu nến dài (tối thiểu gấp đôi thân nến) thể hiện sự từ chối giá quyết liệt của thể chế tại đỉnh hoặc đáy cực trị.
+2. Tọa độ chuẩn BẮT BUỘC CHỈ LẤY PHẦN RÂU NẾN dài bị từ chối đó.
+3. Nếu học viên khoanh đúng phần râu nến dài này, học viên đã vẽ HOÀN TOÀN ĐÚNG (Kết luận: ĐÚNG, Điểm: 90 - 100)."""
+            json_example_type = "Rejection Block"
+            json_example_name = "Bearish Rejection Block"
+            json_example_label = "AI: Bearish Rejection Block"
+            json_example_exp = "Vùng râu nến dài thể hiện sự từ chối giá dứt khoát tại cực trị"
         else:
-            concept_directive = """🎯 HÃY NHẬN DIỆN KHÁI NIỆM HỌC VIÊN ĐANG VẼ (ORDER BLOCK HOẶC FAIR VALUE GAP) DỰA TRÊN TỌA ĐỘ VÀ KÝ HIỆU HỌC VIÊN ĐẶT!"""
+            concept_directive = """🎯 HÃY NHẬN DIỆN KHÁI NIỆM HỌC VIÊN ĐANG VẼ (ORDER BLOCK, CISD HOẶC FAIR VALUE GAP) DỰA TRÊN TỌA ĐỘ VÀ KÝ HIỆU HỌC VIÊN ĐẶT!"""
             json_example_type = "Fair Value Gap (FVG)" if detected_fvgs else "Order Block (OB)"
             json_example_name = "Fair Value Gap" if detected_fvgs else "Order Block"
             json_example_label = f"AI: {json_example_name}"
@@ -1848,7 +1913,13 @@ class AiTutorService:
                 f"Các Đỉnh đảo chiều gần nhất: {sh_str}\n"
                 f"Các Đáy đảo chiều gần nhất: {sl_str}\n\n"
                 f"CÁC VÙNG ORDER BLOCK (OB) THỰC TẾ TRÊN BIỂU ĐỒ:\n{obs_str}\n\n"
-                f"CÁC KHOẢNG TRỐNG GIÁ FVG THỰC TẾ TRÊN BIỂU ĐỒ (ĐO CHUẨN 100% THEO RÂU NẾN WICKS):\n{fvgs_str}\n"
+                f"CÁC KHOẢNG TRỐNG GIÁ FVG THỰC TẾ TRÊN BIỂU ĐỒ (ĐO CHUẨN 100% THEO RÂU NẾN WICKS):\n{fvgs_str}\n\n"
+                f"CÁC VÙNG BREAKER BLOCK (BB - LẬT POLARITY) TRÊN BIỂU ĐỒ:\n{bb_str}\n\n"
+                f"CÁC VÙNG MITIGATION BLOCK (MB - TIẾP DIỄN TIẾP CẬN) TRÊN BIỂU ĐỒ:\n{mb_str}\n\n"
+                f"CÁC VÙNG INVERSION FVG (IFVG - KHOẢNG TRỐNG ĐẢO) TRÊN BIỂU ĐỒ:\n{ifvg_str}\n\n"
+                f"CÁC KHOẢNG TRỐNG VOLUME IMBALANCE (VI - HỞ THÂN NẾN) TRÊN BIỂU ĐỒ:\n{vi_str}\n\n"
+                f"CÁC VÙNG REJECTION BLOCK (RB - RÂU NẾN TỪ CHỐI) TRÊN BIỂU ĐỒ:\n{rb_str}\n\n"
+                f"CÁC TÍN HIỆU CISD (CHANGE IN STATE OF DELIVERY) TRÊN BIỂU ĐỒ:\n{cisd_str}\n"
             )
             if user_notes:
                 user_prompt += f"\nGhi chú học viên: {user_notes}\n"
@@ -1899,23 +1970,106 @@ class AiTutorService:
             except:
                 pass
 
-        if is_en:
-            verdict = "CORRECT" if ("CORRECT" in analysis.upper() and "INCORRECT" not in analysis[:300].upper()) else ("INCORRECT" if "INCORRECT" in analysis[:300].upper() else "PARTIALLY_CORRECT")
-        else:
-            verdict = "CORRECT" if "ĐÚNG" in analysis.upper() and "SAI" not in analysis[:300].upper() else "PARTIALLY_CORRECT"
-        if "CHƯA ĐÚNG" in analysis[:300].upper() or "SAI" in analysis[:300].upper():
+        has_fail_signal = (score <= 55 or "CHƯA ĐÚNG" in analysis[:350].upper() or "SAI" in analysis[:350].upper() or "INCORRECT" in analysis[:350].upper())
+        has_correct_signal = (score >= 80 and not has_fail_signal and ("ĐÚNG" in analysis[:350].upper() or "CORRECT" in analysis[:350].upper()))
+
+        if has_correct_signal:
+            verdict = "CORRECT"
+        elif has_fail_signal:
             verdict = "INCORRECT"
+        else:
+            verdict = "PARTIALLY_CORRECT"
 
         # Calculate average candle height across recent klines
         candle_ranges = [abs(k.get("high", 0) - k.get("low", 0)) for k in recent_klines if isinstance(k.get("high"), (int, float)) and isinstance(k.get("low"), (int, float))]
         avg_candle_h = sum(candle_ranges) / len(candle_ranges) if candle_ranges else 1.0
 
         # STRICT CONCEPT RESOLUTION PIPELINE:
-        # If the student drew an FVG, NEVER let it become an Order Block!
-        if is_user_fvg:
+        if is_user_cisd:
+            matched_cisd = None
+            if detected_cisds:
+                if u_time_start:
+                    time_cands = [c for c in detected_cisds if abs((c.get("startTimestamp") or 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 7]
+                    if time_cands:
+                        matched_cisd = min(time_cands, key=lambda c: abs((c.get("startTimestamp") or 0) - u_time_start))
+                if not matched_cisd:
+                    matched_cisd = min(detected_cisds, key=lambda c: abs(((c['priceHigh'] + c['priceLow']) / 2) - user_mid))
+
+            if matched_cisd:
+                suggested_zone = {
+                    "type": matched_cisd["type"],
+                    "name": matched_cisd["name"],
+                    "label": matched_cisd["label"],
+                    "priceHigh": matched_cisd["priceHigh"],
+                    "priceLow": matched_cisd["priceLow"],
+                    "startTimestamp": matched_cisd.get("startTimestamp") or u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": matched_cisd.get("rule", "Vùng Change In State of Delivery (CISD) chuẩn xác theo Smart Money")
+                }
+                if user_p_high and user_p_low:
+                    h_err = abs(user_p_high - matched_cisd["priceHigh"]) / max(1.0, matched_cisd["priceHigh"])
+                    l_err = abs(user_p_low - matched_cisd["priceLow"]) / max(1.0, matched_cisd["priceLow"])
+                    user_h = abs(user_p_high - user_p_low)
+                    cisd_h = abs(matched_cisd["priceHigh"] - matched_cisd["priceLow"])
+                    if user_h <= max(cisd_h * 2.5, avg_candle_h * 3.0) and (h_err < 0.12 or l_err < 0.12):
+                        score = max(score, 95)
+                        verdict = "CORRECT"
+            elif not suggested_zone:
+                suggested_zone = {
+                    "type": "CISD",
+                    "name": json_example_name,
+                    "label": json_example_label,
+                    "priceHigh": round(user_p_high, 4),
+                    "priceLow": round(user_p_low, 4),
+                    "startTimestamp": u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": "Vùng Change In State of Delivery (CISD) tại khu vực học viên đang vẽ"
+                }
+
+        elif is_user_ifvg:
+            matched_ifvg = None
+            if detected_ifvgs:
+                if u_time_start:
+                    time_cands = [f for f in detected_ifvgs if abs((f.get("startTimestamp") or 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 7]
+                    if time_cands:
+                        matched_ifvg = min(time_cands, key=lambda f: abs((f.get("startTimestamp") or 0) - u_time_start))
+                if not matched_ifvg:
+                    matched_ifvg = min(detected_ifvgs, key=lambda f: abs(((f['priceHigh'] + f['priceLow']) / 2) - user_mid))
+
+            if matched_ifvg:
+                suggested_zone = {
+                    "type": matched_ifvg["type"],
+                    "name": matched_ifvg["type"],
+                    "label": f"AI: {matched_ifvg['type']}",
+                    "priceHigh": matched_ifvg["priceHigh"],
+                    "priceLow": matched_ifvg["priceLow"],
+                    "startTimestamp": matched_ifvg.get("startTimestamp") or u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": matched_ifvg.get("rule", "Vùng Inversion FVG lật vai trò hỗ trợ/kháng cự chuẩn xác")
+                }
+                if user_p_high and user_p_low:
+                    h_err = abs(user_p_high - matched_ifvg["priceHigh"]) / max(1.0, matched_ifvg["priceHigh"])
+                    l_err = abs(user_p_low - matched_ifvg["priceLow"]) / max(1.0, matched_ifvg["priceLow"])
+                    user_h = abs(user_p_high - user_p_low)
+                    ifvg_h = abs(matched_ifvg["priceHigh"] - matched_ifvg["priceLow"])
+                    if user_h <= max(ifvg_h * 2.5, avg_candle_h * 2.5) and (h_err < 0.12 or l_err < 0.12):
+                        score = max(score, 95)
+                        verdict = "CORRECT"
+            elif not suggested_zone:
+                suggested_zone = {
+                    "type": "Inversion FVG (IFVG)",
+                    "name": "Inversion FVG (IFVG)",
+                    "label": "AI: Inversion FVG (IFVG)",
+                    "priceHigh": round(user_p_high, 4),
+                    "priceLow": round(user_p_low, 4),
+                    "startTimestamp": u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": "Vùng Inversion FVG tại khu vực bạn phân tích"
+                }
+
+        elif is_user_fvg:
             matched_fvg = None
             if detected_fvgs:
-                # 1. Match candidate nearest in price & time
                 if u_time_start:
                     time_candidates = [f for f in detected_fvgs if abs((f.get("startTimestamp") or f.get("c1_timestamp") or 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 7]
                     if time_candidates:
@@ -1934,11 +2088,12 @@ class AiTutorService:
                     "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else matched_fvg.get("c3_timestamp")),
                     "explanation": matched_fvg.get("rule", "Vùng Fair Value Gap chuẩn xác theo Râu Nến Wicks của Nến 1 và Nến 3")
                 }
-                # Check accuracy against student's FVG drawing
                 if user_p_high and user_p_low:
                     h_err = abs(user_p_high - matched_fvg["top"]) / max(1.0, matched_fvg["top"])
                     l_err = abs(user_p_low - matched_fvg["bottom"]) / max(1.0, matched_fvg["bottom"])
-                    if h_err < 0.08 or l_err < 0.08:
+                    user_h = abs(user_p_high - user_p_low)
+                    fvg_h = abs(matched_fvg["top"] - matched_fvg["bottom"])
+                    if not has_fail_signal and user_h <= fvg_h * 2.0 and (h_err < 0.08 and l_err < 0.08):
                         score = max(score, 90)
                         verdict = "CORRECT"
             elif not suggested_zone:
@@ -1955,18 +2110,18 @@ class AiTutorService:
 
         elif is_user_ob:
             matched_ob = None
-            if detected_obs:
+            pref_type = "Bearish" if ("BEARISH" in all_text or "-" in all_text or "GIẢM" in all_text) else ("Bullish" if ("BULLISH" in all_text or "+" in all_text or "TĂNG" in all_text) else None)
+
+            loc_ob = find_order_block_at_candle(klines, u_time_start, user_p_high, user_p_low, preferred_type=pref_type)
+            if loc_ob:
+                matched_ob = loc_ob
+            elif detected_obs:
                 if u_time_start:
                     time_candidates = [o for o in detected_obs if abs(o.get("startTimestamp", 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 3]
                     if time_candidates:
                         matched_ob = min(time_candidates, key=lambda o: abs(o.get("startTimestamp", 0) - u_time_start))
                 if not matched_ob:
                     matched_ob = min(detected_obs, key=lambda o: abs(((o['priceHigh'] + o['priceLow']) / 2) - user_mid))
-
-            if not matched_ob:
-                loc_ob = find_order_block_at_candle(klines, u_time_start, user_p_high, user_p_low)
-                if loc_ob:
-                    matched_ob = loc_ob
 
             if matched_ob:
                 suggested_zone = {
@@ -1977,12 +2132,25 @@ class AiTutorService:
                     "priceLow": matched_ob["priceLow"],
                     "startTimestamp": matched_ob.get("startTimestamp") or u_time_start,
                     "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
-                    "explanation": matched_ob.get("rule", "Cây nến Order Block đơn lẻ chuẩn xác theo Smart Money")
+                    "explanation": matched_ob.get("rule", "Vùng Order Block chuẩn xác theo Smart Money Concepts")
                 }
                 if user_p_high and user_p_low:
                     h_err = abs(user_p_high - matched_ob["priceHigh"]) / max(1.0, matched_ob["priceHigh"])
                     l_err = abs(user_p_low - matched_ob["priceLow"]) / max(1.0, matched_ob["priceLow"])
-                    if h_err < 0.06 and l_err < 0.06:
+                    user_h = abs(user_p_high - user_p_low)
+                    ob_h = abs(matched_ob["priceHigh"] - matched_ob["priceLow"])
+
+                    # Support BOTH single candle AND consecutive cluster in one box
+                    is_single_match = (h_err < 0.08 and l_err < 0.08)
+                    is_cluster_match = False
+                    if matched_ob.get("cluster_high") and matched_ob.get("cluster_low"):
+                        cl_h = matched_ob["cluster_high"]
+                        cl_l = matched_ob["cluster_low"]
+                        cl_h_err = abs(user_p_high - cl_h) / max(1.0, cl_h)
+                        cl_l_err = abs(user_p_low - cl_l) / max(1.0, cl_l)
+                        is_cluster_match = (cl_h_err < 0.08 or cl_l_err < 0.08) or (user_p_high <= cl_h * 1.05 and user_p_low >= cl_l * 0.95)
+
+                    if is_single_match or is_cluster_match or (user_h <= max(ob_h * 3.5, avg_candle_h * 3.0) and (h_err < 0.12 or l_err < 0.12)):
                         score = max(score, 95)
                         verdict = "CORRECT"
             elif not suggested_zone:
@@ -1996,8 +2164,171 @@ class AiTutorService:
                     "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
                     "explanation": "Cây nến Order Block đơn lẻ tại khu vực bạn phân tích"
                 }
+
+        elif is_user_breaker:
+            matched_bb = None
+            if detected_breakers:
+                if u_time_start:
+                    time_cands = [b for b in detected_breakers if abs((b.get("startTimestamp") or 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 7]
+                    if time_cands:
+                        matched_bb = min(time_cands, key=lambda b: abs((b.get("startTimestamp") or 0) - u_time_start))
+                if not matched_bb:
+                    matched_bb = min(detected_breakers, key=lambda b: abs(((b['priceHigh'] + b['priceLow']) / 2) - user_mid))
+
+            if matched_bb:
+                suggested_zone = {
+                    "type": matched_bb["type"],
+                    "name": matched_bb.get("name", matched_bb["type"]),
+                    "label": matched_bb.get("label", f"AI: {matched_bb['type']}"),
+                    "priceHigh": matched_bb["priceHigh"], # Strictly intermediate low candle, NOT Higher High!
+                    "priceLow": matched_bb["priceLow"],
+                    "startTimestamp": matched_bb.get("startTimestamp") or u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": matched_bb.get("rule", "Khối Breaker Block lật vai trò Polarity chuẩn xác")
+                }
+                if user_p_high and user_p_low:
+                    h_err = abs(user_p_high - matched_bb["priceHigh"]) / max(1.0, matched_bb["priceHigh"])
+                    l_err = abs(user_p_low - matched_bb["priceLow"]) / max(1.0, matched_bb["priceLow"])
+                    user_h = abs(user_p_high - user_p_low)
+                    bb_h = abs(matched_bb["priceHigh"] - matched_bb["priceLow"])
+                    if user_h <= max(bb_h * 3.0, avg_candle_h * 2.5) and (h_err < 0.12 or l_err < 0.12):
+                        score = max(score, 95)
+                        verdict = "CORRECT"
+            elif not suggested_zone:
+                suggested_zone = {
+                    "type": "Breaker Block",
+                    "name": json_example_name,
+                    "label": json_example_label,
+                    "priceHigh": round(user_p_high, 4),
+                    "priceLow": round(user_p_low, 4),
+                    "startTimestamp": u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": "Khối Breaker Block tại khu vực phân tích của học viên"
+                }
+
+        elif is_user_mitigation:
+            matched_mb = None
+            if detected_mitigations:
+                if u_time_start:
+                    time_cands = [m for m in detected_mitigations if abs((m.get("startTimestamp") or 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 7]
+                    if time_cands:
+                        matched_mb = min(time_cands, key=lambda m: abs((m.get("startTimestamp") or 0) - u_time_start))
+                if not matched_mb:
+                    matched_mb = min(detected_mitigations, key=lambda m: abs(((m['priceHigh'] + m['priceLow']) / 2) - user_mid))
+
+            if matched_mb:
+                suggested_zone = {
+                    "type": matched_mb["type"],
+                    "name": matched_mb["type"],
+                    "label": f"AI: {matched_mb['type']}",
+                    "priceHigh": matched_mb["priceHigh"],
+                    "priceLow": matched_mb["priceLow"],
+                    "startTimestamp": matched_mb.get("startTimestamp") or u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": matched_mb.get("rule", "Khối Mitigation Block giảm thiểu rủi ro chuẩn xác")
+                }
+                if user_p_high and user_p_low:
+                    h_err = abs(user_p_high - matched_mb["priceHigh"]) / max(1.0, matched_mb["priceHigh"])
+                    l_err = abs(user_p_low - matched_mb["priceLow"]) / max(1.0, matched_mb["priceLow"])
+                    user_h = abs(user_p_high - user_p_low)
+                    mb_h = abs(matched_mb["priceHigh"] - matched_mb["priceLow"])
+                    if not has_fail_signal and user_h <= mb_h * 2.0 and (h_err < 0.05 and l_err < 0.05):
+                        score = max(score, 95)
+                        verdict = "CORRECT"
+            elif not suggested_zone:
+                suggested_zone = {
+                    "type": "Mitigation Block",
+                    "name": "Mitigation Block",
+                    "label": "AI: Mitigation Block",
+                    "priceHigh": round(user_p_high, 4),
+                    "priceLow": round(user_p_low, 4),
+                    "startTimestamp": u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": "Khối Mitigation Block tại khu vực phân tích của học viên"
+                }
+
+        elif is_user_vi:
+            matched_vi = None
+            if detected_vis:
+                if u_time_start:
+                    time_cands = [v for v in detected_vis if abs((v.get("startTimestamp") or 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 7]
+                    if time_cands:
+                        matched_vi = min(time_cands, key=lambda v: abs((v.get("startTimestamp") or 0) - u_time_start))
+                if not matched_vi:
+                    matched_vi = min(detected_vis, key=lambda v: abs(((v['priceHigh'] + v['priceLow']) / 2) - user_mid))
+
+            if matched_vi:
+                suggested_zone = {
+                    "type": matched_vi["type"],
+                    "name": matched_vi["type"],
+                    "label": f"AI: {matched_vi['type']}",
+                    "priceHigh": matched_vi["priceHigh"],
+                    "priceLow": matched_vi["priceLow"],
+                    "startTimestamp": matched_vi.get("startTimestamp") or u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": matched_vi.get("rule", "Khoảng hở giữa 2 thân nến Volume Imbalance chuẩn xác")
+                }
+                if user_p_high and user_p_low:
+                    h_err = abs(user_p_high - matched_vi["priceHigh"]) / max(1.0, matched_vi["priceHigh"])
+                    l_err = abs(user_p_low - matched_vi["priceLow"]) / max(1.0, matched_vi["priceLow"])
+                    user_h = abs(user_p_high - user_p_low)
+                    vi_h = abs(matched_vi["priceHigh"] - matched_vi["priceLow"])
+                    if not has_fail_signal and user_h <= max(1.0, vi_h * 2.5) and (h_err < 0.05 and l_err < 0.05):
+                        score = max(score, 90)
+                        verdict = "CORRECT"
+            elif not suggested_zone:
+                suggested_zone = {
+                    "type": "Volume Imbalance (VI)",
+                    "name": "Volume Imbalance (VI)",
+                    "label": "AI: Volume Imbalance (VI)",
+                    "priceHigh": round(user_p_high, 4),
+                    "priceLow": round(user_p_low, 4),
+                    "startTimestamp": u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": "Khoảng hở Volume Imbalance tại khu vực bạn vẽ"
+                }
+
+        elif is_user_rejection:
+            matched_rb = None
+            if detected_rbs:
+                if u_time_start:
+                    time_cands = [r for r in detected_rbs if abs((r.get("startTimestamp") or 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 7]
+                    if time_cands:
+                        matched_rb = min(time_cands, key=lambda r: abs((r.get("startTimestamp") or 0) - u_time_start))
+                if not matched_rb:
+                    matched_rb = min(detected_rbs, key=lambda r: abs(((r['priceHigh'] + r['priceLow']) / 2) - user_mid))
+
+            if matched_rb:
+                suggested_zone = {
+                    "type": matched_rb["type"],
+                    "name": matched_rb["type"],
+                    "label": f"AI: {matched_rb['type']}",
+                    "priceHigh": matched_rb["priceHigh"],
+                    "priceLow": matched_rb["priceLow"],
+                    "startTimestamp": matched_rb.get("startTimestamp") or u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": matched_rb.get("rule", "Phần râu nến Rejection Block từ chối giá cực trị")
+                }
+                if user_p_high and user_p_low:
+                    h_err = abs(user_p_high - matched_rb["priceHigh"]) / max(1.0, matched_rb["priceHigh"])
+                    l_err = abs(user_p_low - matched_rb["priceLow"]) / max(1.0, matched_rb["priceLow"])
+                    user_h = abs(user_p_high - user_p_low)
+                    rb_h = abs(matched_rb["priceHigh"] - matched_rb["priceLow"])
+                    if not has_fail_signal and user_h <= max(1.0, rb_h * 2.0) and (h_err < 0.05 and l_err < 0.05):
+                        score = max(score, 90)
+                        verdict = "CORRECT"
+            elif not suggested_zone:
+                suggested_zone = {
+                    "type": "Rejection Block (RB)",
+                    "name": "Rejection Block (RB)",
+                    "label": "AI: Rejection Block (RB)",
+                    "priceHigh": round(user_p_high, 4),
+                    "priceLow": round(user_p_low, 4),
+                    "startTimestamp": u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": "Vùng râu nến Rejection Block tại khu vực bạn vẽ"
+                }
         else:
-            # Fallback for untagged drawings: bind to student's exact coordinates
             if not suggested_zone:
                 suggested_zone = {
                     "type": first_draw.get("name") or "Vùng Cấu Trúc SMC",
@@ -2010,27 +2341,66 @@ class AiTutorService:
                     "explanation": "Vùng cấu trúc nến tối ưu tại khu vực học viên đang vẽ"
                 }
 
-                # SYNCHRONIZATION GUARANTEE:
-        # If verdict is CORRECT (score >= 80), harmonize the markdown conclusion text
-        # so that the badge, score, and explanation text are in 100% agreement!
-        if verdict == "CORRECT" and score >= 80:
+        # Guard against hallucinated massive zones in suggestedZone (e.g. whole wave instead of single candle)
+        if suggested_zone and is_user_ob:
+            sz_h = abs(float(suggested_zone.get("priceHigh", 0)) - float(suggested_zone.get("priceLow", 0)))
+            if sz_h > avg_candle_h * 3.5:
+                if matched_ob:
+                    suggested_zone["priceHigh"] = matched_ob["priceHigh"]
+                    suggested_zone["priceLow"] = matched_ob["priceLow"]
+                elif user_p_high and user_p_low and (user_p_high - user_p_low) <= avg_candle_h * 3.5:
+                    suggested_zone["priceHigh"] = user_p_high
+                    suggested_zone["priceLow"] = user_p_low
+
+        # Guard against Breaker Block stretching up to Higher High or down to Lower Low!
+        if suggested_zone and is_user_breaker and matched_bb:
+            suggested_zone["priceHigh"] = matched_bb["priceHigh"]
+            suggested_zone["priceLow"] = matched_bb["priceLow"]
+            suggested_zone["name"] = matched_bb.get("name", matched_bb["type"])
+            suggested_zone["label"] = matched_bb.get("label", f"AI: {matched_bb['type']}")
+
+        # Guard against CISD stretching
+        if suggested_zone and is_user_cisd and matched_cisd:
+            suggested_zone["priceHigh"] = matched_cisd["priceHigh"]
+            suggested_zone["priceLow"] = matched_cisd["priceLow"]
+            suggested_zone["name"] = matched_cisd["name"]
+            suggested_zone["label"] = matched_cisd["label"]
+
+        # SYNCHRONIZATION GUARANTEE:
+        if verdict == "CORRECT":
             analysis = re.sub(
-                r'(-\s*\*\*Kết luận tổng quan:\*\*\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:CHƯA ĐÚNG|SAI)[^\r\n]*',
+                r'(-\s*\*\*Kết luận tổng quan:\*\*\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:CHƯA ĐÚNG|SAI|ĐÚNG MỘT PHẦN)[^\r\n]*',
                 r'\1Bài vẽ của học viên **ĐÚNG** chuẩn xác theo định nghĩa Smart Money Concepts (SMC/ICT).',
                 analysis,
                 flags=re.IGNORECASE
             )
-            if is_user_fvg:
-                analysis = re.sub(r'Hình #\d+ - \[Order Block.*?Học viên đã kéo một vùng phạm vi quá rộng[^\r\n]*', '', analysis)
-                analysis = re.sub(r'Theo nguyên tắc tối thượng của ICT, một Order Block thuần túy chỉ là DUY NHẤT MỘT CÂY NẾN ĐƠN LẺ[^\r\n]*', '', analysis)
-
-        elif verdict == "INCORRECT" and score <= 60:
+            analysis = re.sub(r'Hình #\d+ - \[Order Block.*?Học viên đã kéo một vùng phạm vi quá rộng[^\r\n]*', '', analysis)
+            analysis = re.sub(r'Theo nguyên tắc tối thượng của ICT, một Order Block thuần túy chỉ là DUY NHẤT MỘT CÂY NẾN ĐƠN LẺ[^\r\n]*', '', analysis)
+            analysis = re.sub(r'chỉ được vẽ DUY NHẤT 1 CÂY NẾN[^\r\n]*', '', analysis)
+            analysis = re.sub(r'giá đã đâm thủng.*?nên không còn hợp lệ[^\r\n]*', '', analysis, flags=re.IGNORECASE)
+        elif verdict == "INCORRECT":
             analysis = re.sub(
-                r'(-\s*\*\*Kết luận tổng quan:\*\*\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:ĐÚNG|CHÍNH XÁC)[^\r\n]*',
+                r'(-\s*\*\*Kết luận tổng quan:\*\*\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:ĐÚNG|CHÍNH XÁC|ĐÚNG MỘT PHẦN)[^\r\n]*',
                 r'\1Bài vẽ của học viên **CHƯA ĐÚNG** theo tiêu chuẩn kỹ thuật.',
                 analysis,
                 flags=re.IGNORECASE
             )
+        elif verdict == "PARTIALLY_CORRECT":
+            if "ĐÚNG MỘT PHẦN" not in analysis[:350].upper():
+                analysis = re.sub(
+                    r'(-\s*\*\*Kết luận tổng quan:\*\*\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:ĐÚNG|CHÍNH XÁC|CHƯA ĐÚNG|SAI)[^\r\n]*',
+                    r'\1Bài vẽ của học viên **ĐÚNG MỘT PHẦN** (cần lưu ý hoàn thiện thêm).',
+                    analysis,
+                    flags=re.IGNORECASE
+                )
+
+        # CRITICAL: Always keep Section 5 score synchronized with final score
+        analysis = re.sub(
+            r'((?:Điểm\s*(?:đánh giá|số)?|Score)[:\s*]+)\d{1,3}(\s*(?:/\s*100)?)',
+            rf'\g<1>{score}\g<2>',
+            analysis,
+            flags=re.IGNORECASE
+        )
 
         return {
             "success": True,
