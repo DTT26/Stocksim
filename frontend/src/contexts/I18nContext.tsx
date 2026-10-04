@@ -62,6 +62,10 @@ const translations: Translations = {
     'chart.loading': 'Đang tải dữ liệu...',
     'chart.toolActive': 'đang hoạt động',
     'chart.adjustData': 'Chỉnh thông tin số liệu',
+    'chart.solidLine': 'Đường thẳng',
+    'chart.dashedLine': 'Đường đứt nét',
+    'chart.dottedLine': 'Đường chấm chấm',
+    'chart.opacity': 'Độ mờ',
 
     'ctx.template': 'Bản mẫu',
     'ctx.saveAs': 'Lưu thành...',
@@ -416,6 +420,11 @@ const translations: Translations = {
     'chart.loading': 'Loading data...',
     'chart.toolActive': 'is active',
     'chart.adjustData': 'Adjust Data & Inputs',
+    'chart.addText': 'Add text',
+    'chart.solidLine': 'Solid Line',
+    'chart.dashedLine': 'Dashed Line',
+    'chart.dottedLine': 'Dotted Line',
+    'chart.opacity': 'Opacity',
 
     // Settings Modal
     'settings.trendLine': 'Trend Line',

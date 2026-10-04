@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { init, dispose, registerOverlay } from 'klinecharts';
 import type { Chart, KLineData, DataLoaderGetBarsParams, DataLoaderSubscribeBarParams } from 'klinecharts';
 import { Settings2, Trash2, Edit2, Type, Minus, MoreHorizontal, Lock, Unlock, GripVertical, LayoutGrid, Pencil, Plus, ChevronRight, Copy, Settings, X, Layers, RotateCcw, Clipboard, Edit3 } from 'lucide-react';
-import { generateOHLCV, getPricePrecision, getContractMultiplier, timeframeToMs, type Stock } from '../data';
+import { generateOHLCV, getPricePrecision, timeframeToMs, getContractMultiplier, type Stock } from '../data';
 import { fetchBinanceKlines, mapTimeframeToBinance, subscribeBinanceKline } from '../../../services/binanceApi';
 import { fetchUnifiedKlines, subscribeUnifiedBar } from '../../../services/marketDataService';
 import type { TradeOrder } from '../TradingTerminal';
@@ -73,6 +73,7 @@ export const isUserDrawingOverlay = (ov: any): boolean => {
     id.startsWith('pending_') ||
     id.startsWith('tpsl_') ||
     name === 'tpslZone' ||
+    name === 'orderTpslLine' ||
     name === 'aiCorrectionZone' ||
     name === 'aiCorrectionBox' ||
     name === 'zoomInBox'
@@ -168,32 +169,11 @@ export const detectSmcConcept = (text: string, overlayName: string): { tag: stri
       displayLabel: clean ? `Breaker Block (${clean})` : 'Breaker Block'
     };
   }
-  if (/\b(mb|mitigation|mitigation\s*block|giảm\s*thải)\b/i.test(lower)) {
+  if (/\b(mb|mitigation|mitigation\s*block)\b/i.test(lower)) {
     return {
       tag: 'MITIGATION',
       detectedConcept: 'Mitigation Block',
       displayLabel: clean ? `Mitigation Block (${clean})` : 'Mitigation Block'
-    };
-  }
-  if (/\b(ifvg|inversion\s*fvg|inversion|fvg\s*đảo)\b/i.test(lower)) {
-    return {
-      tag: 'IFVG',
-      detectedConcept: 'Inversion Fair Value Gap (IFVG)',
-      displayLabel: clean ? `Inversion FVG (${clean})` : 'Inversion Fair Value Gap (IFVG)'
-    };
-  }
-  if (/\b(vi|volume\s*imbalance|gap\s*thân|hở\s*thân)\b/i.test(lower)) {
-    return {
-      tag: 'VI',
-      detectedConcept: 'Volume Imbalance (VI)',
-      displayLabel: clean ? `Volume Imbalance (${clean})` : 'Volume Imbalance (VI)'
-    };
-  }
-  if (/\b(rb|rejection\s*block|rejection|râu\s*từ\s*chối)\b/i.test(lower)) {
-    return {
-      tag: 'REJECTION',
-      detectedConcept: 'Rejection Block (RB)',
-      displayLabel: clean ? `Rejection Block (${clean})` : 'Rejection Block (RB)'
     };
   }
   if (/\b(sd|supply|demand|cung|cầu)\b/i.test(lower)) {
@@ -352,7 +332,7 @@ registerOverlay({
       },
       styles: {
         color: '#ffffff',
-        backgroundColor: overlay?.extendData?.badgeColor || (overlay?.styles?.rect?.borderColor as string) || '#059669',
+        backgroundColor: '#d97706',
         borderRadius: 4,
         paddingLeft: 7,
         paddingRight: 7,
@@ -528,28 +508,10 @@ export const drawAiCorrectionOverlay = (suggestedZone: {
       }
     }
 
-    const candleInterval = klines.length >= 2 ? Math.abs(klines[1].timestamp - klines[0].timestamp) : 3600000;
-    let finalT1: number = t1 || (klines[Math.max(0, klines.length - 15)]?.timestamp) || (Date.now() - 3600000 * 4);
-    let finalT2: number = t2 || 0;
-
-    const isOrderBlockType = zType.includes('ORDER BLOCK') || zType.includes('OB') || zType.includes('BLOCK');
-    const isFvgType = zType.includes('FVG') || zType.includes('GAP') || zType.includes('IMBALANCE');
-
-    if (isOrderBlockType) {
-      // Order Block strictly encapsulates the single institutional candle (1 to 2 candles wide max)
-      if (!finalT2 || finalT2 <= finalT1 || (finalT2 - finalT1) > candleInterval * 4) {
-        finalT2 = finalT1 + Math.max(1, candleInterval) * 2;
-      }
-    } else if (isFvgType) {
-      // FVG encapsulates the 3-candle imbalance range
-      if (!finalT2 || finalT2 <= finalT1 || (finalT2 - finalT1) > candleInterval * 6) {
-        finalT2 = finalT1 + Math.max(1, candleInterval) * 3;
-      }
-    } else {
-      if (!finalT2 || finalT2 <= finalT1) {
-        finalT2 = ((lastKline?.timestamp && lastKline.timestamp > finalT1) ? lastKline.timestamp : (finalT1 + 3600000 * 24 * 7));
-      }
-    }
+    const finalT1: number = t1 || (klines[Math.max(0, klines.length - 15)]?.timestamp) || (Date.now() - 3600000 * 4);
+    const finalT2: number = (!t2 || t2 <= finalT1)
+      ? ((lastKline?.timestamp && lastKline.timestamp > finalT1) ? lastKline.timestamp : (finalT1 + 3600000 * 24 * 7))
+      : t2;
 
     // Determine colors according to concept
     let fillColor = 'rgba(245, 158, 11, 0.22)';
@@ -581,7 +543,6 @@ export const drawAiCorrectionOverlay = (suggestedZone: {
         priceText,
         priceHigh: suggestedZone.priceHigh,
         priceLow: suggestedZone.priceLow,
-        badgeColor: borderColor,
         explanation: suggestedZone.explanation
       },
       styles: {
@@ -2325,130 +2286,183 @@ registerOverlay({
     return [];
   }
 });
+
+// Helper tính toán text hiển thị trên Badge (ví dụ: "TP  +$199.64" hoặc "SL  -$99.82")
+const computeOrderLineBadge = (
+  type: 'TP' | 'SL' | 'ENTRY' | 'ORDER',
+  targetPrice: number,
+  entryPrice: number,
+  side: 'LONG' | 'SHORT',
+  quantity?: number
+): string => {
+  if (type === 'ENTRY') {
+    return `${side === 'LONG' ? '▲ LONG' : '▼ SHORT'} @ $${targetPrice.toLocaleString('en-US')}`;
+  }
+  if (type === 'ORDER') {
+    return `${side} @ $${targetPrice.toLocaleString('en-US')}`;
+  }
+
+  const isLong = side === 'LONG';
+  let diff = targetPrice - entryPrice;
+  if (!isLong) diff = -diff; // Với lệnh SHORT, giá giảm là lãi
+
+  const pct = entryPrice > 0 ? (diff / entryPrice) * 100 : 0;
+
+  if (quantity && quantity > 0) {
+    const pnl = diff * quantity;
+    const sign = pnl >= 0 ? '+' : '-';
+    return `${type}  ${sign}$${Math.abs(pnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  const sign = pct >= 0 ? '+' : '-';
+  return `${type}  ${sign}${Math.abs(pct).toFixed(2)}%`;
+};
+
+// Đăng ký overlay TP / SL / Order Line theo chuẩn TradingView (Có Badge trên Chart và Tag Giá trên trục Y)
 registerOverlay({
-  name: 'tpslLine',
+  name: 'orderTpslLine',
   totalStep: 2,
   needDefaultPointFigure: false,
   needDefaultXAxisFigure: false,
   needDefaultYAxisFigure: false,
-  performEventPressedMove: ({ points, performPoint }: any) => {
-    if (points && points.length > 0 && performPoint && typeof performPoint.value === 'number') {
-      points[0].value = performPoint.value;
-      if (points[1]) {
-        points[1].value = performPoint.value;
+  createPointFigures: ({ coordinates, bounding, overlay, yAxis }) => {
+    let y = coordinates?.[0]?.y;
+    const price = overlay.points?.[0]?.value ?? (overlay.extendData as any)?.price;
+    if (typeof y !== 'number' || isNaN(y)) {
+      if (typeof price === 'number' && !isNaN(price) && yAxis && typeof yAxis.convertToPixel === 'function') {
+        y = yAxis.convertToPixel(price);
       }
     }
-  },
-  createPointFigures: ({ coordinates, bounding, overlay }: any) => {
-    if (!coordinates || coordinates.length === 0 || !coordinates[0]) return [];
-    const py = coordinates[0].y;
-    if (typeof py !== 'number' || isNaN(py)) return [];
-    const width = bounding?.width || 3000;
+    if (typeof y !== 'number' || isNaN(y)) return [];
 
-    const isTP = overlay.extendData?.type === 'tp';
-    const isPreview = !!overlay.extendData?.isPreview;
-    const lineColor = isTP ? '#089981' : '#f23645';
-    const badgeText = overlay.extendData?.badgeText || (isTP ? 'TP' : 'SL');
+    const width = bounding?.width || 3000;
+    const color = (overlay.extendData as any)?.color || '#089981';
+    const isDashed = (overlay.extendData as any)?.isDashed ?? true;
+    const badgeText = (overlay.extendData as any)?.badgeText || '';
 
     const figures: any[] = [];
 
-    // 1. Horizontal full-width line
+    // 1. Đường kẻ ngang chạy hết màn hình
     figures.push({
       type: 'line',
       attrs: {
         coordinates: [
-          { x: 0, y: py },
-          { x: width, y: py }
+          { x: 0, y },
+          { x: width, y }
         ]
       },
       styles: {
-        style: isPreview ? 'dashed' : 'solid',
-        color: lineColor,
-        size: 2,
-        dashedValue: [5, 5]
+        color: color,
+        size: 1.5,
+        style: isDashed ? 'dashed' : 'solid',
+        dashedValue: [5, 4]
       }
     });
 
-    // 2. Control Point / Drag Handle (circle)
-    figures.push({
-      type: 'circle',
-      attrs: {
-        x: width - 18,
-        y: py,
-        r: 6
-      },
-      styles: {
-        style: 'fill_stroke',
-        color: lineColor,
-        borderColor: '#ffffff',
-        borderSize: 2
-      }
-    });
+    // 2. Khối Badge pill hiển thị TP / SL và PnL (e.g. "TP  +$199.64", "SL  -$99.82")
+    if (badgeText) {
+      const charWidth = 7.5;
+      const badgeWidth = Math.max(90, Math.round(badgeText.length * charWidth + 24));
+      const badgeHeight = 22;
+      // Đặt badge ngay bên phải của các nến hiện tại (hoặc 40-50% màn hình), đẹp mắt như TradingView
+      const lastCandleX = (coordinates[1] && typeof coordinates[1].x === 'number') ? coordinates[1].x : (width * 0.45);
+      const badgeX = Math.max(60, Math.min(width - badgeWidth - 80, lastCandleX + 35));
 
-    // 3. Profit / Loss Badge Pill (e.g. "TP  +$38.13" or "SL  -$41.27")
-    figures.push({
-      type: 'text',
-      attrs: {
-        x: width - 34,
-        y: py,
-        text: badgeText,
-        align: 'right',
-        baseline: 'middle'
-      },
-      styles: {
-        color: '#ffffff',
-        backgroundColor: lineColor,
-        paddingLeft: 8,
-        paddingRight: 8,
-        paddingTop: 4,
-        paddingBottom: 4,
-        borderRadius: 4,
-        size: 11,
-        weight: 'bold',
-        family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-      }
-    });
+      figures.push({
+        type: 'rect',
+        attrs: {
+          x: badgeX,
+          y: y - badgeHeight / 2,
+          width: badgeWidth,
+          height: badgeHeight
+        },
+        styles: {
+          style: 'fill',
+          color: color,
+          borderRadius: 4
+        }
+      });
 
-    return figures;
-  },
-  createYAxisFigures: ({ coordinates, overlay }: any) => {
-    if (!coordinates || coordinates.length === 0 || !coordinates[0]) return [];
-    const py = coordinates[0].y;
-    if (typeof py !== 'number' || isNaN(py)) return [];
-    const isTP = overlay.extendData?.type === 'tp';
-    const price = overlay.points?.[0]?.value || 0;
-    const precision = overlay.extendData?.precision ?? 2;
-    const formattedPrice = price.toLocaleString('en-US', {
-      minimumFractionDigits: precision,
-      maximumFractionDigits: precision
-    });
-    const lineColor = isTP ? '#089981' : '#f23645';
-
-    return [
-      {
+      figures.push({
         type: 'text',
         attrs: {
-          x: 4,
-          y: py,
-          text: formattedPrice,
-          align: 'left',
+          x: badgeX + badgeWidth / 2,
+          y: y,
+          text: badgeText,
+          align: 'center',
           baseline: 'middle'
         },
         styles: {
           color: '#ffffff',
-          backgroundColor: lineColor,
-          paddingLeft: 5,
-          paddingRight: 5,
-          paddingTop: 3,
-          paddingBottom: 3,
-          borderRadius: 3,
+          backgroundColor: 'transparent',
           size: 11,
-          weight: 'bold'
+          weight: 'bold',
+          family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         }
+      });
+    }
+
+    return figures;
+  },
+  createYAxisFigures: ({ coordinates, bounding, overlay, yAxis }) => {
+    let y = coordinates?.[0]?.y;
+    const price = overlay.points?.[0]?.value ?? (overlay.extendData as any)?.price;
+    if (typeof price !== 'number' || isNaN(price)) return [];
+    if (typeof y !== 'number' || isNaN(y)) {
+      if (yAxis && typeof yAxis.convertToPixel === 'function') {
+        y = yAxis.convertToPixel(price);
+      }
+    }
+    if (typeof y !== 'number' || isNaN(y)) return [];
+
+    const color = (overlay.extendData as any)?.color || '#089981';
+    const precision = (overlay.extendData as any)?.precision ?? 2;
+    const formattedPrice = price.toLocaleString('en-US', {
+      minimumFractionDigits: precision,
+      maximumFractionDigits: precision
+    });
+
+    const yWidth = bounding?.width || 75;
+    const boxHeight = 20;
+
+    return [
+      {
+        type: 'rect',
+        attrs: {
+          x: 0,
+          y: y - boxHeight / 2,
+          width: yWidth,
+          height: boxHeight
+        },
+        styles: {
+          style: 'fill',
+          color: color,
+          borderRadius: 3
+        },
+        ignoreEvent: true
+      },
+      {
+        type: 'text',
+        attrs: {
+          x: yWidth / 2,
+          y: y,
+          text: formattedPrice,
+          align: 'center',
+          baseline: 'middle'
+        },
+        styles: {
+          color: '#ffffff',
+          backgroundColor: 'transparent',
+          size: 11,
+          weight: 'bold',
+          family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        ignoreEvent: true
       }
     ];
   }
 });
+
 // ÄÄƒng kĂ½ ÄÆ°á»ng thĂ´ng tin (infoLine)
 registerOverlay({
   name: 'infoLine',
@@ -2515,13 +2529,13 @@ registerOverlay({
       // Line 1: Price difference
       figures.push({
         type: 'text',
-        attrs: { x: cardX + 10, y: cardY + 10, text: `â†•  ${priceDiff} (${pctChange}), ${valDiff}` },
+        attrs: { x: cardX + 10, y: cardY + 10, text: `↕  ${priceDiff} (${pctChange}), ${valDiff}` },
         styles: { color: '#ffffff', size: 12, weight: 'bold', backgroundColor: 'transparent' }
       });
       // Line 2: Bar count & Time & Distance px
       figures.push({
         type: 'text',
-        attrs: { x: cardX + 10, y: cardY + 32, text: `â†”  ${barCount} thanh (${timeText}), khoáº£ng cĂ¡ch: ${distPx} px` },
+        attrs: { x: cardX + 10, y: cardY + 32, text: `↔  ${barCount} thanh (${timeText}), khoảng cách: ${distPx} px` },
         styles: { color: '#d1d4dc', size: 11, backgroundColor: 'transparent' }
       });
       // Line 3: Angle
@@ -2586,7 +2600,7 @@ registerOverlay({
         attrs: {
           x: p1.x + (radius + 20) * Math.cos(midAngle),
           y: p1.y - (radius + 20) * Math.sin(midAngle),
-          text: `${angleDeg}Â°`
+          text: `${angleDeg}°`
         },
         styles: {
           color: '#2962ff',
@@ -3724,7 +3738,7 @@ registerOverlay({
       const p1 = coordinates[1];
       let channelHeight = Math.abs(p1.y - p0.y) * 0.4;
       if (channelHeight < 25) channelHeight = 35;
-      let rSquaredText = 'RÂ² = 0.984';
+      let rSquaredText = 'R² = 0.984';
       let deltaText = '';
       if (points && points.length >= 2 && kLineDataList && kLineDataList.length > 0) {
         const idx0 = Math.min(points[0].dataIndex ?? 0, points[1].dataIndex ?? 0);
@@ -4242,7 +4256,7 @@ interface ChartAreaProps {
   stayInDrawingMode?: boolean;
   lockDrawing?: boolean;
   hideDrawing?: boolean;
-  previewTPSL?: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; lot?: number; actualQty?: number } | null;
+  previewTPSL?: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; quantity?: number; lot?: number; actualQty?: number } | null;
   onTPSLChange?: (type: 'tp' | 'sl' | 'orderPrice', price: number) => void;
   simulatorPositions?: any[];
   undoTrigger?: number;
@@ -4306,7 +4320,6 @@ export const ChartArea = ({
     if (debouncedSaveTimerRef.current) clearTimeout(debouncedSaveTimerRef.current);
     debouncedSaveTimerRef.current = setTimeout(() => {
       saveDrawingsRef.current?.();
-      window.dispatchEvent(new CustomEvent('stocksim-drawings-changed'));
     }, 150);
   };
   globalTriggerAutoSave = triggerAutoSaveDrawings;
@@ -4339,6 +4352,8 @@ export const ChartArea = ({
   const stayInDrawingModeRef = useRef(stayInDrawingMode);
   stayInDrawingModeRef.current = stayInDrawingMode;
   const lastOverlayPointsRef = useRef<Record<string, any>>({});
+  const isOverlayDraggingRef = useRef<boolean>(false);
+  const lineDragHandleRef = useRef<Record<string, 'p0' | 'p1' | 'body' | 'none'>>({});
   // Fibonacci & Tool Floating Bar States
   const [isFibModalOpen, setIsFibModalOpen] = useState(false);
   const [fibConfig, setFibConfig] = useState<FibonacciConfig>(DEFAULT_FIBONACCI_CONFIG);
@@ -4582,7 +4597,7 @@ export const ChartArea = ({
           showType: 'standard',
           title: {
             show: true,
-            template: '{ticker} Â· {period}'
+            template: '{ticker} · {period}'
           },
           legend: {
             template: [
@@ -4805,7 +4820,7 @@ export const ChartArea = ({
     globalChartInstance = chart;
     (window as any).__STOCKSIM_CHART__ = chart;
     (window as any).__currentKlineChart = chart;
-    // Globally prevent right-click from deleting ANY overlay
+    // Globally prevent right-click from deleting ANY overlay and support Shift snapping on line tools
     const originalCreateOverlay = chart.createOverlay.bind(chart);
     chart.createOverlay = (value: any, paneId?: string) => {
       if (value && typeof value === 'object') {
@@ -4835,6 +4850,122 @@ export const ChartArea = ({
           }
           if (typeof originalOnSelected === 'function') {
             originalOnSelected(event);
+          }
+        };
+        const originalOnDrawing = value.onDrawing;
+        value.onDrawing = (event: any) => {
+          if (typeof originalOnDrawing === 'function') {
+            originalOnDrawing(event);
+          }
+          const isLine = ['segment', 'rayLine', 'arrow', 'trendAngle', 'straightLine', 'measure', 'infoLine', 'horizontalStraightLine', 'verticalStraightLine', 'priceLine'].includes(event.overlay?.name);
+          if (isLine && event.overlay?.points?.length > 1) {
+            const isShift = !!((window as any)._isShiftPressed || (event as any)?.shiftKey);
+            if (isShift) {
+              const pts = event.overlay.points;
+              const p0 = pts[0];
+              const pLast = pts[pts.length - 1];
+              if (p0?.value !== undefined && pLast?.value !== undefined) {
+                pLast.value = p0.value;
+                chart.overrideOverlay({ id: event.overlay.id, points: pts });
+              }
+            }
+          }
+        };
+        const originalOnPressedMoveStart = value.onPressedMoveStart;
+        value.onPressedMoveStart = (event: any) => {
+          isOverlayDraggingRef.current = true;
+          const isLine = ['segment', 'rayLine', 'arrow', 'trendAngle', 'straightLine', 'measure', 'infoLine', 'horizontalStraightLine', 'verticalStraightLine', 'priceLine'].includes(event.overlay?.name);
+          if (isLine && event.overlay?.points?.length > 1) {
+            const pts = event.overlay.points;
+            const overlayId = event.overlay.id;
+            lastOverlayPointsRef.current[overlayId] = pts.map((p: any) => ({ ...p }));
+            let dragHandle: 'p0' | 'p1' | 'body' | 'none' = 'none';
+            if (event.x !== undefined && event.y !== undefined) {
+              const pixelCoords = chart.convertToPixel(pts, { paneId: 'candle_pane' });
+              const coords = Array.isArray(pixelCoords) ? pixelCoords : [pixelCoords];
+              if (coords[0] && Math.hypot(coords[0].x - event.x, coords[0].y - event.y) <= 30) {
+                dragHandle = 'p0';
+              } else if (coords[coords.length - 1] && Math.hypot(coords[coords.length - 1].x - event.x, coords[coords.length - 1].y - event.y) <= 30) {
+                dragHandle = 'p1';
+              } else {
+                dragHandle = 'body';
+              }
+            }
+            lineDragHandleRef.current[overlayId] = dragHandle;
+          }
+          if (typeof originalOnPressedMoveStart === 'function') {
+            originalOnPressedMoveStart(event);
+          }
+        };
+        const originalOnPressedMoving = value.onPressedMoving;
+        value.onPressedMoving = (event: any) => {
+          let handled = false;
+          if (typeof originalOnPressedMoving === 'function') {
+            handled = originalOnPressedMoving(event) === true;
+          }
+          const isLine = ['segment', 'rayLine', 'arrow', 'trendAngle', 'straightLine', 'measure', 'infoLine', 'horizontalStraightLine', 'verticalStraightLine', 'priceLine'].includes(event.overlay?.name);
+          if (!handled && isLine && event.overlay?.points?.length > 1) {
+            const overlayId = event.overlay.id;
+            const pts = event.overlay.points;
+            const p0 = pts[0];
+            const p1 = pts[pts.length - 1];
+            const isShift = !!((window as any)._isShiftPressed || (event as any)?.shiftKey);
+
+            if (isShift && p0?.value !== undefined && p1?.value !== undefined) {
+              let handle = lineDragHandleRef.current[overlayId];
+              if (!handle || handle === 'none') {
+                const lastPts = lastOverlayPointsRef.current[overlayId];
+                if (lastPts && lastPts[0] && lastPts[lastPts.length - 1]) {
+                  const p0Changed = p0.timestamp !== lastPts[0].timestamp || p0.value !== lastPts[0].value;
+                  const p1Changed = p1.timestamp !== lastPts[lastPts.length - 1].timestamp || p1.value !== lastPts[lastPts.length - 1].value;
+                  if (p0Changed && !p1Changed) handle = 'p0';
+                  else if (!p0Changed && p1Changed) handle = 'p1';
+                  else if (p0Changed && p1Changed) handle = 'body';
+                }
+              }
+              if (handle === 'p0') {
+                p0.value = p1.value;
+                chart.overrideOverlay({ id: overlayId, points: pts });
+                lastOverlayPointsRef.current[overlayId] = pts.map((p: any) => ({ ...p }));
+                return true;
+              } else if (handle === 'p1') {
+                p1.value = p0.value;
+                chart.overrideOverlay({ id: overlayId, points: pts });
+                lastOverlayPointsRef.current[overlayId] = pts.map((p: any) => ({ ...p }));
+                return true;
+              }
+            }
+            lastOverlayPointsRef.current[overlayId] = pts.map((p: any) => ({ ...p }));
+          }
+          return handled;
+        };
+        const originalOnPressedMoveEnd = value.onPressedMoveEnd;
+        value.onPressedMoveEnd = (event: any) => {
+          isOverlayDraggingRef.current = false;
+          if (event.overlay?.id) {
+            delete lineDragHandleRef.current[event.overlay.id];
+          }
+          if (typeof originalOnPressedMoveEnd === 'function') {
+            originalOnPressedMoveEnd(event);
+          }
+        };
+        const originalOnDrawEnd = value.onDrawEnd;
+        value.onDrawEnd = (event: any) => {
+          const isLine = ['segment', 'rayLine', 'arrow', 'trendAngle', 'straightLine', 'measure', 'infoLine', 'horizontalStraightLine', 'verticalStraightLine', 'priceLine'].includes(event.overlay?.name);
+          if (isLine && event.overlay?.points?.length > 1) {
+            const isShift = !!((window as any)._isShiftPressed || (event as any)?.shiftKey);
+            if (isShift) {
+              const pts = event.overlay.points;
+              const p0 = pts[0];
+              const pLast = pts[pts.length - 1];
+              if (p0?.value !== undefined && pLast?.value !== undefined) {
+                pLast.value = p0.value;
+                chart.overrideOverlay({ id: event.overlay.id, points: pts });
+              }
+            }
+          }
+          if (typeof originalOnDrawEnd === 'function') {
+            originalOnDrawEnd(event);
           }
         };
       }
@@ -5130,7 +5261,56 @@ export const ChartArea = ({
       }
     });
   };
-  // --- Measure Feature using Shift + Drag ---
+  // --- Helper to calculate distance from point (px, py) to segment (x1, y1)-(x2, y2) ---
+  const pointToSegmentDistance = (px: number, py: number, x1: number, y1: number, x2: number, y2: number): number => {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+    let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const projX = x1 + t * dx;
+    const projY = y1 + t * dy;
+    return Math.hypot(px - projX, py - projY);
+  };
+
+  // --- Helper to check if pixel coordinates are on or near any overlay or handle ---
+  const isNearAnyOverlay = (chart: any, clickX: number, clickY: number, excludeOverlayId?: string | null): boolean => {
+    if (!chart || typeof chart.getOverlays !== 'function') return false;
+    try {
+      const overlays = chart.getOverlays() || [];
+      for (const ov of overlays) {
+        if (!ov || (excludeOverlayId && ov.id === excludeOverlayId)) continue;
+        const pts = ov.points;
+        if (!pts || !Array.isArray(pts) || pts.length === 0) continue;
+        const converted = chart.convertToPixel(pts, { paneId: 'candle_pane' });
+        const coords: Array<{ x?: number; y?: number }> = Array.isArray(converted) ? converted : [converted];
+        // 1. Proximity to any handle / point (tolerance 30px)
+        for (const pt of coords) {
+          if (pt && typeof pt.x === 'number' && typeof pt.y === 'number') {
+            if (Math.hypot(pt.x - clickX, pt.y - clickY) <= 30) {
+              return true;
+            }
+          }
+        }
+        // 2. Proximity to line segments between consecutive points (tolerance 20px)
+        for (let i = 0; i < coords.length - 1; i++) {
+          const c1 = coords[i];
+          const c2 = coords[i + 1];
+          if (c1 && c2 && typeof c1.x === 'number' && typeof c1.y === 'number' && typeof c2.x === 'number' && typeof c2.y === 'number') {
+            if (pointToSegmentDistance(clickX, clickY, c1.x, c1.y, c2.x, c2.y) <= 20) {
+              return true;
+            }
+          }
+        }
+      }
+    } catch {
+      // safe fallback
+    }
+    return false;
+  };
+
+  // --- Measure Feature using Shift + Drag on empty chart space ---
   const shiftMeasureOverlayIdRef = useRef<string | null>(null);
   const isShiftMeasuringRef = useRef<boolean>(false);
   const shiftStartPointRef = useRef<any>(null);
@@ -5138,35 +5318,64 @@ export const ChartArea = ({
     const container = chartContainerRef.current;
     if (!container) return;
     const handleMouseDown = (e: MouseEvent) => {
-      const isCursorTool = !activeToolRef.current || ['cursor', 'cursor_group', 'cursor_dot', 'cursor_arrow', 'eraser', 'clear'].includes(activeToolRef.current);
-      if (e.shiftKey && e.button === 0 && isCursorTool && chartRef.current) {
-        e.stopPropagation();
-        e.preventDefault();
-        if (shiftMeasureOverlayIdRef.current) {
-          chartRef.current?.removeOverlay({ id: shiftMeasureOverlayIdRef.current });
-          shiftMeasureOverlayIdRef.current = null;
-        }
-        const rect = container.getBoundingClientRect();
-        const absoluteX = e.clientX - rect.left;
-        const absoluteY = e.clientY - rect.top;
-        const chart = chartRef.current;
-        const converted = chart.convertFromPixel([{ x: absoluteX, y: absoluteY }], { paneId: 'candle_pane' });
-        const point = converted && (converted as any)[0];
-        if (point) {
-          isShiftMeasuringRef.current = true;
-          shiftStartPointRef.current = { ...point };
-          const id = chart.createOverlay({
-            name: 'timePriceRange',
-            points: [{ ...point }, { ...point }],
-            lock: false,
-          });
-          if (id) {
-            shiftMeasureOverlayIdRef.current = id as string;
+      // Keep _isShiftPressed in sync
+      if (e.shiftKey !== undefined) {
+        (window as any)._isShiftPressed = e.shiftKey;
+      }
+
+      const isCursorTool = !activeToolRef.current || ['cursor', 'cursor_group', 'cursor_dot', 'cursor_arrow'].includes(activeToolRef.current);
+      if (!isCursorTool || !e.shiftKey || e.button !== 0 || !chartRef.current) return;
+
+      const rect = container.getBoundingClientRect();
+      const absoluteX = e.clientX - rect.left;
+      const absoluteY = e.clientY - rect.top;
+
+      // CRITICAL: If click is near ANY overlay (handle or line), or if an overlay is being dragged:
+      // DO NOT intercept! Let the click pass to KlineCharts so the overlay/handle can be dragged and snapped horizontally!
+      if (isOverlayDraggingRef.current || isNearAnyOverlay(chartRef.current, absoluteX, absoluteY, shiftMeasureOverlayIdRef.current)) {
+        return;
+      }
+
+      // If an overlay is selected and click is near it, let it pass
+      if ((window as any).__selectedOverlayId) {
+        const selOvs = chartRef.current.getOverlays({ id: (window as any).__selectedOverlayId });
+        if (selOvs && selOvs.length > 0) {
+          const selPts = selOvs[0].points || [];
+          const selCoords = chartRef.current.convertToPixel(selPts, { paneId: 'candle_pane' });
+          const selArr = Array.isArray(selCoords) ? selCoords : [selCoords];
+          for (const sc of selArr) {
+            if (sc && typeof sc.x === 'number' && typeof sc.y === 'number') {
+              if (Math.hypot(sc.x - absoluteX, sc.y - absoluteY) <= 50) {
+                return;
+              }
+            }
           }
+        }
+      }
+
+      // Only on EMPTY space: trigger shift measurement tool!
+      e.stopPropagation();
+      e.preventDefault();
+      const chart = chartRef.current;
+      const converted = chart.convertFromPixel([{ x: absoluteX, y: absoluteY }], { paneId: 'candle_pane' });
+      const point = converted && (converted as any)[0];
+      if (point) {
+        isShiftMeasuringRef.current = true;
+        shiftStartPointRef.current = { ...point, pixelX: absoluteX, pixelY: absoluteY };
+        const id = chart.createOverlay({
+          name: 'timePriceRange',
+          points: [{ ...point }, { ...point }],
+          lock: false,
+        });
+        if (id) {
+          shiftMeasureOverlayIdRef.current = id as string;
         }
       }
     };
     const handleMouseMove = (e: MouseEvent) => {
+      if (e.shiftKey !== undefined) {
+        (window as any)._isShiftPressed = e.shiftKey;
+      }
       if (isShiftMeasuringRef.current && shiftMeasureOverlayIdRef.current && shiftStartPointRef.current && chartRef.current) {
         e.stopPropagation();
         e.preventDefault();
@@ -5179,34 +5388,72 @@ export const ChartArea = ({
         if (p2) {
           chart.overrideOverlay({
             id: shiftMeasureOverlayIdRef.current,
-            points: [shiftStartPointRef.current, p2]
+            points: [
+              { timestamp: shiftStartPointRef.current.timestamp, value: shiftStartPointRef.current.value },
+              p2
+            ]
           });
         }
       }
     };
     const handleMouseUp = (e: MouseEvent) => {
+      if (e.shiftKey !== undefined) {
+        (window as any)._isShiftPressed = e.shiftKey;
+      }
       if (isShiftMeasuringRef.current) {
         isShiftMeasuringRef.current = false;
         e.stopPropagation();
+        const rect = container.getBoundingClientRect();
+        const absoluteX = e.clientX - rect.left;
+        const absoluteY = e.clientY - rect.top;
+        if (shiftStartPointRef.current?.pixelX !== undefined) {
+          const dist = Math.hypot(absoluteX - shiftStartPointRef.current.pixelX, absoluteY - shiftStartPointRef.current.pixelY);
+          if (dist < 5) {
+            // Click without dragging: remove accidental 0-size dot
+            if (shiftMeasureOverlayIdRef.current && chartRef.current) {
+              chartRef.current.removeOverlay({ id: shiftMeasureOverlayIdRef.current });
+            }
+          } else {
+            // Dragged successfully: finalize and persist the drawing!
+            triggerAutoSaveDrawings();
+          }
+        }
+        shiftMeasureOverlayIdRef.current = null;
+        shiftStartPointRef.current = null;
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && shiftMeasureOverlayIdRef.current) {
+      if (e.key === 'Shift') {
+        (window as any)._isShiftPressed = true;
+      }
+      if (e.key === 'Escape' && isShiftMeasuringRef.current && shiftMeasureOverlayIdRef.current) {
         chartRef.current?.removeOverlay({ id: shiftMeasureOverlayIdRef.current });
         shiftMeasureOverlayIdRef.current = null;
         shiftStartPointRef.current = null;
         isShiftMeasuringRef.current = false;
       }
     };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') {
+        (window as any)._isShiftPressed = false;
+      }
+    };
+    const handleBlur = () => {
+      (window as any)._isShiftPressed = false;
+    };
     container.addEventListener('mousedown', handleMouseDown, { capture: true });
     window.addEventListener('mousemove', handleMouseMove, { capture: true });
     window.addEventListener('mouseup', handleMouseUp, { capture: true });
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
     return () => {
       container.removeEventListener('mousedown', handleMouseDown, { capture: true });
       window.removeEventListener('mousemove', handleMouseMove, { capture: true });
       window.removeEventListener('mouseup', handleMouseUp, { capture: true });
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
     };
   }, []);
   // Sync activeTool to ref so the closure can access it
@@ -5380,6 +5627,7 @@ export const ChartArea = ({
           mode: magnetMode ? (magnetType === 'weak' ? 'weak_magnet' : 'strong_magnet') : 'normal',
           onClick: (chart as any).handleOverlayClick,
           onPressedMoveStart: (event: any) => {
+            isOverlayDraggingRef.current = true;
             const allowedNames = ['rect', 'gannBox', 'priceRange', 'timeRange', 'timePriceRange'];
             if (allowedNames.includes(event.overlay?.name)) {
               handleRectPressedMoveStart(event);
@@ -5387,55 +5635,9 @@ export const ChartArea = ({
           },
           onPressedMoving: (event: any) => {
             if (event.overlay && event.overlay.points && event.overlay.points.length > 1) {
-              const pts = event.overlay.points;
-              
               const allowedNames = ['rect', 'gannBox', 'priceRange', 'timeRange', 'timePriceRange'];
               if (allowedNames.includes(event.overlay.name)) {
                 if (handleRectPressedMoving(event)) return true;
-              }
-              const isLineTool = ['segment', 'rayLine', 'arrow', 'trendAngle', 'straightLine', 'measure'].includes(event.overlay.name);
-              if (isLineTool) {
-                const p0 = pts[0];
-                const p1 = pts[pts.length - 1];
-                if (p0.value !== undefined && p1.value !== undefined) {
-                  const overlayId = event.overlay.id;
-                  const lastPts = lastOverlayPointsRef.current[overlayId];
-                  // Compute what changed since last frame
-                  let p0Changed = false;
-                  let p1Changed = false;
-                  if (lastPts && lastPts[0] && lastPts[1]) {
-                    p0Changed = p0.timestamp !== lastPts[0].timestamp || p0.value !== lastPts[0].value;
-                    p1Changed = p1.timestamp !== lastPts[1].timestamp || p1.value !== lastPts[1].value;
-                  }
-                  if ((window as any)._isShiftPressed) {
-                    if (!lastPts || !lastPts[0] || !lastPts[1]) {
-                      lastOverlayPointsRef.current[overlayId] = [{ ...p0 }, { ...p1 }];
-                      return false;
-                    }
-                    let anchor = 'p0';
-                    if (p0Changed && !p1Changed) {
-                      anchor = 'p1';
-                    }
-                    if (anchor !== 'none') {
-                      let overridePoints;
-                      if (anchor === 'p1') {
-                        event.overlay.points[0].value = event.overlay.points[event.overlay.points.length - 1].value;
-                        overridePoints = event.overlay.points;
-                      } else {
-                        event.overlay.points[event.overlay.points.length - 1].value = event.overlay.points[0].value;
-                        overridePoints = event.overlay.points;
-                      }
-                      chart.overrideOverlay({
-                        id: overlayId,
-                        points: overridePoints
-                      });
-                      lastOverlayPointsRef.current[overlayId] = [{ ...overridePoints[0] }, { ...overridePoints[1] }];
-                      return true;
-                    }
-                  }
-                  // Update points tracker for next frame
-                  lastOverlayPointsRef.current[overlayId] = [{ ...p0 }, { ...p1 }];
-                }
               }
             }
             return false;
@@ -5756,21 +5958,7 @@ export const ChartArea = ({
     currentTpRef.current = tpToDraw;
     currentSlRef.current = slToDraw;
     currentOrderPriceRef.current = orderToDraw;
-    // 0. Draw Green Shaded TP/SL Zone between Take-Profit and Stop-Loss
-    if (tpToDraw && slToDraw) {
-      chart.createOverlay({
-        id: 'tpsl_zone',
-        name: 'tpslZone',
-        lock: true,
-        points: [
-          { timestamp: allData[lastDataIndex].timestamp, value: tpToDraw },
-          { timestamp: allData[lastDataIndex].timestamp, value: slToDraw }
-        ]
-      });
-    } else {
-      chart.removeOverlay({ id: 'tpsl_zone' });
-      chart.removeOverlay({ name: 'tpslZone' });
-    }
+    // 0. (Removed giant tpsl_zone to prevent overlapping with individual TP and SL zones)
     // 1. Draw main entry price lines
     const positionsToDraw: Array<{ quantity: number; averagePrice: number; side: 'LONG' | 'SHORT'; leverage?: number }> = [];
     if (simulatorPositions && simulatorPositions.length > 0) {
@@ -5794,28 +5982,19 @@ export const ChartArea = ({
         const color = '#ffffff';
         const overlayId = `active_position_line_${index}`;
         const overlayProps = {
-          name: 'horizontalStraightLine',
+          name: 'orderTpslLine',
           lock: true,
           points: [
             { timestamp: allData[0].timestamp, value: pos.averagePrice },
             { timestamp: allData[lastDataIndex].timestamp, value: pos.averagePrice }
           ],
-          styles: {
-            line: { color: '#ffffff', size: 2, style: 'dashed', dashedValue: [5, 5] },
-            text: {
-              color: '#131722',
-              backgroundColor: color,
-              paddingLeft: 6,
-              paddingRight: 6,
-              paddingTop: 4,
-              paddingBottom: 4,
-              borderRadius: 4,
-              size: 12,
-              family: 'Inter',
-              weight: 'bold',
-            },
-          },
-          extendData: `${isBuy ? 'â–² LONG' : 'â–¼ SHORT'} ${pos.quantity.toFixed(2)} @ $${pos.averagePrice.toLocaleString('en-US')}`,
+          extendData: {
+            color: '#00b894',
+            isDashed: true,
+            badgeText: `${selectedStock.symbol} ${pos.averagePrice.toLocaleString('en-US')}`,
+            price: pos.averagePrice,
+            precision: getPricePrecision(pos.averagePrice)
+          }
         };
         chart.removeOverlay({ id: overlayId });
         chart.createOverlay({ id: overlayId, ...overlayProps } as any);
@@ -5832,52 +6011,30 @@ export const ChartArea = ({
       const isLimit = previewTPSL.orderType === 'LIMIT';
       const color = isLimit ? '#2962ff' : '#e65100'; // Blue for limit, Orange for stop
       const currentSide = previewTPSL.side || 'LONG';
+      const precision = getPricePrecision(previewTPSL.orderPrice);
       const overlayProps = {
-        name: 'horizontalStraightLine',
+        name: 'orderTpslLine',
         lock: false,
         points: [
           { timestamp: allData[0].timestamp, value: previewTPSL.orderPrice },
           { timestamp: allData[lastDataIndex].timestamp, value: previewTPSL.orderPrice }
         ],
-        styles: {
-          line: { color, size: 2, style: 'dashed', dashedValue: [5, 5] },
-          point: {
-            color,
-            borderColor: '#ffffff',
-            borderSize: 2,
-            radius: 5,
-            activeColor: '#ffffff',
-            activeBorderColor: color,
-            activeBorderSize: 3,
-            activeRadius: 7
-          },
-          text: {
-            color: '#ffffff',
-            backgroundColor: color,
-            paddingLeft: 6,
-            paddingRight: 6,
-            paddingTop: 3,
-            paddingBottom: 3,
-            borderRadius: 4,
-            size: 10,
-            family: 'Inter',
-            weight: 'bold',
-          },
+        extendData: {
+          color,
+          isDashed: true,
+          badgeText: `${previewTPSL.orderType} ${currentSide}`,
+          price: previewTPSL.orderPrice,
+          precision
         },
-        extendData: `${previewTPSL.orderType} ${currentSide} (Xem trước) @ $${previewTPSL.orderPrice.toLocaleString('en-US')} ↕ Kéo`,
         onPressedMoveStart: () => {
           isDraggingRef.current = true;
         },
         onPressedMoving: (event: any) => {
           const newPrice = event.overlay?.points?.[0]?.value;
           if (typeof newPrice === 'number' && !isNaN(newPrice)) {
-            const precision = getPricePrecision(newPrice);
-            const cleanPrice = Number(newPrice.toFixed(precision));
+            const p = getPricePrecision(newPrice);
+            const cleanPrice = Number(newPrice.toFixed(p));
             currentOrderPriceRef.current = cleanPrice;
-            chart.overrideOverlay({
-              id: 'preview_order_line',
-              extendData: `${previewTPSL.orderType} ${currentSide} (Xem trước) @ $${cleanPrice.toLocaleString('en-US')} ↕ Kéo`
-            });
             if (currentTpRef.current) {
               chart.overrideOverlay({
                 id: 'preview_tp_zone',
@@ -5885,6 +6042,19 @@ export const ChartArea = ({
                   { timestamp: allData[0].timestamp, value: cleanPrice },
                   { timestamp: allData[lastDataIndex].timestamp, value: currentTpRef.current }
                 ]
+              });
+              const side = previewTPSL?.side || effectiveActivePos?.side || 'LONG';
+              const qty = previewTPSL?.quantity || (effectiveActivePos?.quantity ? effectiveActivePos.quantity * (getContractMultiplier(selectedStock) || 1) : 0);
+              const tpBadge = computeOrderLineBadge('TP', currentTpRef.current, cleanPrice, side, qty);
+              chart.overrideOverlay({
+                id: 'preview_tp_line',
+                extendData: {
+                  color: '#089981',
+                  isDashed: true,
+                  badgeText: tpBadge,
+                  price: currentTpRef.current,
+                  precision: getPricePrecision(currentTpRef.current)
+                }
               });
             }
             if (currentSlRef.current) {
@@ -5894,6 +6064,19 @@ export const ChartArea = ({
                   { timestamp: allData[0].timestamp, value: cleanPrice },
                   { timestamp: allData[lastDataIndex].timestamp, value: currentSlRef.current }
                 ]
+              });
+              const side = previewTPSL?.side || effectiveActivePos?.side || 'LONG';
+              const qty = previewTPSL?.quantity || (effectiveActivePos?.quantity ? effectiveActivePos.quantity * (getContractMultiplier(selectedStock) || 1) : 0);
+              const slBadge = computeOrderLineBadge('SL', currentSlRef.current, cleanPrice, side, qty);
+              chart.overrideOverlay({
+                id: 'preview_sl_line',
+                extendData: {
+                  color: '#f23645',
+                  isDashed: true,
+                  badgeText: slBadge,
+                  price: currentSlRef.current,
+                  precision: getPricePrecision(currentSlRef.current)
+                }
               });
             }
             onTPSLChangeRef.current?.('orderPrice', cleanPrice);
@@ -5914,95 +6097,82 @@ export const ChartArea = ({
     } else {
       chart.removeOverlay({ id: 'preview_order_line' });
     }
-    const activeMultiplier = getContractMultiplier(selectedStock);
-    const activeSide: 'LONG' | 'SHORT' = effectiveActivePos?.side || previewTPSL?.side || 'LONG';
-    const activeEntryPrice: number = effectiveActivePos?.averagePrice || previewTPSL?.orderPrice || selectedStock.price;
-    const activeQty: number = (effectiveActivePos && effectiveActivePos.quantity > 0)
-      ? (activeSimPos ? (activeSimPos.lot || 1) * activeMultiplier : effectiveActivePos.quantity)
-      : (previewTPSL?.actualQty || (previewTPSL?.lot ? previewTPSL.lot * activeMultiplier : activeMultiplier));
-
-    const formatBadge = (type: 'tp' | 'sl', targetPrice: number) => {
-      const isBuy = activeSide === 'LONG';
-      const diff = isBuy ? (targetPrice - activeEntryPrice) : (activeEntryPrice - targetPrice);
-      const pnl = diff * activeQty;
-      const isProfit = pnl >= 0;
-      const sign = isProfit ? '+' : '-';
-      const prefix = type === 'tp' ? 'TP' : 'SL';
-      const formattedVal = Math.abs(pnl).toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      });
-      return `${prefix}  ${sign}$${formattedVal}`;
-    };
     // 2. Draw Take Profit line (TP) - Draggable
     if (tpToDraw) {
       const isPreview = previewTPSL?.enabled && previewTPSL.tp && (!effectiveActivePos || effectiveActivePos.quantity <= 0);
-      const tpBadge = formatBadge('tp', tpToDraw);
-      const pricePrecision = getPricePrecision(tpToDraw);
+      const precision = getPricePrecision(tpToDraw);
+      const side = previewTPSL?.side || effectiveActivePos?.side || 'LONG';
+      const entryP = orderToDraw || selectedStock.price;
+      const qty = previewTPSL?.quantity || (effectiveActivePos?.quantity ? effectiveActivePos.quantity * (getContractMultiplier(selectedStock) || 1) : 0);
+      const badgeText = computeOrderLineBadge('TP', tpToDraw, entryP, side, qty);
+
+      const isTpProfit = side === 'LONG' ? tpToDraw >= entryP : tpToDraw <= entryP;
+      const tpColor = isTpProfit ? '#089981' : '#f23645';
+      const tpZoneColor = isTpProfit ? 'rgba(8, 153, 129, 0.1)' : 'rgba(242, 54, 69, 0.1)';
 
       const overlayProps = {
-        name: 'tpslLine',
+        name: 'orderTpslLine',
         lock: false,
         points: [
           { timestamp: allData[0].timestamp, value: tpToDraw },
           { timestamp: allData[lastDataIndex].timestamp, value: tpToDraw }
         ],
         extendData: {
-          type: 'tp',
-          isPreview,
-          badgeText: tpBadge,
-          precision: pricePrecision
+          color: tpColor,
+          isDashed: isPreview,
+          badgeText,
+          price: tpToDraw,
+          precision
         },
         onPressedMoveStart: () => {
           isDraggingRef.current = true;
         },
         onPressedMoving: (event: any) => {
-          const newPrice = event.overlay?.points?.[0]?.value ?? event.overlay?.points?.[1]?.value;
+          const newPrice = event.overlay?.points?.[0]?.value;
           if (typeof newPrice === 'number' && !isNaN(newPrice)) {
-            const precision = getPricePrecision(newPrice);
-            const cleanPrice = Number(newPrice.toFixed(precision));
+            const p = getPricePrecision(newPrice);
+            const cleanPrice = Number(newPrice.toFixed(p));
             currentTpRef.current = cleanPrice;
-            const updatedBadge = formatBadge('tp', cleanPrice);
             const orderP = currentOrderPriceRef.current || previewTPSL?.orderPrice || selectedStock.price;
-
-            chart.overrideOverlay({
-              id: 'preview_tp_line',
-              extendData: {
-                type: 'tp',
-                isPreview,
-                badgeText: updatedBadge,
-                precision
-              }
-            });
+            
+            const isTpProfit = side === 'LONG' ? cleanPrice >= orderP : cleanPrice <= orderP;
+            const newTpColor = isTpProfit ? '#089981' : '#f23645';
+            const newTpZoneColor = isTpProfit ? 'rgba(8, 153, 129, 0.1)' : 'rgba(242, 54, 69, 0.1)';
 
             chart.overrideOverlay({
               id: 'preview_tp_zone',
               points: [
                 { timestamp: allData[0].timestamp, value: orderP },
                 { timestamp: allData[lastDataIndex].timestamp, value: cleanPrice }
-              ]
+              ],
+              styles: {
+                polygon: { color: newTpZoneColor, borderColor: newTpColor }
+              }
             });
-
-            if (currentSlRef.current) {
-              chart.overrideOverlay({
-                id: 'tpsl_zone',
-                points: [
-                  { timestamp: allData[lastDataIndex].timestamp, value: cleanPrice },
-                  { timestamp: allData[lastDataIndex].timestamp, value: currentSlRef.current }
-                ]
-              });
-            }
-
+            const newBadge = computeOrderLineBadge('TP', cleanPrice, orderP, side, qty);
+            chart.overrideOverlay({
+              id: 'preview_tp_line',
+              points: [
+                { timestamp: allData[0].timestamp, value: cleanPrice },
+                { timestamp: allData[lastDataIndex].timestamp, value: cleanPrice }
+              ],
+              extendData: {
+                ...event.overlay.extendData,
+                color: newTpColor,
+                price: cleanPrice,
+                badgeText: newBadge,
+                precision: p
+              }
+            });
             onTPSLChangeRef.current?.('tp', cleanPrice);
           }
         },
         onPressedMoveEnd: (event: any) => {
           isDraggingRef.current = false;
-          const newPrice = event.overlay?.points?.[0]?.value ?? event.overlay?.points?.[1]?.value;
+          const newPrice = event.overlay?.points?.[0]?.value;
           if (typeof newPrice === 'number' && !isNaN(newPrice)) {
             const precision = getPricePrecision(newPrice);
             const cleanPrice = Number(newPrice.toFixed(precision));
-            currentTpRef.current = cleanPrice;
             onTPSLChangeRef.current?.('tp', cleanPrice);
           }
         }
@@ -6021,8 +6191,8 @@ export const ChartArea = ({
           ],
           styles: {
             polygon: {
-              color: 'rgba(8, 153, 129, 0.1)',
-              borderColor: '#089981'
+              color: tpZoneColor,
+              borderColor: tpColor
             }
           }
         } as any);
@@ -6030,77 +6200,83 @@ export const ChartArea = ({
     } else {
       chart.removeOverlay({ id: 'preview_tp_line' });
       chart.removeOverlay({ id: 'preview_tp_zone' });
-      chart.removeOverlay({ id: 'tpsl_zone' });
     }
     // 3. Draw Stop Loss line (SL) - Draggable
     if (slToDraw) {
       const isPreview = previewTPSL?.enabled && previewTPSL.sl && (!effectiveActivePos || effectiveActivePos.quantity <= 0);
-      const slBadge = formatBadge('sl', slToDraw);
-      const pricePrecision = getPricePrecision(slToDraw);
+      const precision = getPricePrecision(slToDraw);
+      const side = previewTPSL?.side || effectiveActivePos?.side || 'LONG';
+      const entryP = orderToDraw || selectedStock.price;
+      const qty = previewTPSL?.quantity || (effectiveActivePos?.quantity ? effectiveActivePos.quantity * (getContractMultiplier(selectedStock) || 1) : 0);
+      const badgeText = computeOrderLineBadge('SL', slToDraw, entryP, side, qty);
+
+      const isSlLoss = side === 'LONG' ? slToDraw <= entryP : slToDraw >= entryP;
+      const slColor = isSlLoss ? '#f23645' : '#089981';
+      const slZoneColor = isSlLoss ? 'rgba(242, 54, 69, 0.1)' : 'rgba(8, 153, 129, 0.1)';
 
       const overlayProps = {
-        name: 'tpslLine',
+        name: 'orderTpslLine',
         lock: false,
         points: [
           { timestamp: allData[0].timestamp, value: slToDraw },
           { timestamp: allData[lastDataIndex].timestamp, value: slToDraw }
         ],
         extendData: {
-          type: 'sl',
-          isPreview,
-          badgeText: slBadge,
-          precision: pricePrecision
+          color: slColor,
+          isDashed: isPreview,
+          badgeText,
+          price: slToDraw,
+          precision
         },
         onPressedMoveStart: () => {
           isDraggingRef.current = true;
         },
         onPressedMoving: (event: any) => {
-          const newPrice = event.overlay?.points?.[0]?.value ?? event.overlay?.points?.[1]?.value;
+          const newPrice = event.overlay?.points?.[0]?.value;
           if (typeof newPrice === 'number' && !isNaN(newPrice)) {
-            const precision = getPricePrecision(newPrice);
-            const cleanPrice = Number(newPrice.toFixed(precision));
+            const p = getPricePrecision(newPrice);
+            const cleanPrice = Number(newPrice.toFixed(p));
             currentSlRef.current = cleanPrice;
-            const updatedBadge = formatBadge('sl', cleanPrice);
             const orderP = currentOrderPriceRef.current || previewTPSL?.orderPrice || selectedStock.price;
 
-            chart.overrideOverlay({
-              id: 'preview_sl_line',
-              extendData: {
-                type: 'sl',
-                isPreview,
-                badgeText: updatedBadge,
-                precision
-              }
-            });
+            const isSlLoss = side === 'LONG' ? cleanPrice <= orderP : cleanPrice >= orderP;
+            const newSlColor = isSlLoss ? '#f23645' : '#089981';
+            const newSlZoneColor = isSlLoss ? 'rgba(242, 54, 69, 0.1)' : 'rgba(8, 153, 129, 0.1)';
 
             chart.overrideOverlay({
               id: 'preview_sl_zone',
               points: [
                 { timestamp: allData[0].timestamp, value: orderP },
                 { timestamp: allData[lastDataIndex].timestamp, value: cleanPrice }
-              ]
+              ],
+              styles: {
+                polygon: { color: newSlZoneColor, borderColor: newSlColor }
+              }
             });
-
-            if (currentTpRef.current) {
-              chart.overrideOverlay({
-                id: 'tpsl_zone',
-                points: [
-                  { timestamp: allData[lastDataIndex].timestamp, value: currentTpRef.current },
-                  { timestamp: allData[lastDataIndex].timestamp, value: cleanPrice }
-                ]
-              });
-            }
-
+            const newBadge = computeOrderLineBadge('SL', cleanPrice, orderP, side, qty);
+            chart.overrideOverlay({
+              id: 'preview_sl_line',
+              points: [
+                { timestamp: allData[0].timestamp, value: cleanPrice },
+                { timestamp: allData[lastDataIndex].timestamp, value: cleanPrice }
+              ],
+              extendData: {
+                ...event.overlay.extendData,
+                color: newSlColor,
+                price: cleanPrice,
+                badgeText: newBadge,
+                precision: p
+              }
+            });
             onTPSLChangeRef.current?.('sl', cleanPrice);
           }
         },
         onPressedMoveEnd: (event: any) => {
           isDraggingRef.current = false;
-          const newPrice = event.overlay?.points?.[0]?.value ?? event.overlay?.points?.[1]?.value;
+          const newPrice = event.overlay?.points?.[0]?.value;
           if (typeof newPrice === 'number' && !isNaN(newPrice)) {
             const precision = getPricePrecision(newPrice);
             const cleanPrice = Number(newPrice.toFixed(precision));
-            currentSlRef.current = cleanPrice;
             onTPSLChangeRef.current?.('sl', cleanPrice);
           }
         }
@@ -6119,8 +6295,8 @@ export const ChartArea = ({
           ],
           styles: {
             polygon: {
-              color: 'rgba(242, 54, 69, 0.1)',
-              borderColor: '#f23645'
+              color: slZoneColor,
+              borderColor: slColor
             }
           }
         } as any);
@@ -6128,7 +6304,6 @@ export const ChartArea = ({
     } else {
       chart.removeOverlay({ id: 'preview_sl_line' });
       chart.removeOverlay({ id: 'preview_sl_zone' });
-      chart.removeOverlay({ id: 'tpsl_zone' });
     }
     if (pendingOrders && pendingOrders.length > 0) {
       const stockPending = pendingOrders.filter(o =>
@@ -6143,22 +6318,19 @@ export const ChartArea = ({
         if (orderPrice <= 0) return;
         const overlayId = `pending_order_${order._id || order.id || orderPrice}`;
         const overlayProps = {
-          name: 'horizontalStraightLine',
+          name: 'orderTpslLine',
           lock: true,
           points: [
             { timestamp: allData[0].timestamp, value: orderPrice },
             { timestamp: allData[lastDataIndex].timestamp, value: orderPrice }
           ],
-          styles: {
-            line: { color, size: 1, style: 'dashed', dashedValue: [3, 3] },
-            text: {
-              color: '#ffffff',
-              backgroundColor: color,
-              paddingLeft: 4, paddingRight: 4, paddingTop: 2, paddingBottom: 2,
-              borderRadius: 2, size: 10, family: 'Inter', weight: 'bold',
-            },
-          },
-          extendData: `${order.type || 'LIMIT'} ${order.side || ''} ${orderQty ? Number(orderQty).toFixed(2) : ''} @ $${orderPrice.toLocaleString('en-US')}`,
+          extendData: {
+            color,
+            isDashed: true,
+            badgeText: `${order.type || 'LIMIT'} ${order.side || ''} ${orderQty ? Number(orderQty).toFixed(2) : ''}`,
+            price: orderPrice,
+            precision: getPricePrecision(orderPrice)
+          }
         };
         chart.removeOverlay({ id: overlayId });
         chart.createOverlay({ id: overlayId, ...overlayProps } as any);
@@ -6570,7 +6742,7 @@ export const ChartArea = ({
             className="px-1.5 py-0.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-white font-mono flex items-center gap-1 transition-colors"
             title="Äá»™ dĂ y Ä‘Æ°á»ng káº»"
           >
-            <span>â€”</span>
+            <span>—</span>
             <span>{selectedOverlay.extendData?.lineWidth || 1}px</span>
           </button>
           {/* Background fill toggle */}
@@ -6730,7 +6902,7 @@ export const ChartArea = ({
               onClick={() => setOverlayPopup(prev => prev === 'style' ? null : 'style')}
               className={`p-1.5 rounded transition-colors font-mono font-bold text-xs ${overlayPopup === 'style' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500' : 'text-[#787b86] hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] hover:text-[#1e2329] dark:hover:text-[#d1d4dc]'}`}
             >
-              {overlayLineStyle === 'dashed' ? '---' : overlayLineStyle === 'dotted' ? 'Â·Â·Â·Â·' : 'â€”'}
+              {overlayLineStyle === 'dashed' ? '---' : overlayLineStyle === 'dotted' ? '····' : '—'}
             </button>
             <div className="w-[1px] h-4 bg-[#e6e8ea] dark:bg-[#2a2e39] mx-0.5" />
             {/* Lock */}
@@ -6814,7 +6986,7 @@ export const ChartArea = ({
               <div className="w-full h-[1px] bg-[#e6e8ea] dark:bg-[#2a2e39]" />
               <div className="flex flex-col gap-1.5">
                 <div className="flex justify-between items-center text-xs text-[#787b86]">
-                  <span>Äá»™ má»</span>
+                  <span>{t('chart.opacity', 'Độ mờ')}</span>
                   <span className="font-mono text-[#1e2329] dark:text-white font-semibold">{overlayOpacity}%</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -6848,9 +7020,9 @@ export const ChartArea = ({
               onClick={(e) => e.stopPropagation()}
             >
               {[
-                { id: 'solid', label: 'ÄÆ°á»ng tháº³ng', val: 'solid', icon: <div className="w-6 h-[2px] bg-current" /> },
-                { id: 'dashed', label: 'ÄÆ°á»ng Äá»©t nĂ©t', val: 'dashed', icon: <div className="w-6 h-[2px] border-b-2 border-dashed border-current" /> },
-                { id: 'dotted', label: 'ÄÆ°á»ng cháº¥m cháº¥m', val: 'dotted', icon: <div className="w-6 h-[2px] border-b-2 border-dotted border-current" /> }
+                { id: 'solid', label: t('chart.solidLine', 'Đường thẳng'), val: 'solid', icon: <div className="w-6 h-[2px] bg-current" /> },
+                { id: 'dashed', label: t('chart.dashedLine', 'Đường đứt nét'), val: 'dashed', icon: <div className="w-6 h-[2px] border-b-2 border-dashed border-current" /> },
+                { id: 'dotted', label: t('chart.dottedLine', 'Đường chấm chấm'), val: 'dotted', icon: <div className="w-6 h-[2px] border-b-2 border-dotted border-current" /> }
               ].map(item => (
                 <button
                   key={item.id}
@@ -7245,3 +7417,4 @@ export const ChartArea = ({
     </div>
   );
 };
+
