@@ -157,7 +157,7 @@ TRADING_METHODS_REGISTRY: Dict[int, TradingMethod] = {
             "mss là gì", "bos là gì", "choch là gì", "liquidity sweep là gì",
             "khác nhau thế nào", "khac nhau the nao",
             "fvg", "order block", "ob", "breaker block", "breaker",
-            "mss", "bos", "choch", "bsl", "ssl", "bpr", "ifvg", "inversion fvg", "inversion fvg là gì", "cisd", "cisd là gì", "cisd la gi", "change in state of delivery", "liquidity sweep",
+            "mss", "bos", "choch", "bsl", "ssl", "bpr", "ifvg", "liquidity sweep",
             "khai niem ict", "khai niem smc"
         ]
     ),
