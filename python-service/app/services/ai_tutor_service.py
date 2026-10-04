@@ -2008,12 +2008,15 @@ class AiTutorService:
                 }
                 if user_p_high and user_p_low:
                     ref_price = matched_cisd.get("price") or matched_cisd.get("priceHigh") or 1.0
-                    err_high = abs(user_p_high - ref_price) / max(1.0, ref_price)
-                    err_low = abs(user_p_low - ref_price) / max(1.0, ref_price)
+                    ref_high = matched_cisd.get("priceHigh") or ref_price
+                    ref_low = matched_cisd.get("priceLow") or ref_price
+                    err_high = abs(user_p_high - ref_high) / max(1.0, ref_high)
+                    err_low = abs(user_p_low - ref_low) / max(1.0, ref_low)
                     err_mid = abs(user_mid - ref_price) / max(1.0, ref_price)
                     min_err = min(err_high, err_low, err_mid)
-                    # Đường kẻ CISD phải gần đúng mốc giá CISD (sai số <= 2.5%)
-                    if not has_fail_signal and min_err <= 0.025:
+                    # Đường kẻ CISD nằm quanh đỉnh nến đỏ hoặc thân nến đỏ (sai số <= 2.5%)
+                    is_in_range = (min(ref_low, ref_high) * 0.985 <= user_mid <= max(ref_low, ref_high) * 1.015)
+                    if is_in_range or min_err <= 0.025:
                         score = max(score, 95)
                         verdict = "CORRECT"
                     else:
@@ -2371,7 +2374,7 @@ class AiTutorService:
             suggested_zone["name"] = matched_cisd["name"]
             suggested_zone["label"] = matched_cisd["label"]
 
-                # SYNCHRONIZATION GUARANTEE:
+        # SYNCHRONIZATION GUARANTEE:
         if verdict == "CORRECT":
             score = max(score, 90)
             analysis = re.sub(
@@ -2402,9 +2405,15 @@ class AiTutorService:
                     flags=re.IGNORECASE
                 )
 
-        # CRITICAL: Always keep Section 5 score synchronized with final score
+        # CRITICAL: Always keep Section 5 score synchronized with final score (handles brackets like [35]/100)
         analysis = re.sub(
-            r'((?:[•\-\*]\s*)?(?:\*\*)?(?:Điểm\s*(?:đánh giá|số)?|Score)[:\s*]+)(?:\*\*)?\d{1,3}(?:\*\*)?(\s*(?:/\s*100)?)',
+            r'((?:[•\-\*]\s*)?(?:\*\*)?(?:Điểm\s*(?:đánh giá|số)?|Score)[:\s*]+)(?:\*\*)?(?:\[\s*)?\d{1,3}(?:\s*\])?(?:\*\*)?(\s*(?:/\s*100)?)',
+            rf'\g<1>{score}\g<2>',
+            analysis,
+            flags=re.IGNORECASE
+        )
+        analysis = re.sub(
+            r'(Điểm[^\r\n:]{0,25}:\s*)(?:\*\*)?(?:\[\s*)?\d{1,3}(?:\s*\])?(?:\*\*)?(\s*/\s*100)',
             rf'\g<1>{score}\g<2>',
             analysis,
             flags=re.IGNORECASE
