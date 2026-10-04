@@ -96,11 +96,11 @@ class PayOSService:
 
         if is_pro:
             amount = PLAN_PRO_PRICE  # 299.000₫
-            item_name = "AI Tutor PRO (Không giới hạn)"
+            item_name = "AI Tutor PRO"
             description = f"PRO {short_uid}"[:25]
         else:
             amount = PLAN_PLUS_PRICE # 129.000₫
-            item_name = "AI Tutor PLUS (300 Chat, 150 Bai)"
+            item_name = "AI Tutor PLUS"
             description = f"PLUS {short_uid}"[:25]
 
         expire_minutes = 10

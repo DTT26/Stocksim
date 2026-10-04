@@ -27,6 +27,188 @@ function getUserIdFromReq(req: Request): string {
   return '64f7b1e4a3b9c2d1e8f9a0b1';
 }
 
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'sk-uByi5N8dkmANMd6Gq3W5VmPNz3k0ot4KyOr8RTzuJMJS29YG';
+const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.shopaikey.com/v1').replace(/\/+$/, '');
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+
+function buildSystemPrompt(lang: string = 'vi'): string {
+  const isEn = (lang || '').toLowerCase().startsWith('en');
+  if (isEn) {
+    return `You are a Senior Prop Firm Funded Trader & AI Trading Coach on the StockSim platform.
+You analyze markets with professional discipline using ICT (Inner Circle Trader), SMC (Smart Money Concepts), and classical Price Action.
+Key Rules:
+1. Provide deep technical reasoning: identify Key POIs, Fair Value Gaps (FVG), Order Blocks, Liquidity Pools (BSL/SSL), Market Structure (BOS/MSS).
+2. Never give blind Buy/Sell financial advice or direct trade calls. Focus on educational analysis and risk management (1-2% risk per trade).
+3. Be concise, direct, professional, and highlight key price levels.
+4. Respond 100% in natural, fluent ENGLISH.`;
+  }
+  return `Bạn là Senior Prop Firm Funded Trader & AI Trading Coach của nền tảng StockSim.
+Bạn phân tích thị trường với tư duy của một trader chuyên nghiệp theo phương pháp ICT, SMC (Smart Money Concepts) và Price Action thuần túy.
+Quy tắc cốt lõi:
+1. Phân tích sắc sảo: Nhận diện cấu trúc thị trường (BOS, CHoCH, MSS), vùng mất cân bằng cung cầu (FVG, Imbalance), khối lệnh (Order Block), và thanh khoản (BSL, SSL).
+2. Tuyệt đối không phím lệnh Mua/Bán trực tiếp. Luôn nhấn mạnh kỷ luật và quản trị vốn 1-2% tài khoản.
+3. Trả lời súc tích, đi thẳng vào trọng tâm, in đậm các mốc giá và POI quan trọng.
+4. Bắt buộc trả lời 100% bằng TIẾNG VIỆT tự nhiên, chuẩn mực tài chính.`;
+}
+
+function buildUserPrompt(payload: any): string {
+  const { question, symbol, currentPrice, timeframe, chatHistory, userData } = payload;
+  const parts: string[] = [];
+
+  if (chatHistory && chatHistory.length > 0) {
+    const historyText = chatHistory.slice(-4).map((h: any) => `${h.sender === 'user' ? 'Học viên' : 'AI Tutor'}: ${h.text}`).join('\n');
+    parts.push(`💬 [LỊCH SỬ HỘI THOẠI]:\n${historyText}`);
+  }
+
+  if (symbol || currentPrice) {
+    const pStr = currentPrice ? `$${Number(currentPrice).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : 'N/A';
+    parts.push(`📊 [BIỂU ĐỒ ĐANG XEM]: Mã ${symbol || 'N/A'}, Giá hiện tại: ${pStr}, Khung: ${timeframe || '15m'}`);
+  }
+
+  if (userData?.wallet) {
+    parts.push(`👤 [TÀI KHOẢN]: Số dư ví: $${Number(userData.wallet.balance || 10000).toLocaleString('en-US')}`);
+  }
+
+  parts.push(`Câu hỏi của học viên: ${question}`);
+  return parts.join('\n\n');
+}
+
+async function streamDirectOpenAIFallback(res: Response, payload: any, userId: string): Promise<string> {
+  const systemPrompt = buildSystemPrompt(payload.lang);
+  const userPrompt = buildUserPrompt(payload);
+  const url = `${OPENAI_BASE_URL}/chat/completions`;
+
+  const metaPayload = {
+    type: 'meta',
+    intent: 'LEARNING_EDUCATIONAL',
+    plan: payload.plan || 'FREE',
+    concept: 'AI Trading Tutor',
+    framework: 'VIP_LLM',
+    provider: 'openai',
+    sources: []
+  };
+  res.write(`data: ${JSON.stringify(metaPayload)}\n\n`);
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      max_tokens: 1500,
+      temperature: 0.4,
+      stream: true
+    }),
+    signal: AbortSignal.timeout(45000)
+  });
+
+  if (!resp.ok || !resp.body) {
+    throw new Error(`OpenAI Direct Fallback HTTP ${resp.status}`);
+  }
+
+  const reader = (resp.body as any).getReader();
+  const decoder = new TextDecoder();
+  let fullAnswer = '';
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('data: ') && !trimmed.includes('[DONE]')) {
+        try {
+          const chunk = JSON.parse(trimmed.slice(6));
+          const delta = chunk.choices?.[0]?.delta?.content || '';
+          if (delta) {
+            fullAnswer += delta;
+            res.write(`data: ${JSON.stringify({ type: 'token', token: delta })}\n\n`);
+          }
+        } catch {}
+      }
+    }
+  }
+
+  const donePayload = {
+    type: 'done',
+    answer: fullAnswer,
+    concept: 'AI Trading Tutor',
+    framework: 'VIP_LLM',
+    provider: 'openai',
+    sources: [],
+    socraticQuestions: []
+  };
+  res.write(`data: ${JSON.stringify(donePayload)}\n\n`);
+  res.end();
+
+  if (fullAnswer.trim()) {
+    try {
+      await AiChatMessage.create({
+        userId,
+        symbol: payload.symbol || 'BTCUSDT',
+        sender: 'tutor',
+        text: fullAnswer,
+        data: donePayload
+      });
+    } catch (saveErr) {
+      console.warn('Could not save direct fallback response to DB:', saveErr);
+    }
+  }
+
+  return fullAnswer;
+}
+
+async function directOpenAITextFallback(payload: any): Promise<any> {
+  const systemPrompt = buildSystemPrompt(payload.lang);
+  const userPrompt = buildUserPrompt(payload);
+  const url = `${OPENAI_BASE_URL}/chat/completions`;
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      max_tokens: 1500,
+      temperature: 0.4
+    }),
+    signal: AbortSignal.timeout(30000)
+  });
+
+  if (!resp.ok) {
+    throw new Error(`OpenAI Direct HTTP ${resp.status}`);
+  }
+
+  const data: any = await resp.json();
+  const answer = data.choices?.[0]?.message?.content || '';
+
+  return {
+    answer,
+    concept: 'AI Trading Tutor',
+    framework: 'VIP_LLM',
+    provider: 'openai',
+    sources: [],
+    socraticQuestions: []
+  };
+}
+
 async function forwardToPython(endpoint: string, method: string = 'POST', data?: any) {
   const cleanBaseUrl = PYTHON_URL.replace(/\/+$/, '');
   const url = `${cleanBaseUrl}/internal/ai${endpoint}`;
@@ -178,7 +360,17 @@ router.post('/ask', protect, async (req: AuthRequest, res: Response) => {
       userData: userData || req.body?.userData
     };
 
-    const data = await forwardToPython('/ask', 'POST', payload);
+    let data: any = null;
+    try {
+      data = await forwardToPython('/ask', 'POST', payload);
+    } catch (pythonErr: any) {
+      console.warn('[AI Route] Python service cold-starting (502) or unavailable. Falling back to direct OpenAI:', pythonErr.message);
+      try {
+        data = await directOpenAITextFallback(payload);
+      } catch (openAiErr: any) {
+        throw pythonErr;
+      }
+    }
 
     // If quota exceeded, return controlled tutor message
     if (data && data.success === false && data.guardrailTriggered === 'QUOTA_EXCEEDED') {
@@ -312,23 +504,25 @@ router.post('/ask-stream', protect, async (req: AuthRequest, res: Response) => {
     let doneData: any = null;
 
     try {
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Connection': 'keep-alive'
-        },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(65000)
-      });
+      let resp: any = null;
+      try {
+        resp = await fetch(url, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Connection': 'keep-alive'
+          },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(15000)
+        });
+      } catch (fetchErr: any) {
+        console.warn('[AI Stream] Python service connection error (Cold-start). Seamlessly falling back to Direct OpenAI streaming...');
+        return await streamDirectOpenAIFallback(res, payload, userId);
+      }
 
-      if (!resp.ok || !resp.body) {
-        const errorText = await resp.text();
-        const cleanMsg = errorText.includes('<!DOCTYPE html') || errorText.length > 200
-          ? `Máy chủ AI Render đang khởi động (${resp.status}). Vui lòng thử lại sau 30-60 giây.`
-          : errorText;
-        res.write(`data: ${JSON.stringify({ type: 'error', message: cleanMsg })}\n\n`);
-        return res.end();
+      if (!resp || !resp.ok || !resp.body) {
+        console.warn(`[AI Stream] Python service returned ${resp?.status || 'no response'}. Seamlessly falling back to Direct OpenAI streaming...`);
+        return await streamDirectOpenAIFallback(res, payload, userId);
       }
 
       // Stream chunks from python service to frontend
@@ -380,9 +574,14 @@ router.post('/ask-stream', protect, async (req: AuthRequest, res: Response) => {
 
       res.end();
     } catch (fetchErr: any) {
-      console.error('Error streaming from Python service:', fetchErr);
-      res.write(`data: ${JSON.stringify({ type: 'error', message: fetchErr.message || 'Lỗi kết nối streaming AI' })}\n\n`);
-      res.end();
+      console.warn('[AI Stream] Stream failed. Trying Direct OpenAI fallback:', fetchErr.message);
+      try {
+        return await streamDirectOpenAIFallback(res, payload, userId);
+      } catch (directErr: any) {
+        console.error('[AI Stream] Both Python and Direct OpenAI failed:', directErr);
+        res.write(`data: ${JSON.stringify({ type: 'error', message: directErr.message || 'Lỗi kết nối streaming AI' })}\n\n`);
+        res.end();
+      }
     }
   } catch (error: any) {
     console.error('AI Ask Stream error:', error.message);
