@@ -37,7 +37,7 @@ export const PositionsManager = ({ currentPrice }: PositionsManagerProps) => {
   };
 
   return (
-    <div className={`border-t border-[#e6e8ea] dark:border-[#2a2e39] bg-white dark:bg-[#0b0e11] flex flex-col shrink-0 overflow-hidden text-xs text-[#787b86] transition-all duration-300 ${isExpanded ? 'h-64' : 'h-10'}`}>
+    <div data-tour="positions-manager" className={`border-t border-[#e6e8ea] dark:border-[#2a2e39] bg-white dark:bg-[#0b0e11] flex flex-col shrink-0 overflow-hidden text-xs text-[#787b86] transition-all duration-300 ${isExpanded ? 'h-64' : 'h-10'}`}>
       {/* Header Tabs */}
       <div className="flex items-center justify-between border-b border-[#e6e8ea] dark:border-[#2a2e39] px-2 h-10 shrink-0 bg-[#f8f9fa] dark:bg-[#131722] gap-2">
         <div className="flex items-center gap-3 sm:gap-6 h-full overflow-x-auto no-scrollbar shrink-0 min-w-0 flex-1">
@@ -79,7 +79,7 @@ export const PositionsManager = ({ currentPrice }: PositionsManagerProps) => {
       <div className="flex-1 overflow-auto custom-scrollbar relative">
         {activeTab === 'positions' && (
           positions.length > 0 ? (
-            <table className="w-full min-w-[760px] text-left text-xs text-[#1e2329] dark:text-[#d1d4dc]">
+            <table data-tour="positions-table" className="w-full min-w-[760px] text-left text-xs text-[#1e2329] dark:text-[#d1d4dc]">
               <thead className="sticky top-0 bg-[#f8f9fa] dark:bg-[#0b0e11] text-[#787b86] font-normal text-[11px] border-b border-[#e6e8ea] dark:border-transparent z-10">
                 <tr>
                   <th className="px-4 py-2">Symbol</th>
@@ -98,7 +98,7 @@ export const PositionsManager = ({ currentPrice }: PositionsManagerProps) => {
                   const pnlInfo = calculatePositionPnL(p);
                   const pnlColor = pnlInfo.netPnl >= 0 ? 'text-[#089981]' : 'text-[#f23645]';
                   return (
-                    <tr key={p.id} className="hover:bg-[#f5f5f5] dark:hover:bg-[#1e222d] transition-colors">
+                    <tr key={p.id} data-tour="position-row" className="hover:bg-[#f5f5f5] dark:hover:bg-[#1e222d] transition-colors">
                       <td className="px-4 py-2 font-bold">{p.symbol}</td>
                       <td className="px-4 py-2 font-mono">
                         {pnlInfo.actualQty < 1 ? Number(pnlInfo.actualQty.toFixed(6)).toString() : pnlInfo.actualQty.toLocaleString('vi-VN')} {getAssetUnit(p.symbol)}
@@ -117,6 +117,7 @@ export const PositionsManager = ({ currentPrice }: PositionsManagerProps) => {
                       </td>
                       <td className="px-4 py-2 text-center">
                         <button 
+                          data-tour="close-position-btn"
                           onClick={() => store.closePosition(p.id)}
                           className="bg-[#f0f3fa] hover:bg-[#e0e5f2] text-[#4b5563] hover:text-[#1e2329] dark:bg-[#2a2e39] dark:hover:bg-[#363a45] dark:text-[#d1d4dc] dark:hover:text-white px-3 py-1 rounded text-[11px] font-medium transition-colors"
                         >

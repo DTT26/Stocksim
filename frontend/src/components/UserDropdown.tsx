@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { LogOut, Keyboard, LayoutDashboard, Trophy } from 'lucide-react';
+import { LogOut, LayoutDashboard, Trophy } from 'lucide-react';
 import { googleLogout } from '@react-oauth/google';
 import { Link } from 'react-router-dom';
 import { UserAvatar } from './UserAvatar';
@@ -122,12 +122,8 @@ export const UserDropdown = ({
           <div className="py-1 border-b border-gray-100 dark:border-[#2a2e39]">
             <Link to={dashboardRoute} className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#2a2e39] flex items-center gap-3 transition-colors text-blue-600 dark:text-blue-400 font-medium">
               <LayoutDashboard className="w-4 h-4" />
-              <span>My Dashboard</span>
+              <span>Trang tổng quan</span>
             </Link>
-            <button className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#2a2e39] flex items-center gap-3 transition-colors text-gray-700 dark:text-[#d1d4dc]">
-              <Keyboard className="w-4 h-4 text-gray-400 dark:text-[#787b86]" />
-              <span>Phím tắt</span>
-            </button>
           </div>
 
           <div className="py-1">

@@ -33,6 +33,8 @@ import { ChallengeModal } from '../challenge/ChallengeModal';
 import { useModal } from '../../contexts/ModalContext';
 import { AiTutorDrawer } from '../ai/AiTutorDrawer';
 import { BacktestRuleCard } from './components/BacktestRuleCard';
+import { InteractiveTradingGuideModal } from './components/InteractiveTradingGuideModal';
+import { SpotlightOnboardingTour } from './components/SpotlightOnboardingTour';
 
 const MAX_RESETS_PER_WEEK = 4;
 
@@ -84,6 +86,7 @@ export const TradingTerminal = () => {
   const [editingSymbol, setEditingSymbol] = useState<string | null>(null);
 
   const [activeRightPanel, setActiveRightPanel] = useState<'watchlist' | 'order' | 'simulation' | 'calculator' | 'journal' | null>('watchlist');
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
 
   const { user, login } = useAuth();
   const { addNotification } = useNotificationStore();
@@ -1306,6 +1309,7 @@ export const TradingTerminal = () => {
     <div className="flex flex-col flex-1 overflow-hidden bg-white dark:bg-[#131722] text-[#1e2329] dark:text-[#d1d4dc]">
       <ToolbarNavbar
         balance={balance}
+        onOpenGuide={() => setIsGuideModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onOpenChallenge={() => setIsChallengeModalOpen(true)}
         onOpenAiTutor={() => {
@@ -1946,6 +1950,19 @@ export const TradingTerminal = () => {
           volume: currentTicker?.volume24h
         }}
         onStartBacktestReplay={handleStartBacktestReplayFromAi}
+      />
+      <InteractiveTradingGuideModal
+        isOpen={false}
+        onClose={() => setIsGuideModalOpen(false)}
+        onGoToJournal={() => navigate('/student/journal')}
+      />
+      <SpotlightOnboardingTour
+        isOpen={isGuideModalOpen}
+        onClose={() => setIsGuideModalOpen(false)}
+        isReplaying={isReplaying}
+        onSetRightPanel={(panel) => setActiveRightPanel(panel)}
+        onNavigateToJournal={() => navigate('/student/journal')}
+        onTriggerReplayStart={() => setIsSelectingReplayStart(true)}
       />
     </div>
   );

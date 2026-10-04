@@ -108,7 +108,7 @@ export const StudentAssignments = () => {
     <div className="space-y-5 sm:space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-          Bài tập & Phân tích (Assignments)
+          Bài tập & Phân tích
         </h1>
         <p className="text-slate-500 dark:text-slate-400 mt-1 sm:mt-2 text-xs sm:text-sm">
           Hoàn thành các bài tập phân tích kỹ thuật và quản trị vốn do Giảng viên giao.

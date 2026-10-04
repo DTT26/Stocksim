@@ -63,7 +63,7 @@ export const AdminTopbar = ({ mobileOpen, setMobileOpen }: AdminTopbarProps) => 
           </div>
           <input
             type="text"
-            placeholder="Search users, simulations..."
+            placeholder="Tìm kiếm người dùng, kỳ thi mô phỏng..."
             className="w-full bg-slate-100 dark:bg-[#172033] border border-slate-200 dark:border-[#1e293b] text-slate-900 dark:text-white text-sm rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:border-blue-500 focus:bg-white dark:focus:bg-[#172033] focus:ring-1 focus:ring-blue-500 transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
         </div>
@@ -97,8 +97,8 @@ export const AdminTopbar = ({ mobileOpen, setMobileOpen }: AdminTopbarProps) => 
           {showNotifications && (
             <div className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-[#172033] rounded-xl shadow-2xl border border-slate-200 dark:border-[#1e293b] overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
               <div className="p-4 border-b border-slate-200 dark:border-[#1e293b] flex justify-between items-center bg-slate-50 dark:bg-[#111827]">
-                <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Notifications</h3>
-                <button onClick={() => markAllAsRead()} className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium cursor-pointer">Mark all as read</button>
+                <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Thông báo</h3>
+                <button onClick={() => markAllAsRead()} className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium cursor-pointer">Đánh dấu đã đọc tất cả</button>
               </div>
               <div className="max-h-80 overflow-y-auto">
                 {notifications.length === 0 ? (
@@ -139,13 +139,13 @@ export const AdminTopbar = ({ mobileOpen, setMobileOpen }: AdminTopbarProps) => 
           >
             <UserAvatar 
               src={user?.picture} 
-              name={user?.name || 'Admin'} 
+              name={user?.name || 'Quản trị viên'} 
               size="w-8 h-8" 
               className="border border-slate-200 dark:border-[#1e293b]" 
             />
             <div className="hidden sm:block text-left">
-              <p className="text-sm font-medium text-slate-900 dark:text-white line-clamp-1">{user?.name || 'Admin'}</p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">Admin</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-white line-clamp-1">{user?.name || 'Quản trị viên'}</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">Quản trị viên</p>
             </div>
             <ChevronDown className="w-4 h-4 text-slate-400 hidden sm:block" />
           </button>
@@ -158,12 +158,12 @@ export const AdminTopbar = ({ mobileOpen, setMobileOpen }: AdminTopbarProps) => 
               </div>
               <div className="p-1.5">
                 <Link to="/admin/profile" onClick={() => setShowProfileMenu(false)} className="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors">
-                  <User className="w-4 h-4" /> My Profile
+                  <User className="w-4 h-4" /> Hồ sơ cá nhân
                 </Link>
               </div>
               <div className="p-1.5 border-t border-slate-200 dark:border-[#1e293b]">
                 <button onClick={() => logout()} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer">
-                  <LogOut className="w-4 h-4" /> Sign Out
+                  <LogOut className="w-4 h-4" /> Đăng xuất
                 </button>
               </div>
             </div>

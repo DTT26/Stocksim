@@ -558,6 +558,7 @@ export const SimulationPanel = ({
             HỦY
           </button>
           <button 
+            data-tour="sim-start-create-btn"
             onClick={handleStart}
             className="flex-1 bg-[#089981] hover:bg-[#089981]/90 text-white font-bold py-2.5 rounded-md transition-colors text-sm cursor-pointer shadow-sm"
           >
@@ -636,6 +637,7 @@ export const SimulationPanel = ({
       {activeTab === 'running' && (
         <div className="flex flex-col px-4 flex-1 overflow-hidden">
           <button 
+            data-tour="sim-new-session-btn"
             onClick={() => {
               if (!isReplaying) {
                 setShowReplayWarning(true);
@@ -738,6 +740,7 @@ export const SimulationPanel = ({
                     {/* Action buttons: Tiếp tục & Hoàn thành */}
                     <div className="flex items-center gap-2 pt-2 border-t border-[#e6e8ea] dark:border-[#2a2e39]/60">
                       <button
+                        data-tour="sim-continue-btn"
                         onClick={() => handleContinueSession(session)}
                         className="flex-1 py-2 px-3 rounded-lg border border-[#089981]/30 dark:border-[#089981]/50 bg-[#089981]/10 hover:bg-[#089981]/15 dark:bg-[#0e2722] dark:hover:bg-[#133730] text-[#089981] dark:text-[#26a69a] font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                       >
@@ -745,6 +748,7 @@ export const SimulationPanel = ({
                         Tiếp tục
                       </button>
                       <button
+                        data-tour="sim-finish-session-btn"
                         onClick={(e) => handleCompleteSession(session, e)}
                         className="flex-1 py-2 px-3 rounded-lg border border-[#f23645]/30 dark:border-[#f23645]/40 bg-[#f23645]/10 hover:bg-[#f23645]/15 dark:bg-[#2b1723] dark:hover:bg-[#3d1e31] text-[#f23645] font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                       >

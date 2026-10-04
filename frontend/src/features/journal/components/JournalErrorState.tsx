@@ -8,8 +8,8 @@ interface JournalErrorStateProps {
 }
 
 export const JournalErrorState: React.FC<JournalErrorStateProps> = ({
-  title = 'Unable to load trading journal',
-  message = 'Something went wrong while loading your trading data.',
+  title = 'Không thể tải nhật ký giao dịch',
+  message = 'Đã có lỗi xảy ra khi tải dữ liệu giao dịch của bạn.',
   onRetry
 }) => {
   return (
@@ -28,7 +28,7 @@ export const JournalErrorState: React.FC<JournalErrorStateProps> = ({
         className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 font-semibold text-xs sm:text-sm rounded-xl transition-all shadow-sm"
       >
         <RotateCcw className="w-4 h-4" />
-        <span>Try Again</span>
+        <span>Thử lại</span>
       </button>
     </div>
   );

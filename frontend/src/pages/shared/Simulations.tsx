@@ -201,19 +201,19 @@ export const SimulationsList = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Simulations
+            Kỳ thi mô phỏng
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1 text-xs sm:text-sm">
-            Join trading simulations, practice with virtual capital, and track your performance.
+            Tham gia kỳ thi giao dịch mô phỏng, rèn luyện với vốn ảo và theo dõi hiệu suất của bạn.
           </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-center">
           <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#172033] text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-[#253047]">
-            {simulations.length} Simulations
+            {simulations.length} Kỳ thi
           </span>
           <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            {activeSimsCount} Active
+            {activeSimsCount} Đang diễn ra
           </span>
         </div>
       </div>
@@ -224,7 +224,7 @@ export const SimulationsList = () => {
         <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-2xl border border-slate-200/80 dark:border-[#253047] shadow-sm relative overflow-hidden group transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Active Simulations
+              Kỳ thi đang diễn ra
             </span>
             <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <Activity className="w-4 h-4" />
@@ -234,7 +234,7 @@ export const SimulationsList = () => {
             <span className="text-2xl sm:text-3xl font-bold font-mono text-slate-900 dark:text-white">
               {activeSimsCount}
             </span>
-            <span className="text-xs text-slate-400 dark:text-slate-500">running now</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500">đang hoạt động</span>
           </div>
         </div>
 
@@ -242,7 +242,7 @@ export const SimulationsList = () => {
         <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-2xl border border-slate-200/80 dark:border-[#253047] shadow-sm relative overflow-hidden group transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Best Return
+              Tỷ suất sinh lời cao nhất
             </span>
             <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
               <TrendingUp className="w-4 h-4" />
@@ -256,7 +256,7 @@ export const SimulationsList = () => {
             >
               {bestReturn >= 0 ? `+${bestReturn.toFixed(2)}%` : `${bestReturn.toFixed(2)}%`}
             </span>
-            <span className="text-xs text-slate-400 dark:text-slate-500">across simulations</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500">trên các kỳ thi</span>
           </div>
         </div>
 
@@ -264,7 +264,7 @@ export const SimulationsList = () => {
         <div className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-2xl border border-slate-200/80 dark:border-[#253047] shadow-sm relative overflow-hidden group transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Assignments
+              Bài tập cần làm
             </span>
             <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
               <BookOpen className="w-4 h-4" />
@@ -274,7 +274,7 @@ export const SimulationsList = () => {
             <span className="text-2xl sm:text-3xl font-bold font-mono text-slate-900 dark:text-white">
               {pendingAssignmentsCount}
             </span>
-            <span className="text-xs text-slate-400 dark:text-slate-500">active / pending</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500">đang mở / chờ làm</span>
           </div>
         </div>
       </div>
@@ -284,6 +284,12 @@ export const SimulationsList = () => {
         {/* Tabs */}
         <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {(['All', 'Active', 'Upcoming', 'Completed'] as const).map(tab => {
+            const labelMap: Record<string, string> = {
+              'All': 'Tất cả',
+              'Active': 'Đang diễn ra',
+              'Upcoming': 'Sắp diễn ra',
+              'Completed': 'Đã kết thúc'
+            };
             const isActive = filter === tab;
             return (
               <button
@@ -295,7 +301,7 @@ export const SimulationsList = () => {
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-[#172033] border border-transparent'
                 }`}
               >
-                <span>{tab}</span>
+                <span>{labelMap[tab]}</span>
                 <span
                   className={`text-[10px] sm:text-[11px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
                     isActive
@@ -317,7 +323,7 @@ export const SimulationsList = () => {
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search simulations..."
+              placeholder="Tìm kiếm kỳ thi mô phỏng..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full bg-slate-50 dark:bg-[#172033] border border-slate-200 dark:border-[#253047] text-slate-900 dark:text-white placeholder:text-slate-400 text-xs rounded-xl pl-8 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
@@ -331,10 +337,10 @@ export const SimulationsList = () => {
               onChange={e => setSortBy(e.target.value as any)}
               className="bg-slate-50 dark:bg-[#172033] border border-slate-200 dark:border-[#253047] text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl pl-3 pr-7 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer appearance-none transition-all"
             >
-              <option value="newest">Newest</option>
-              <option value="capital_high">Highest Capital</option>
-              <option value="capital_low">Lowest Capital</option>
-              <option value="name">Name A-Z</option>
+              <option value="newest">Mới nhất</option>
+              <option value="capital_high">Vốn cao nhất</option>
+              <option value="capital_low">Vốn thấp nhất</option>
+              <option value="name">Tên A-Z</option>
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -345,13 +351,13 @@ export const SimulationsList = () => {
       {loading ? (
         <div className="py-20 text-center text-slate-400 dark:text-slate-500 flex flex-col items-center justify-center">
           <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
-          <span className="text-sm">Loading simulations...</span>
+          <span className="text-sm">Đang tải kỳ thi mô phỏng...</span>
         </div>
       ) : filteredSimulations.length === 0 ? (
         <div className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200 dark:border-[#253047] shadow-sm p-12 text-center text-slate-500 dark:text-slate-400">
           <BarChart2 className="w-10 h-10 opacity-30 mx-auto mb-2 text-slate-400" />
-          <p className="text-base font-semibold text-slate-800 dark:text-slate-200">No simulations found</p>
-          <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or search keywords.</p>
+          <p className="text-base font-semibold text-slate-800 dark:text-slate-200">Không tìm thấy kỳ thi nào</p>
+          <p className="text-xs text-slate-400 mt-1">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 items-stretch">
@@ -384,15 +390,15 @@ export const SimulationsList = () => {
                       {sim.status === 'ACTIVE' ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          ACTIVE
+                          ĐANG DIỄN RA
                         </span>
                       ) : sim.status === 'ENDED' ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">
-                          COMPLETED
+                          ĐÃ KẾT THÚC
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                          UPCOMING
+                          SẮP DIỄN RA
                         </span>
                       )}
 
@@ -405,20 +411,20 @@ export const SimulationsList = () => {
                     {/* Top-Right Participants */}
                     <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0 bg-slate-50 dark:bg-[#172033] px-2.5 py-1 rounded-lg border border-slate-100 dark:border-[#253047]/60">
                       <Users className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{sim.participantsCount ?? 0} {sim.participantsCount === 1 ? 'Participant' : 'Participants'}</span>
+                      <span>{sim.participantsCount ?? 0} Thí sinh</span>
                     </div>
                   </div>
 
                   {/* Description (max 2 lines) */}
                   <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-2 min-h-[2.5rem] leading-relaxed">
-                    {sim.description || 'Practice portfolio management with VN stocks in a live simulated environment.'}
+                    {sim.description || 'Rèn luyện quản lý danh mục đầu tư với cổ phiếu thực chiến trong môi trường mô phỏng.'}
                   </p>
 
                   {/* 7. Simulation Information Row */}
                   <div className="grid grid-cols-3 gap-2 py-2.5 px-3.5 bg-slate-50/80 dark:bg-[#172033]/60 rounded-xl border border-slate-100 dark:border-[#253047]/60 my-3 text-xs">
                     <div>
                       <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500 block mb-0.5">
-                        Initial Capital
+                        Vốn ban đầu
                       </span>
                       <span className="font-bold text-slate-800 dark:text-white font-mono truncate block text-xs sm:text-sm">
                         {formatCapital(sim.initialBalance, sim.market)}
@@ -426,15 +432,15 @@ export const SimulationsList = () => {
                     </div>
                     <div>
                       <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500 block mb-0.5">
-                        Market
+                        Thị trường
                       </span>
                       <span className="font-bold text-slate-800 dark:text-white truncate block text-xs sm:text-sm">
-                        {sim.market || 'VN'}
+                        {sim.market || 'Việt Nam'}
                       </span>
                     </div>
                     <div>
                       <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500 block mb-0.5">
-                        Ends
+                        Kết thúc
                       </span>
                       <span className="font-bold text-slate-800 dark:text-white font-mono truncate block text-xs sm:text-sm">
                         {formatDate(sim.endDate)}
@@ -448,16 +454,16 @@ export const SimulationsList = () => {
                       <div className="bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-xl p-3 my-2 text-xs">
                         <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-indigo-100/70 dark:border-indigo-900/30">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
-                            YOUR PERFORMANCE
+                            HIỆU SUẤT CỦA BẠN
                           </span>
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                            ACTIVE
+                            ĐANG THAM GIA
                           </span>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                           <div>
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">
-                              Portfolio Value
+                              Giá trị danh mục
                             </span>
                             <span className="font-bold text-slate-800 dark:text-white font-mono truncate block text-xs">
                               {formatCapital(
@@ -468,7 +474,7 @@ export const SimulationsList = () => {
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">
-                              Return
+                              Tỷ suất sinh lời
                             </span>
                             <span
                               className={`font-bold font-mono text-xs ${
@@ -481,7 +487,7 @@ export const SimulationsList = () => {
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">
-                              Rank
+                              Xếp hạng
                             </span>
                             <span className="font-bold font-mono text-indigo-600 dark:text-indigo-400 text-xs">
                               {participation.rank
@@ -505,7 +511,7 @@ export const SimulationsList = () => {
                           </div>
                         </div>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 shrink-0">
-                          PENDING
+                          CHỜ DUYỆT
                         </span>
                       </div>
                     ) : (
@@ -519,7 +525,7 @@ export const SimulationsList = () => {
                           </span>
                         </div>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 shrink-0">
-                          REJECTED
+                          TỪ CHỐI
                         </span>
                       </div>
                     )
@@ -528,7 +534,7 @@ export const SimulationsList = () => {
                     <div className="bg-slate-50/60 dark:bg-[#172033]/40 border border-slate-100 dark:border-[#253047]/40 rounded-xl p-2.5 my-2 text-xs flex items-center justify-between">
                       <span className="text-slate-500 dark:text-slate-400">Trạng thái tham gia:</span>
                       <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-800 px-2.5 py-0.5 rounded-full">
-                        Not joined
+                        Chưa tham gia
                       </span>
                     </div>
                   )}
@@ -543,20 +549,20 @@ export const SimulationsList = () => {
                         to={`/trade/${sim._id}`}
                         className="flex-1 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-semibold py-2.5 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-600/20 transition-all"
                       >
-                        <span>Enter Simulation</span>
+                        <span>Vào phòng thi</span>
                         <ArrowRight className="w-4 h-4" />
                       </Link>
                       <Link
                         to={`/leaderboard?sim=${sim._id}`}
                         className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200/80 dark:bg-[#172033] dark:hover:bg-[#253047] text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-[#253047] font-semibold rounded-xl text-xs sm:text-sm transition-colors text-center"
                       >
-                        Leaderboard
+                        Bảng xếp hạng
                       </Link>
                       <Link
                         to="/student/journal"
                         className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200/80 dark:bg-[#172033] dark:hover:bg-[#253047] text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-[#253047] font-semibold rounded-xl text-xs sm:text-sm transition-colors text-center"
                       >
-                        Journal
+                        Nhật ký
                       </Link>
                     </div>
                   ) : isPending ? (
@@ -572,7 +578,7 @@ export const SimulationsList = () => {
                         to={`/leaderboard?sim=${sim._id}`}
                         className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200/80 dark:bg-[#172033] dark:hover:bg-[#253047] text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-[#253047] font-semibold rounded-xl text-xs sm:text-sm transition-colors text-center"
                       >
-                        View Leaderboard
+                        Bảng xếp hạng
                       </Link>
                     </div>
                   ) : (
@@ -593,7 +599,7 @@ export const SimulationsList = () => {
                         to={`/leaderboard?sim=${sim._id}`}
                         className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200/80 dark:bg-[#172033] dark:hover:bg-[#253047] text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-[#253047] font-semibold rounded-xl text-xs sm:text-sm transition-colors text-center"
                       >
-                        View Leaderboard
+                        Bảng xếp hạng
                       </Link>
                     </div>
                   )
@@ -610,13 +616,13 @@ export const SimulationsList = () => {
                       ) : (
                         <PlusCircle className="w-4 h-4" />
                       )}
-                      <span>Join Simulation</span>
+                      <span>Tham gia kỳ thi</span>
                     </button>
                     <Link
                       to={`/leaderboard?sim=${sim._id}`}
                       className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200/80 dark:bg-[#172033] dark:hover:bg-[#253047] text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-[#253047] font-semibold rounded-xl text-xs sm:text-sm transition-colors text-center"
                     >
-                      View Leaderboard
+                      Bảng xếp hạng
                     </Link>
                   </div>
                 )}

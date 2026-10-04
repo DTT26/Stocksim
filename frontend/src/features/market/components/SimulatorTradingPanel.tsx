@@ -251,6 +251,7 @@ export const SimulatorTradingPanel = ({
         <div className="flex items-center gap-2">
           {onBack && (
             <button 
+              data-tour="sim-back-btn"
               onClick={onBack}
               className="p-1 hover:bg-[#e6e8ea] dark:hover:bg-[#1e222d] rounded text-[#787b86] hover:text-[#1e2329] dark:hover:text-white transition-colors"
               title="Quay lại danh sách phiên"
@@ -282,8 +283,8 @@ export const SimulatorTradingPanel = ({
           </span>
         </div>
 
-        {/* Order Type Tabs */}
-        <div className="flex bg-[#f0f1f3] dark:bg-[#1e222d] rounded p-1 shrink-0 gap-1 text-xs font-semibold">
+        {/* 1. Order Type Tabs */}
+        <div data-tour="order-type-tabs" className="flex bg-[#f0f1f3] dark:bg-[#1e222d] rounded p-1 shrink-0 gap-1 text-xs font-semibold">
           {(['MARKET', 'LIMIT', 'STOP'] as const).map(type => (
             <button
               key={type}
@@ -299,8 +300,8 @@ export const SimulatorTradingPanel = ({
           ))}
         </div>
 
-        {/* Trade Side Tabs */}
-        <div className="flex bg-[#f0f1f3] dark:bg-[#1e222d] rounded p-1 shrink-0 gap-1 text-xs font-semibold mt-1">
+        {/* 2. Trade Side Tabs */}
+        <div data-tour="order-side-btns" className="flex bg-[#f0f1f3] dark:bg-[#1e222d] rounded p-1 shrink-0 gap-1 text-xs font-semibold mt-1">
           {(['LONG', 'SHORT'] as const).map(side => (
             <button
               key={side}
@@ -316,8 +317,8 @@ export const SimulatorTradingPanel = ({
           ))}
         </div>
 
-        {/* Price input */}
-        <div className="flex gap-2">
+        {/* 3. Price input */}
+        <div data-tour="order-market-price" className="flex gap-2">
           <div className="flex flex-col gap-1 flex-1">
             <label className="text-[10px] text-[#787b86] uppercase tracking-wider font-semibold">
               {orderType === 'MARKET' ? 'Giá (Thị trường)' : 'Giá đặt (USD)'}
@@ -343,8 +344,8 @@ export const SimulatorTradingPanel = ({
           </div>
         </div>
 
-        {/* RISK PER TRADE */}
-        <div className="border border-[#e6e8ea] dark:border-[#2a2e39] rounded p-2.5 flex flex-col gap-2 mt-2">
+        {/* 4. RISK PER TRADE */}
+        <div data-tour="order-risk-box" className="border border-[#e6e8ea] dark:border-[#2a2e39] rounded p-2.5 flex flex-col gap-2 mt-2">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-[#787b86] uppercase tracking-wider font-semibold">RISK PER TRADE</span>
             <div className="flex bg-[#f0f1f3] dark:bg-[#1e222d] rounded shrink-0 text-xs font-semibold overflow-hidden">
@@ -385,8 +386,8 @@ export const SimulatorTradingPanel = ({
           )}
         </div>
 
-        {/* VOLUME (LOTS) */}
-        <div className="border border-[#e6e8ea] dark:border-[#2a2e39] rounded p-2.5 flex flex-col gap-2 mt-1">
+        {/* 5. VOLUME (LOTS) */}
+        <div data-tour="order-volume-box" className="border border-[#e6e8ea] dark:border-[#2a2e39] rounded p-2.5 flex flex-col gap-2 mt-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-[#787b86] uppercase tracking-wider font-semibold">VOLUME (LOTS)</span>
             <div className="flex bg-[#f0f1f3] dark:bg-[#1e222d] rounded shrink-0 text-xs font-semibold overflow-hidden">
@@ -431,8 +432,8 @@ export const SimulatorTradingPanel = ({
           )}
         </div>
 
-        {/* Custom Leverage Slider Inline */}
-        <div className="flex flex-col gap-1 mt-1">
+        {/* 6. Custom Leverage Slider Inline */}
+        <div data-tour="order-leverage-slider" className="flex flex-col gap-1 mt-1">
           <div className="flex justify-between items-center px-1">
             <label className="text-[10px] text-[#787b86] uppercase tracking-wider font-semibold">Đòn bẩy</label>
             <span className="text-xs font-mono font-bold text-[#1e2329] dark:text-white">{leverage}X</span>
@@ -484,100 +485,102 @@ export const SimulatorTradingPanel = ({
           </div>
         </div>
 
-        {/* TP / SL Toggle */}
-        <div className="flex items-center gap-2 pt-2 border-t border-[#e6e8ea] dark:border-[#2a2e39]/50">
-          <input
-            type="checkbox"
-            id="sim-toggle-tpsl"
-            checked={showTPSL}
-            onChange={(e) => {
-              const isChecked = e.target.checked;
-              setShowTPSL(isChecked);
-              if (isChecked) {
-                const refPrice = orderType !== 'MARKET' && parseFloat(priceStr) > 0 ? parseFloat(priceStr) : effectivePrice;
-                const precision = getPricePrecision(refPrice);
-                const currentSide = tradeSide;
+        {/* 7. TP / SL Toggle & Inputs */}
+        <div data-tour="order-tpsl-box" className="flex flex-col gap-1">
+          <div className="flex items-center gap-2 pt-2 border-t border-[#e6e8ea] dark:border-[#2a2e39]/50">
+            <input
+              type="checkbox"
+              id="sim-toggle-tpsl"
+              checked={showTPSL}
+              onChange={(e) => {
+                const isChecked = e.target.checked;
+                setShowTPSL(isChecked);
+                if (isChecked) {
+                  const refPrice = orderType !== 'MARKET' && parseFloat(priceStr) > 0 ? parseFloat(priceStr) : effectivePrice;
+                  const precision = getPricePrecision(refPrice);
+                  const currentSide = tradeSide;
 
-                let newTp = tp;
-                let newSl = sl;
-                if (!newTp) {
-                  const tpFactor = currentSide === 'LONG' ? 1.05 : 0.95;
-                  newTp = (refPrice * tpFactor).toFixed(precision);
-                  setTp(newTp);
+                  let newTp = tp;
+                  let newSl = sl;
+                  if (!newTp) {
+                    const tpFactor = currentSide === 'LONG' ? 1.05 : 0.95;
+                    newTp = (refPrice * tpFactor).toFixed(precision);
+                    setTp(newTp);
+                  }
+                  if (!newSl) {
+                    const slFactor = currentSide === 'LONG' ? 0.97 : 1.03;
+                    newSl = (refPrice * slFactor).toFixed(precision);
+                    setSl(newSl);
+                  }
+                } else {
+                  setTp('');
+                  setSl('');
                 }
-                if (!newSl) {
-                  const slFactor = currentSide === 'LONG' ? 0.97 : 1.03;
-                  newSl = (refPrice * slFactor).toFixed(precision);
-                  setSl(newSl);
-                }
-              } else {
-                setTp('');
-                setSl('');
-              }
-            }}
-            className="w-3.5 h-3.5 accent-blue-600 cursor-pointer"
-          />
-          <label htmlFor="sim-toggle-tpsl" className="text-xs text-[#787b86] cursor-pointer hover:text-[#1e2329] dark:hover:text-[#d1d4dc] transition-colors">
-            Thiết lập Chốt lời / Cắt lỗ (TP/SL)
-          </label>
+              }}
+              className="w-3.5 h-3.5 accent-blue-600 cursor-pointer"
+            />
+            <label htmlFor="sim-toggle-tpsl" className="text-xs text-[#787b86] cursor-pointer hover:text-[#1e2329] dark:hover:text-[#d1d4dc] transition-colors">
+              Thiết lập Chốt lời / Cắt lỗ (TP/SL)
+            </label>
+          </div>
+
+          {/* TP / SL inputs */}
+          {showTPSL && (() => {
+            const baseRefPrice = (orderType !== 'MARKET' && parseFloat(priceStr) > 0) ? parseFloat(priceStr) : effectivePrice;
+            const sliderPrecision = getPricePrecision(baseRefPrice);
+            const sliderStep = baseRefPrice > 1000 ? '1' : baseRefPrice > 10 ? '0.1' : Math.pow(10, -sliderPrecision).toString();
+
+            return (
+              <div className="flex gap-2 border-t border-[#e6e8ea] dark:border-[#2a2e39]/50 pt-2 mt-1">
+                <div className="flex flex-col gap-1 flex-1">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] text-[#089981] uppercase tracking-wider font-semibold">Chốt lời (TP)</label>
+                  </div>
+                  <input
+                    type="number"
+                    value={tp}
+                    placeholder="Tùy chọn"
+                    onChange={e => setTp(e.target.value)}
+                    className="bg-white dark:bg-[#1e222d] border border-[#e6e8ea] dark:border-[#2a2e39] rounded px-3 py-1.5 text-sm text-[#1e2329] dark:text-white font-mono focus:outline-none focus:border-[#089981] transition-colors w-full placeholder:text-[#787b86] dark:placeholder:text-[#434651]"
+                  />
+                  <input
+                    type="range"
+                    min={(baseRefPrice * 0.5).toFixed(sliderPrecision)}
+                    max={(baseRefPrice * 1.5).toFixed(sliderPrecision)}
+                    step={sliderStep}
+                    value={tp || baseRefPrice}
+                    onChange={e => setTp(e.target.value)}
+                    className="w-full accent-[#089981] mt-1 h-1 bg-[#e6e8ea] dark:bg-[#2a2e39] rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                <div className="flex flex-col gap-1 flex-1">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] text-[#f23645] uppercase tracking-wider font-semibold">Cắt lỗ (SL)</label>
+                  </div>
+                  <input
+                    type="number"
+                    value={sl}
+                    placeholder="Tùy chọn"
+                    onChange={e => setSl(e.target.value)}
+                    className="bg-white dark:bg-[#1e222d] border border-[#e6e8ea] dark:border-[#2a2e39] rounded px-3 py-1.5 text-sm text-[#1e2329] dark:text-white font-mono focus:outline-none focus:border-[#f23645] transition-colors w-full placeholder:text-[#787b86] dark:placeholder:text-[#434651]"
+                  />
+                  <input
+                    type="range"
+                    min={(baseRefPrice * 0.5).toFixed(sliderPrecision)}
+                    max={(baseRefPrice * 1.5).toFixed(sliderPrecision)}
+                    step={sliderStep}
+                    value={sl || baseRefPrice}
+                    onChange={e => setSl(e.target.value)}
+                    className="w-full accent-[#f23645] mt-1 h-1 bg-[#e6e8ea] dark:bg-[#2a2e39] rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
-        {/* TP / SL inputs */}
-        {showTPSL && (() => {
-          const baseRefPrice = (orderType !== 'MARKET' && parseFloat(priceStr) > 0) ? parseFloat(priceStr) : effectivePrice;
-          const sliderPrecision = getPricePrecision(baseRefPrice);
-          const sliderStep = baseRefPrice > 1000 ? '1' : baseRefPrice > 10 ? '0.1' : Math.pow(10, -sliderPrecision).toString();
-
-          return (
-            <div className="flex gap-2 border-t border-[#e6e8ea] dark:border-[#2a2e39]/50 pt-2 mt-1">
-              <div className="flex flex-col gap-1 flex-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] text-[#089981] uppercase tracking-wider font-semibold">Chốt lời (TP)</label>
-                </div>
-                <input
-                  type="number"
-                  value={tp}
-                  placeholder="Tùy chọn"
-                  onChange={e => setTp(e.target.value)}
-                  className="bg-white dark:bg-[#1e222d] border border-[#e6e8ea] dark:border-[#2a2e39] rounded px-3 py-1.5 text-sm text-[#1e2329] dark:text-white font-mono focus:outline-none focus:border-[#089981] transition-colors w-full placeholder:text-[#787b86] dark:placeholder:text-[#434651]"
-                />
-                <input
-                  type="range"
-                  min={(baseRefPrice * 0.5).toFixed(sliderPrecision)}
-                  max={(baseRefPrice * 1.5).toFixed(sliderPrecision)}
-                  step={sliderStep}
-                  value={tp || baseRefPrice}
-                  onChange={e => setTp(e.target.value)}
-                  className="w-full accent-[#089981] mt-1 h-1 bg-[#e6e8ea] dark:bg-[#2a2e39] rounded-lg appearance-none cursor-pointer"
-                />
-              </div>
-              <div className="flex flex-col gap-1 flex-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] text-[#f23645] uppercase tracking-wider font-semibold">Cắt lỗ (SL)</label>
-                </div>
-                <input
-                  type="number"
-                  value={sl}
-                  placeholder="Tùy chọn"
-                  onChange={e => setSl(e.target.value)}
-                  className="bg-white dark:bg-[#1e222d] border border-[#e6e8ea] dark:border-[#2a2e39] rounded px-3 py-1.5 text-sm text-[#1e2329] dark:text-white font-mono focus:outline-none focus:border-[#f23645] transition-colors w-full placeholder:text-[#787b86] dark:placeholder:text-[#434651]"
-                />
-                <input
-                  type="range"
-                  min={(baseRefPrice * 0.5).toFixed(sliderPrecision)}
-                  max={(baseRefPrice * 1.5).toFixed(sliderPrecision)}
-                  step={sliderStep}
-                  value={sl || baseRefPrice}
-                  onChange={e => setSl(e.target.value)}
-                  className="w-full accent-[#f23645] mt-1 h-1 bg-[#e6e8ea] dark:bg-[#2a2e39] rounded-lg appearance-none cursor-pointer"
-                />
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Setup Tag (Journal) */}
-        <div className="flex flex-col gap-1">
+        {/* 8. Setup Tag (Journal) */}
+        <div data-tour="order-setup-tag" className="flex flex-col gap-1">
           <label className="text-[10px] text-[#787b86] uppercase tracking-wider font-semibold">Nhãn Setup (Nhật ký)</label>
           <input
             type="text"
@@ -588,8 +591,8 @@ export const SimulatorTradingPanel = ({
           />
         </div>
 
-        {/* Risk / Margin Details */}
-        <div className="bg-[#f8f9fa] dark:bg-[#151924] rounded border border-[#e6e8ea] dark:border-[#1e222d] p-2.5 flex flex-col gap-1.5 text-xs">
+        {/* 9. Risk / Margin Details */}
+        <div data-tour="order-margin-summary" className="bg-[#f8f9fa] dark:bg-[#151924] rounded border border-[#e6e8ea] dark:border-[#1e222d] p-2.5 flex flex-col gap-1.5 text-xs">
           <div className="flex items-center justify-between">
             <span className="text-[#787b86]">Ký quỹ yêu cầu</span>
             <span className="font-mono text-[#1e2329] dark:text-white font-bold">
@@ -625,6 +628,7 @@ export const SimulatorTradingPanel = ({
       {/* Action Buttons LONG / SHORT */}
       <div className="p-3 border-t border-[#e6e8ea] dark:border-[#2a2e39] flex flex-col gap-2 shrink-0 bg-white dark:bg-[#131722]">
         <button
+          data-tour="order-submit-btn"
           disabled={isMarginExceeded}
           onClick={() => handleTrade(tradeSide)}
           className={`w-full text-white font-bold py-3 rounded text-sm transition-all flex flex-col items-center justify-center gap-0.5 ${
