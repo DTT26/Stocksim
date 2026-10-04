@@ -32,24 +32,73 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'sk-uByi5N8dkmANMd6Gq3W5VmP
 const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.shopaikey.com/v1').replace(/\/+$/, '');
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
+function getCurrentRealTimeContext() {
+  const now = new Date();
+  const vnFormatter = new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour12: false,
+    weekday: 'long',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+  const vnTimeStr = vnFormatter.format(now);
+  const utcStr = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+
+  const nyFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour12: false,
+    weekday: 'long',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+  const nyTimeStr = nyFormatter.format(now) + ' (New York, EDT/EST)';
+
+  return {
+    vnTime: vnTimeStr,
+    utcTime: utcStr,
+    nyTime: nyTimeStr
+  };
+}
+
 function buildSystemPrompt(lang: string = 'vi'): string {
   const isEn = (lang || '').toLowerCase().startsWith('en');
+  const timeCtx = getCurrentRealTimeContext();
+
+  const timeSection = `
+🕒 THỜI GIAN THỰC TẾ HỆ THỐNG HIỆN TẠI (REAL-TIME CLOCK):
+- Giờ & Ngày Việt Nam (Chuẩn): ${timeCtx.vnTime}
+- Giờ Quốc tế: ${timeCtx.utcTime}
+- Giờ New York: ${timeCtx.nyTime}
+QUY TẮC BẮT BUỘC: Khi học viên hỏi về thời gian, ngày hôm nay, thứ mấy, hoặc năm nay, bạn BẮT BUỘC sử dụng CHÍNH XÁC thời gian thực tế ở trên (${timeCtx.vnTime}). TUYỆT ĐỐI KHÔNG sử dụng mốc thời gian cũ trong dữ liệu training (như năm 2023 hay trước đó).`;
+
   if (isEn) {
     return `You are a Senior Prop Firm Funded Trader & AI Trading Coach on the StockSim platform.
 You analyze markets with professional discipline using ICT (Inner Circle Trader), SMC (Smart Money Concepts), and classical Price Action.
+${timeSection}
 Key Rules:
 1. Provide deep technical reasoning: identify Key POIs, Fair Value Gaps (FVG), Order Blocks, Liquidity Pools (BSL/SSL), Market Structure (BOS/MSS).
 2. Never give blind Buy/Sell financial advice or direct trade calls. Focus on educational analysis and risk management (1-2% risk per trade).
-3. Be concise, direct, professional, and highlight key price levels.
-4. Respond 100% in natural, fluent ENGLISH.`;
+3. If asked about current time or date, answer with the EXACT real-time clock above.
+4. Be concise, direct, professional, and highlight key price levels.
+5. Respond 100% in natural, fluent ENGLISH.`;
   }
   return `Bạn là Senior Prop Firm Funded Trader & AI Trading Coach của nền tảng StockSim.
 Bạn phân tích thị trường với tư duy của một trader chuyên nghiệp theo phương pháp ICT, SMC (Smart Money Concepts) và Price Action thuần túy.
+${timeSection}
 Quy tắc cốt lõi:
 1. Phân tích sắc sảo: Nhận diện cấu trúc thị trường (BOS, CHoCH, MSS), vùng mất cân bằng cung cầu (FVG, Imbalance), khối lệnh (Order Block), và thanh khoản (BSL, SSL).
 2. Tuyệt đối không phím lệnh Mua/Bán trực tiếp. Luôn nhấn mạnh kỷ luật và quản trị vốn 1-2% tài khoản.
-3. Trả lời súc tích, đi thẳng vào trọng tâm, in đậm các mốc giá và POI quan trọng.
-4. Bắt buộc trả lời 100% bằng TIẾNG VIỆT tự nhiên, chuẩn mực tài chính.`;
+3. Khi học viên hỏi hôm nay là ngày mấy, thứ mấy hoặc giờ giấc, hãy lấy CHÍNH XÁC thời gian: ${timeCtx.vnTime}.
+4. Trả lời súc tích, đi thẳng vào trọng tâm, in đậm các mốc giá và POI quan trọng.
+5. Bắt buộc trả lời 100% bằng TIẾNG VIỆT tự nhiên, chuẩn mực tài chính.`;
 }
 
 function buildUserPrompt(payload: any): string {
@@ -70,6 +119,8 @@ function buildUserPrompt(payload: any): string {
     parts.push(`👤 [TÀI KHOẢN]: Số dư ví: $${Number(userData.wallet.balance || 10000).toLocaleString('en-US')}`);
   }
 
+  const timeCtx = getCurrentRealTimeContext();
+  parts.push(`🕒 [ĐỒNG HỒ HỆ THỐNG THỜI GIAN THỰC]: ${timeCtx.vnTime} | Quốc tế: ${timeCtx.utcTime}`);
   parts.push(`Câu hỏi của học viên: ${question}`);
   return parts.join('\n\n');
 }

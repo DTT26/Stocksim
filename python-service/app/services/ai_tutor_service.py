@@ -278,11 +278,13 @@ class AiTutorService:
                 "\n\n==================================================\n"
                 "🕒 THỜI GIAN THỰC TẾ HỆ THỐNG & PHIÊN GIAO DỊCH (REAL-TIME CLOCK):\n"
                 "==================================================\n"
-                f"- Giờ Việt Nam (Chuẩn chính hệ thống): {time_ctx['vn_time']}\n"
+                f"- Giờ & Ngày Việt Nam (Chuẩn chính hệ thống): {time_ctx['vn_time']}\n"
                 f"- Giờ Quốc tế (UTC): {time_ctx['utc_time']}\n"
                 f"- Giờ New York (Wall Street): {time_ctx['ny_time']}\n"
                 f"- Phiên thị trường hiện tại: {time_ctx['active_session']}\n"
-                f"- Trạng thái Killzone ICT: {time_ctx['active_killzone']}"
+                f"- Trạng thái Killzone ICT: {time_ctx['active_killzone']}\n"
+                "QUY TẮC BẮT BUỘC: Khi học viên hỏi về thời gian, ngày hôm nay, thứ mấy hoặc năm nay, bạn BẮT BUỘC sử dụng "
+                f"CHÍNH XÁC thời gian thực tế ở trên ({time_ctx['vn_time']}). TUYỆT ĐỐI KHÔNG dùng thời gian cũ trong dữ liệu training (như năm 2023)."
             )
 
             # Tiered Prompting (Section 33: FREE vs PREMIUM)
@@ -965,11 +967,13 @@ class AiTutorService:
                 "\n\n==================================================\n"
                 "🕒 THỜI GIAN THỰC TẾ HỆ THỐNG & PHIÊN GIAO DỊCH (REAL-TIME CLOCK):\n"
                 "==================================================\n"
-                f"- Giờ Việt Nam (Chuẩn chính hệ thống): {time_ctx['vn_time']}\n"
+                f"- Giờ & Ngày Việt Nam (Chuẩn chính hệ thống): {time_ctx['vn_time']}\n"
                 f"- Giờ Quốc tế (UTC): {time_ctx['utc_time']}\n"
                 f"- Giờ New York (Wall Street): {time_ctx['ny_time']}\n"
                 f"- Phiên thị trường hiện tại: {time_ctx['active_session']}\n"
-                f"- Trạng thái Killzone ICT: {time_ctx['active_killzone']}"
+                f"- Trạng thái Killzone ICT: {time_ctx['active_killzone']}\n"
+                "QUY TẮC BẮT BUỘC: Khi học viên hỏi về thời gian, ngày hôm nay, thứ mấy hoặc năm nay, bạn BẮT BUỘC sử dụng "
+                f"CHÍNH XÁC thời gian thực tế ở trên ({time_ctx['vn_time']}). TUYỆT ĐỐI KHÔNG dùng thời gian cũ trong dữ liệu training (như năm 2023)."
             )
 
             if plan == "PREMIUM":
