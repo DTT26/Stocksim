@@ -1900,20 +1900,32 @@ class AiTutorService:
             first_label = str(first_draw.get("label", "")).upper()
             first_tag = str(first_draw.get("tag", "")).upper()
             first_concept = str(first_draw.get("detectedConcept", "")).upper()
+            u_time_start = first_draw.get("timeStart")
+            u_time_end = first_draw.get("timeEnd")
 
             # Priority 1: Match with detected FVGs if user or AI indicates FVG
             is_fvg = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["FVG", "FAIR VALUE", "IMBALANCE", "GAP"])
             if is_fvg and detected_fvgs:
+                # Find all candidates matching price range (within 6% tolerance)
+                price_candidates = [
+                    f for f in detected_fvgs
+                    if abs(float(f.get("top", 0)) - z_high) / max(1.0, z_high) < 0.06
+                    and abs(float(f.get("bottom", 0)) - z_low) / max(1.0, z_low) < 0.06
+                ]
                 matched_fvg = None
-                for fvg in detected_fvgs:
-                    f_top = float(fvg.get("top", 0))
-                    f_bot = float(fvg.get("bottom", 0))
-                    if abs(f_top - z_high) / max(1.0, z_high) < 0.05 and abs(f_bot - z_low) / max(1.0, z_low) < 0.05:
-                        matched_fvg = fvg
-                        break
-                if not matched_fvg:
-                    # Pick closest FVG to user zone
-                    matched_fvg = min(detected_fvgs, key=lambda f: abs(((f['top']+f['bottom'])/2) - user_mid))
+                if price_candidates:
+                    if u_time_start:
+                        # CRITICAL: Pick the candidate closest in time to where the student actually drew!
+                        matched_fvg = min(price_candidates, key=lambda f: abs((f.get("startTimestamp") or f.get("c1_timestamp") or 0) - u_time_start))
+                    else:
+                        # Otherwise pick the most recent candidate (reversed)
+                        matched_fvg = price_candidates[-1]
+                else:
+                    # If prices didn't match directly, find FVG closest in time to user drawing
+                    if u_time_start:
+                        matched_fvg = min(detected_fvgs, key=lambda f: abs((f.get("startTimestamp") or 0) - u_time_start))
+                    else:
+                        matched_fvg = detected_fvgs[-1]
 
                 if matched_fvg:
                     suggested_zone["type"] = matched_fvg["type"]
@@ -1921,21 +1933,30 @@ class AiTutorService:
                     suggested_zone["label"] = f"AI: {matched_fvg['type']}"
                     suggested_zone["priceHigh"] = matched_fvg["top"]
                     suggested_zone["priceLow"] = matched_fvg["bottom"]
-                    suggested_zone["startTimestamp"] = matched_fvg.get("startTimestamp") or matched_fvg.get("c1_timestamp")
-                    suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else matched_fvg.get("c3_timestamp"))
+                    # If user anchored at Candle 2 (displacement), use Candle 1 or userTimeStart so it aligns seamlessly
+                    c1_ts = matched_fvg.get("startTimestamp") or matched_fvg.get("c1_timestamp")
+                    suggested_zone["startTimestamp"] = c1_ts if c1_ts else u_time_start
+                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else matched_fvg.get("c3_timestamp"))
 
             # Priority 2: Match with detected OBs if user or AI indicates Order Block
             is_ob = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["ORDER BLOCK", "OB", "BLOCK"])
             if is_ob and detected_obs and not suggested_zone.get("startTimestamp"):
+                price_candidates = [
+                    o for o in detected_obs
+                    if abs(float(o.get("priceHigh", 0)) - z_high) / max(1.0, z_high) < 0.06
+                    and abs(float(o.get("priceLow", 0)) - z_low) / max(1.0, z_low) < 0.06
+                ]
                 matched_ob = None
-                for ob in detected_obs:
-                    ob_h = float(ob.get("priceHigh", 0))
-                    ob_l = float(ob.get("priceLow", 0))
-                    if abs(ob_h - z_high) / max(1.0, z_high) < 0.05 and abs(ob_l - z_low) / max(1.0, z_low) < 0.05:
-                        matched_ob = ob
-                        break
-                if not matched_ob:
-                    matched_ob = min(detected_obs, key=lambda o: abs(((o['priceHigh']+o['priceLow'])/2) - user_mid))
+                if price_candidates:
+                    if u_time_start:
+                        matched_ob = min(price_candidates, key=lambda o: abs((o.get("startTimestamp") or 0) - u_time_start))
+                    else:
+                        matched_ob = price_candidates[-1]
+                else:
+                    if u_time_start:
+                        matched_ob = min(detected_obs, key=lambda o: abs((o.get("startTimestamp") or 0) - u_time_start))
+                    else:
+                        matched_ob = detected_obs[-1]
 
                 if matched_ob:
                     suggested_zone["type"] = matched_ob["type"]
@@ -1943,13 +1964,13 @@ class AiTutorService:
                     suggested_zone["label"] = f"AI: {matched_ob['type']}"
                     suggested_zone["priceHigh"] = matched_ob["priceHigh"]
                     suggested_zone["priceLow"] = matched_ob["priceLow"]
-                    suggested_zone["startTimestamp"] = matched_ob.get("startTimestamp")
-                    suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else None)
+                    suggested_zone["startTimestamp"] = matched_ob.get("startTimestamp") or u_time_start
+                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
 
             # Priority 3: Fallback timestamp binding using user drawing coordinates
-            if not suggested_zone.get("startTimestamp") and first_draw.get("timeStart"):
-                suggested_zone["startTimestamp"] = first_draw.get("timeStart")
-                suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else None)
+            if not suggested_zone.get("startTimestamp") and u_time_start:
+                suggested_zone["startTimestamp"] = u_time_start
+                suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
 
         return {
             "success": True,

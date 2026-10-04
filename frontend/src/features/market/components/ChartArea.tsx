@@ -437,53 +437,79 @@ export const drawAiCorrectionOverlay = (suggestedZone: {
     const zLow = suggestedZone.priceLow;
     const zType = String(suggestedZone.type || suggestedZone.name || '').toUpperCase();
 
-    // Scan klines if t1 is missing to bind right on the exact candle(s)
+    // Scan klines if t1 is missing: SCAN FROM NEWEST CANDLES BACKWARD (or near userTimeStart), NOT from August!
+    const anchorTime = suggestedZone.userTimeStart;
     if (!t1 && klines.length >= 2) {
-      // 1. If FVG, scan 3-candle sequence
+      // 1. If FVG, scan 3-candle sequence backwards
       if (zType.includes('FVG') || zType.includes('FAIR VALUE') || zType.includes('GAP') || zType.includes('IMBALANCE')) {
-        for (let i = 1; i < klines.length - 1; i++) {
+        let bestCandidateTs: number | undefined;
+        let minTimeDiff = Infinity;
+        for (let i = klines.length - 2; i >= 1; i--) {
           const c1 = klines[i - 1];
           const c3 = klines[i + 1];
           const h1 = c1.high;
           const l3 = c3.low;
+          let matched = false;
           if (typeof h1 === 'number' && typeof l3 === 'number') {
-            if (Math.abs(h1 - zLow) / Math.max(1, zLow) < 0.05 && Math.abs(l3 - zHigh) / Math.max(1, zHigh) < 0.05) {
-              t1 = c1.timestamp;
-              break;
+            if (Math.abs(h1 - zLow) / Math.max(1, zLow) < 0.06 && Math.abs(l3 - zHigh) / Math.max(1, zHigh) < 0.06) {
+              matched = true;
             }
           }
           const l1 = c1.low;
           const h3 = c3.high;
           if (typeof l1 === 'number' && typeof h3 === 'number') {
-            if (Math.abs(l1 - zHigh) / Math.max(1, zHigh) < 0.05 && Math.abs(h3 - zLow) / Math.max(1, zLow) < 0.05) {
-              t1 = c1.timestamp;
+            if (Math.abs(l1 - zHigh) / Math.max(1, zHigh) < 0.06 && Math.abs(h3 - zLow) / Math.max(1, zLow) < 0.06) {
+              matched = true;
+            }
+          }
+          if (matched) {
+            if (anchorTime) {
+              const diff = Math.abs(c1.timestamp - anchorTime);
+              if (diff < minTimeDiff) {
+                minTimeDiff = diff;
+                bestCandidateTs = c1.timestamp;
+              }
+            } else {
+              bestCandidateTs = c1.timestamp;
               break;
             }
           }
         }
+        if (bestCandidateTs) t1 = bestCandidateTs;
       }
 
-      // 2. If Order Block, scan for the exact OB candle (last opposite-colored candle)
+      // 2. If Order Block, scan for the exact OB candle backwards
       if (!t1 && (zType.includes('ORDER BLOCK') || zType.includes('OB') || zType.includes('BLOCK'))) {
-        for (let i = 1; i < klines.length; i++) {
+        let bestCandidateTs: number | undefined;
+        let minTimeDiff = Infinity;
+        for (let i = klines.length - 1; i >= 1; i--) {
           const c = klines[i - 1];
           if (typeof c.high === 'number' && typeof c.low === 'number') {
-            const hMatch = Math.abs(c.high - zHigh) / Math.max(1, zHigh) < 0.05;
-            const lMatch = Math.abs(c.low - zLow) / Math.max(1, zLow) < 0.05;
+            const hMatch = Math.abs(c.high - zHigh) / Math.max(1, zHigh) < 0.06;
+            const lMatch = Math.abs(c.low - zLow) / Math.max(1, zLow) < 0.06;
             if (hMatch || lMatch) {
-              t1 = c.timestamp;
-              break;
+              if (anchorTime) {
+                const diff = Math.abs(c.timestamp - anchorTime);
+                if (diff < minTimeDiff) {
+                  minTimeDiff = diff;
+                  bestCandidateTs = c.timestamp;
+                }
+              } else {
+                bestCandidateTs = c.timestamp;
+                break;
+              }
             }
           }
         }
+        if (bestCandidateTs) t1 = bestCandidateTs;
       }
 
-      // 3. Fallback: match any swing high or low candle
+      // 3. Fallback: match any swing candle backwards
       if (!t1) {
         for (let i = klines.length - 1; i >= 0; i--) {
           const c = klines[i];
           if (typeof c.high === 'number' && typeof c.low === 'number') {
-            if (Math.abs(c.high - zHigh) / Math.max(1, zHigh) < 0.03 || Math.abs(c.low - zLow) / Math.max(1, zLow) < 0.03) {
+            if (Math.abs(c.high - zHigh) / Math.max(1, zHigh) < 0.04 || Math.abs(c.low - zLow) / Math.max(1, zLow) < 0.04) {
               t1 = c.timestamp;
               break;
             }
