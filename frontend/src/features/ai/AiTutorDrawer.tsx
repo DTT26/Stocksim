@@ -690,7 +690,13 @@ export const AiTutorDrawer = ({
 
   const handleApplyAiCorrection = () => {
     if (!inspectResult?.suggestedZone) return;
-    const overlayId = drawAiCorrectionOverlay(inspectResult.suggestedZone);
+    const firstDrawing = detectedDrawings[0];
+    const zoneWithTiming = {
+      ...inspectResult.suggestedZone,
+      userTimeStart: firstDrawing?.timeStart,
+      userTimeEnd: firstDrawing?.timeEnd
+    };
+    const overlayId = drawAiCorrectionOverlay(zoneWithTiming);
     if (overlayId) {
       setHasDrawnCorrection(true);
     }

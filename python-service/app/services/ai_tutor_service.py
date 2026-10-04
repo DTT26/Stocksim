@@ -1426,6 +1426,28 @@ class AiTutorService:
         if "CHƯA ĐÚNG" in analysis[:300].upper() or "SAI" in analysis[:300].upper():
             verdict = "INCORRECT"
 
+                # Bind exact 3-candle timestamps to suggested_zone so AI box touches the 3 candles on chart!
+        if suggested_zone:
+            z_high = float(suggested_zone.get("priceHigh", 0))
+            z_low = float(suggested_zone.get("priceLow", 0))
+            matched_fvg = None
+            if detected_fvgs:
+                for fvg in detected_fvgs:
+                    f_top = float(fvg.get("top", 0))
+                    f_bot = float(fvg.get("bottom", 0))
+                    if abs(f_top - z_high) / max(1.0, z_high) < 0.05 and abs(f_bot - z_low) / max(1.0, z_low) < 0.05:
+                        matched_fvg = fvg
+                        break
+
+            if matched_fvg and matched_fvg.get("startTimestamp"):
+                suggested_zone["startTimestamp"] = matched_fvg["startTimestamp"]
+                u_end = first_draw.get("timeEnd")
+                latest_t = klines[-1].get("timestamp") if klines else matched_fvg.get("c3_timestamp")
+                suggested_zone["endTimestamp"] = u_end or latest_t
+            elif not suggested_zone.get("startTimestamp") and first_draw.get("timeStart"):
+                suggested_zone["startTimestamp"] = first_draw.get("timeStart")
+                suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else None)
+
         return {
             "success": True,
             "symbol": symbol,
@@ -1685,7 +1707,9 @@ class AiTutorService:
                             "label": raw_zone.get("label", f"AI: {raw_zone.get('name', 'Order Block')}"),
                             "priceHigh": round(z_high, 4),
                             "priceLow": round(z_low, 4),
-                            "explanation": raw_zone.get("explanation", "")
+                            "explanation": raw_zone.get("explanation", ""),
+                            "startTimestamp": raw_zone.get("startTimestamp"),
+                            "endTimestamp": raw_zone.get("endTimestamp")
                         }
                 # Clean JSON block from analysis text so UI displays pure clean markdown
                 analysis = analysis[:zone_match.start()].strip()
@@ -1743,6 +1767,28 @@ class AiTutorService:
             verdict = "CORRECT" if "ĐÚNG" in analysis.upper() and "SAI" not in analysis[:300].upper() else "PARTIALLY_CORRECT"
         if "CHƯA ĐÚNG" in analysis[:300].upper() or "SAI" in analysis[:300].upper():
             verdict = "INCORRECT"
+
+                # Bind exact 3-candle timestamps to suggested_zone so AI box touches the 3 candles on chart!
+        if suggested_zone:
+            z_high = float(suggested_zone.get("priceHigh", 0))
+            z_low = float(suggested_zone.get("priceLow", 0))
+            matched_fvg = None
+            if detected_fvgs:
+                for fvg in detected_fvgs:
+                    f_top = float(fvg.get("top", 0))
+                    f_bot = float(fvg.get("bottom", 0))
+                    if abs(f_top - z_high) / max(1.0, z_high) < 0.05 and abs(f_bot - z_low) / max(1.0, z_low) < 0.05:
+                        matched_fvg = fvg
+                        break
+
+            if matched_fvg and matched_fvg.get("startTimestamp"):
+                suggested_zone["startTimestamp"] = matched_fvg["startTimestamp"]
+                u_end = first_draw.get("timeEnd")
+                latest_t = klines[-1].get("timestamp") if klines else matched_fvg.get("c3_timestamp")
+                suggested_zone["endTimestamp"] = u_end or latest_t
+            elif not suggested_zone.get("startTimestamp") and first_draw.get("timeStart"):
+                suggested_zone["startTimestamp"] = first_draw.get("timeStart")
+                suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else None)
 
         return {
             "success": True,

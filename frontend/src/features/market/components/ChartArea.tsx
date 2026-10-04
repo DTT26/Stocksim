@@ -412,24 +412,62 @@ export const drawAiCorrectionOverlay = (suggestedZone: {
   priceLow: number;
   startTimestamp?: number;
   endTimestamp?: number;
+  userTimeStart?: number;
+  userTimeEnd?: number;
   label?: string;
   type?: string;
   name?: string;
   explanation?: string;
 }) => {
-  if (!globalChartInstance) return null;
+  const chart = globalChartInstance || (typeof window !== 'undefined' ? (window as any).__STOCKSIM_CHART__ : null);
+  if (!chart) return null;
   try {
     // Clear any previous AI correction zone
     try {
-      globalChartInstance.removeOverlay({ name: 'aiCorrectionZone' });
+      chart.removeOverlay({ name: 'aiCorrectionZone' });
     } catch (_) {}
 
-    const klines = (globalChartInstance.getDataList && globalChartInstance.getDataList()) || [];
+    const klines: any[] = (chart.getDataList && chart.getDataList()) || [];
     const lastKline = klines[klines.length - 1];
-    const prevKline = klines[Math.max(0, klines.length - 15)];
 
-    const t1 = suggestedZone.startTimestamp || prevKline?.timestamp || (Date.now() - 3600000 * 4);
-    const t2 = suggestedZone.endTimestamp || lastKline?.timestamp || Date.now();
+    let t1 = suggestedZone.startTimestamp || suggestedZone.userTimeStart;
+    let t2 = suggestedZone.endTimestamp || suggestedZone.userTimeEnd;
+
+    // If t1 is still missing, scan klines for the exact 3-candle FVG sequence to anchor at Candle 1
+    if (!t1 && klines.length >= 3) {
+      const zHigh = suggestedZone.priceHigh;
+      const zLow = suggestedZone.priceLow;
+      for (let i = 1; i < klines.length - 1; i++) {
+        const c1 = klines[i - 1];
+        const c3 = klines[i + 1];
+        const h1 = c1.high;
+        const l3 = c3.low;
+        // Bullish FVG: c1.high ≈ zLow and c3.low ≈ zHigh
+        if (typeof h1 === 'number' && typeof l3 === 'number') {
+          if (Math.abs(h1 - zLow) / Math.max(1, zLow) < 0.05 && Math.abs(l3 - zHigh) / Math.max(1, zHigh) < 0.05) {
+            t1 = c1.timestamp;
+            break;
+          }
+        }
+        // Bearish FVG: c1.low ≈ zHigh and c3.high ≈ zLow
+        const l1 = c1.low;
+        const h3 = c3.high;
+        if (typeof l1 === 'number' && typeof h3 === 'number') {
+          if (Math.abs(l1 - zHigh) / Math.max(1, zHigh) < 0.05 && Math.abs(h3 - zLow) / Math.max(1, zLow) < 0.05) {
+            t1 = c1.timestamp;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!t1) {
+      const prevKline = klines[Math.max(0, klines.length - 15)];
+      t1 = prevKline?.timestamp || (Date.now() - 3600000 * 4);
+    }
+    if (!t2) {
+      t2 = lastKline?.timestamp || Date.now();
+    }
 
     const zoneLabel = suggestedZone.label || (suggestedZone.type ? `đŸ¯ AI: ${suggestedZone.type}` : (suggestedZone.name ? `đŸ¯ AI: ${suggestedZone.name}` : 'đŸ¯ AI: VĂ¹ng Chuáº©n'));
     const priceText = `$${suggestedZone.priceLow?.toLocaleString('en-US')} - $${suggestedZone.priceHigh?.toLocaleString('en-US')}`;

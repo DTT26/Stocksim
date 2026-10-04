@@ -344,12 +344,13 @@ def format_detailed_chart_context(
 
 # ==========================================
 # ==========================================
+# ==========================================
 # 6. NHẬN DIỆN FAIR VALUE GAP (FVG) CHUẨN XÁC THEO RÂU NẾN (WICKS)
 # ==========================================
 def detect_fair_value_gaps(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Nhận diện chính xác 100% các khoảng trống giá Fair Value Gap (FVG) theo chuẩn ICT (Michael Huddleston)
-    dựa trên RÂU NẾN (WICKS) của Nến 1 và Nến 3.
+    dựa trên RÂU NẾN (WICKS) của Nến 1 và Nến 3, gắn tọa độ thời gian (timestamp) của 3 cây nến.
     """
     fvgs = []
     if not klines or len(klines) < 3:
@@ -380,6 +381,10 @@ def detect_fair_value_gaps(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]
                 "gap_size": gap_size,
                 "candle_index": i,
                 "candles_ago": n - 1 - i,
+                "startTimestamp": c1.get("timestamp"),
+                "c1_timestamp": c1.get("timestamp"),
+                "c2_timestamp": c2.get("timestamp"),
+                "c3_timestamp": c3.get("timestamp"),
                 "c1_info": f"Nến 1 (t:{c1.get('timestamp')}) Đỉnh râu High = {h1}",
                 "c2_info": f"Nến 2 (t:{c2.get('timestamp')}) Thân tăng mạnh Displacement",
                 "c3_info": f"Nến 3 (t:{c3.get('timestamp')}) Đáy râu Low = {l3}",
@@ -399,6 +404,10 @@ def detect_fair_value_gaps(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]
                 "gap_size": gap_size,
                 "candle_index": i,
                 "candles_ago": n - 1 - i,
+                "startTimestamp": c1.get("timestamp"),
+                "c1_timestamp": c1.get("timestamp"),
+                "c2_timestamp": c2.get("timestamp"),
+                "c3_timestamp": c3.get("timestamp"),
                 "c1_info": f"Nến 1 (t:{c1.get('timestamp')}) Đáy râu Low = {l1}",
                 "c2_info": f"Nến 2 (t:{c2.get('timestamp')}) Thân giảm mạnh Displacement",
                 "c3_info": f"Nến 3 (t:{c3.get('timestamp')}) Đỉnh râu High = {h3}",
