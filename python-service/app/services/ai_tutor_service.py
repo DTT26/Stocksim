@@ -1454,120 +1454,51 @@ class AiTutorService:
             except:
                 pass
 
-        if is_en:
-            verdict = "CORRECT" if ("CORRECT" in analysis.upper() and "INCORRECT" not in analysis[:300].upper()) else ("INCORRECT" if "INCORRECT" in analysis[:300].upper() else "PARTIALLY_CORRECT")
-        else:
-            verdict = "CORRECT" if "ĐÚNG" in analysis.upper() and "SAI" not in analysis[:300].upper() else "PARTIALLY_CORRECT"
-        if "CHƯA ĐÚNG" in analysis[:300].upper() or "SAI" in analysis[:300].upper():
+        has_fail_signal = (score <= 55 or "CHƯA ĐÚNG" in analysis[:350].upper() or "SAI" in analysis[:350].upper() or "INCORRECT" in analysis[:350].upper())
+        has_correct_signal = (score >= 80 and not has_fail_signal and ("ĐÚNG" in analysis[:350].upper() or "CORRECT" in analysis[:350].upper()))
+
+        if has_correct_signal:
+            verdict = "CORRECT"
+        elif has_fail_signal:
             verdict = "INCORRECT"
+        else:
+            verdict = "PARTIALLY_CORRECT"
 
-        # Robust Unified Timestamp & Boundary Binding for ALL Smart Money Patterns
-        if suggested_zone:
-            z_high = float(suggested_zone.get("priceHigh", 0))
-            z_low = float(suggested_zone.get("priceLow", 0))
-            z_type = str(suggested_zone.get("type", "")).upper()
-            z_name = str(suggested_zone.get("name", "")).upper()
-            first_label = str(first_draw.get("label", "")).upper()
-            first_tag = str(first_draw.get("tag", "")).upper()
-            first_concept = str(first_draw.get("detectedConcept", "")).upper()
-            u_time_start = first_draw.get("timeStart")
-            u_time_end = first_draw.get("timeEnd")
+        # Check if vision LLM returned a JSON zone correction block
+        suggested_zone = None
+        zone_match = re.search(r'```(?:json:zone|json)?\s*(\{[\s\S]*?\})\s*```', analysis)
+        if not zone_match:
+            zone_match = re.search(r'(\{[\s\S]*?"priceHigh"[\s\S]*?"priceLow"[\s\S]*?\})', analysis)
+        if zone_match:
+            try:
+                raw_str = zone_match.group(1).strip()
+                raw_str = re.sub(r',(\s*[\}\]])', r'\1', raw_str)
+                raw_zone = json.loads(raw_str)
+                if isinstance(raw_zone, dict) and "priceHigh" in raw_zone and "priceLow" in raw_zone:
+                    z_high = float(raw_zone.get("priceHigh", 0))
+                    z_low = float(raw_zone.get("priceLow", 0))
+                    if z_high > 0 and z_low > 0 and z_high >= z_low:
+                        suggested_zone = {
+                            "type": raw_zone.get("type", "Vùng Cấu Trúc SMC"),
+                            "name": raw_zone.get("name", "Vùng Chuẩn Tối Ưu"),
+                            "label": raw_zone.get("label", f"AI: {raw_zone.get('name', 'Vùng Chuẩn')}"),
+                            "priceHigh": round(z_high, 4),
+                            "priceLow": round(z_low, 4),
+                            "explanation": raw_zone.get("explanation", ""),
+                            "startTimestamp": raw_zone.get("startTimestamp"),
+                            "endTimestamp": raw_zone.get("endTimestamp")
+                        }
+                analysis = analysis[:zone_match.start()].strip()
+            except Exception as e:
+                pass
 
-            # Check concept
-            is_ob = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["ORDER BLOCK", "OB", "BLOCK"])
-            is_fvg = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["FVG", "FAIR VALUE", "IMBALANCE", "GAP"])
-
-            # Calculate average candle height across recent klines
-            candle_ranges = [abs(k.get("high", 0) - k.get("low", 0)) for k in recent_klines if isinstance(k.get("high"), (int, float)) and isinstance(k.get("low"), (int, float))]
-            avg_candle_h = sum(candle_ranges) / len(candle_ranges) if candle_ranges else 1.0
-
-            # 1. ORDER BLOCK RESOLUTION
-            if is_ob or (not is_fvg and not suggested_zone.get("startTimestamp")):
-                # Sanity check: An Order Block cannot span a massive range (> 2.5 * avg candle height or matching wave_min)
-                is_hallucinated = (z_high - z_low) > (avg_candle_h * 2.5) or (wave_min and abs(z_low - wave_min) < 0.001 * wave_min and z_low < user_p_low * 0.98)
-
-                matched_ob = None
-                # First check localized candidates near user drawing time
-                if detected_obs:
-                    if u_time_start:
-                        time_candidates = [o for o in detected_obs if abs(o.get("startTimestamp", 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 3]
-                        if time_candidates:
-                            matched_ob = min(time_candidates, key=lambda o: abs(o.get("startTimestamp", 0) - u_time_start))
-                    if not matched_ob and not is_hallucinated:
-                        # Match candidate close in price
-                        price_candidates = [
-                            o for o in detected_obs
-                            if abs(float(o.get("priceHigh", 0)) - z_high) / max(1.0, z_high) < 0.06
-                            and abs(float(o.get("priceLow", 0)) - z_low) / max(1.0, z_low) < 0.06
-                        ]
-                        if price_candidates:
-                            matched_ob = price_candidates[-1]
-
-                # Fallback to direct localized candle search right at student's drawn coordinates
-                if not matched_ob or is_hallucinated:
-                    loc_ob = find_order_block_at_candle(klines, u_time_start, user_p_high, user_p_low)
-                    if loc_ob:
-                        matched_ob = loc_ob
-
-                if matched_ob:
-                    suggested_zone["type"] = matched_ob["type"]
-                    suggested_zone["name"] = matched_ob["type"]
-                    suggested_zone["label"] = f"AI: {matched_ob['type']}"
-                    suggested_zone["priceHigh"] = matched_ob["priceHigh"]
-                    suggested_zone["priceLow"] = matched_ob["priceLow"]
-                    suggested_zone["startTimestamp"] = matched_ob.get("startTimestamp") or u_time_start
-                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
-                    suggested_zone["explanation"] = matched_ob.get("rule", "Cây nến Order Block chuẩn xác theo Smart Money")
-
-                    # If user drew tightly around this exact OB candle, grant high score and CORRECT!
-                    if user_p_high and user_p_low:
-                        h_err = abs(user_p_high - matched_ob["priceHigh"]) / max(1.0, matched_ob["priceHigh"])
-                        l_err = abs(user_p_low - matched_ob["priceLow"]) / max(1.0, matched_ob["priceLow"])
-                        if h_err < 0.05 and l_err < 0.05:
-                            score = max(score, 95)
-                            verdict = "CORRECT"
-
-                elif is_hallucinated and user_p_high and user_p_low:
-                    # Snap to student's exact candle drawing
-                    suggested_zone["priceHigh"] = user_p_high
-                    suggested_zone["priceLow"] = user_p_low
-                    suggested_zone["startTimestamp"] = u_time_start
-                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
-
-            # 2. FAIR VALUE GAP (FVG) RESOLUTION
-            elif is_fvg and detected_fvgs:
-                price_candidates = [
-                    f for f in detected_fvgs
-                    if abs(float(f.get("top", 0)) - z_high) / max(1.0, z_high) < 0.06
-                    and abs(float(f.get("bottom", 0)) - z_low) / max(1.0, z_low) < 0.06
-                ]
-                matched_fvg = None
-                if price_candidates:
-                    if u_time_start:
-                        matched_fvg = min(price_candidates, key=lambda f: abs((f.get("startTimestamp") or f.get("c1_timestamp") or 0) - u_time_start))
-                    else:
-                        matched_fvg = price_candidates[-1]
-                else:
-                    if u_time_start:
-                        matched_fvg = min(detected_fvgs, key=lambda f: abs((f.get("startTimestamp") or 0) - u_time_start))
-                    else:
-                        matched_fvg = detected_fvgs[-1]
-
-                if matched_fvg:
-                    suggested_zone["type"] = matched_fvg["type"]
-                    suggested_zone["name"] = matched_fvg["type"]
-                    suggested_zone["label"] = f"AI: {matched_fvg['type']}"
-                    suggested_zone["priceHigh"] = matched_fvg["top"]
-                    suggested_zone["priceLow"] = matched_fvg["bottom"]
-                    c1_ts = matched_fvg.get("startTimestamp") or matched_fvg.get("c1_timestamp")
-                    suggested_zone["startTimestamp"] = c1_ts if c1_ts else u_time_start
-                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else matched_fvg.get("c3_timestamp"))
-                    suggested_zone["explanation"] = matched_fvg.get("rule", "Vùng Fair Value Gap chuẩn xác theo Râu Nến")
-
-            # 3. Default anchor timestamps if still missing
-            if not suggested_zone.get("startTimestamp") and u_time_start:
-                suggested_zone["startTimestamp"] = u_time_start
-                suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
+        # CRITICAL: Keep Section 5 score synchronized with final score
+        analysis = re.sub(
+            r'((?:Điểm\s*(?:đánh giá|số)?|Score)[:\s*]+)\d{1,3}(\s*(?:/\s*100)?)',
+            rf'\g<1>{score}\g<2>',
+            analysis,
+            flags=re.IGNORECASE
+        )
 
         return {
             "success": True,
@@ -1899,23 +1830,24 @@ class AiTutorService:
             except:
                 pass
 
-        if is_en:
-            verdict = "CORRECT" if ("CORRECT" in analysis.upper() and "INCORRECT" not in analysis[:300].upper()) else ("INCORRECT" if "INCORRECT" in analysis[:300].upper() else "PARTIALLY_CORRECT")
-        else:
-            verdict = "CORRECT" if "ĐÚNG" in analysis.upper() and "SAI" not in analysis[:300].upper() else "PARTIALLY_CORRECT"
-        if "CHƯA ĐÚNG" in analysis[:300].upper() or "SAI" in analysis[:300].upper():
+        has_fail_signal = (score <= 55 or "CHƯA ĐÚNG" in analysis[:350].upper() or "SAI" in analysis[:350].upper() or "INCORRECT" in analysis[:350].upper())
+        has_correct_signal = (score >= 80 and not has_fail_signal and ("ĐÚNG" in analysis[:350].upper() or "CORRECT" in analysis[:350].upper()))
+
+        if has_correct_signal:
+            verdict = "CORRECT"
+        elif has_fail_signal:
             verdict = "INCORRECT"
+        else:
+            verdict = "PARTIALLY_CORRECT"
 
         # Calculate average candle height across recent klines
         candle_ranges = [abs(k.get("high", 0) - k.get("low", 0)) for k in recent_klines if isinstance(k.get("high"), (int, float)) and isinstance(k.get("low"), (int, float))]
         avg_candle_h = sum(candle_ranges) / len(candle_ranges) if candle_ranges else 1.0
 
         # STRICT CONCEPT RESOLUTION PIPELINE:
-        # If the student drew an FVG, NEVER let it become an Order Block!
         if is_user_fvg:
             matched_fvg = None
             if detected_fvgs:
-                # 1. Match candidate nearest in price & time
                 if u_time_start:
                     time_candidates = [f for f in detected_fvgs if abs((f.get("startTimestamp") or f.get("c1_timestamp") or 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 7]
                     if time_candidates:
@@ -1938,7 +1870,10 @@ class AiTutorService:
                 if user_p_high and user_p_low:
                     h_err = abs(user_p_high - matched_fvg["top"]) / max(1.0, matched_fvg["top"])
                     l_err = abs(user_p_low - matched_fvg["bottom"]) / max(1.0, matched_fvg["bottom"])
-                    if h_err < 0.08 or l_err < 0.08:
+                    user_h = abs(user_p_high - user_p_low)
+                    fvg_h = abs(matched_fvg["top"] - matched_fvg["bottom"])
+                    # Only boost if student's box is proportional and LLM didn't evaluate as incorrect
+                    if not has_fail_signal and user_h <= fvg_h * 2.0 and (h_err < 0.05 and l_err < 0.05):
                         score = max(score, 90)
                         verdict = "CORRECT"
             elif not suggested_zone:
@@ -1982,7 +1917,10 @@ class AiTutorService:
                 if user_p_high and user_p_low:
                     h_err = abs(user_p_high - matched_ob["priceHigh"]) / max(1.0, matched_ob["priceHigh"])
                     l_err = abs(user_p_low - matched_ob["priceLow"]) / max(1.0, matched_ob["priceLow"])
-                    if h_err < 0.06 and l_err < 0.06:
+                    user_h = abs(user_p_high - user_p_low)
+                    ob_h = abs(matched_ob["priceHigh"] - matched_ob["priceLow"])
+                    # Only boost if student's box is proportional and LLM didn't evaluate as incorrect
+                    if not has_fail_signal and user_h <= ob_h * 2.0 and (h_err < 0.05 and l_err < 0.05):
                         score = max(score, 95)
                         verdict = "CORRECT"
             elif not suggested_zone:
@@ -1997,7 +1935,6 @@ class AiTutorService:
                     "explanation": "Cây nến Order Block đơn lẻ tại khu vực bạn phân tích"
                 }
         else:
-            # Fallback for untagged drawings: bind to student's exact coordinates
             if not suggested_zone:
                 suggested_zone = {
                     "type": first_draw.get("name") or "Vùng Cấu Trúc SMC",
@@ -2010,12 +1947,25 @@ class AiTutorService:
                     "explanation": "Vùng cấu trúc nến tối ưu tại khu vực học viên đang vẽ"
                 }
 
-                # SYNCHRONIZATION GUARANTEE:
-        # If verdict is CORRECT (score >= 80), harmonize the markdown conclusion text
-        # so that the badge, score, and explanation text are in 100% agreement!
-        if verdict == "CORRECT" and score >= 80:
+        # Guard against hallucinated massive zones in suggestedZone (e.g. whole wave instead of single candle)
+        if suggested_zone and is_user_ob:
+            sz_h = abs(float(suggested_zone.get("priceHigh", 0)) - float(suggested_zone.get("priceLow", 0)))
+            if sz_h > avg_candle_h * 2.5:
+                if matched_ob:
+                    suggested_zone["priceHigh"] = matched_ob["priceHigh"]
+                    suggested_zone["priceLow"] = matched_ob["priceLow"]
+                elif user_p_high and user_p_low and (user_p_high - user_p_low) <= avg_candle_h * 2.5:
+                    suggested_zone["priceHigh"] = user_p_high
+                    suggested_zone["priceLow"] = user_p_low
+                elif klines:
+                    ref_c = min(klines, key=lambda k: abs(k.get("timestamp", 0) - (u_time_start or 0))) if u_time_start else klines[-1]
+                    suggested_zone["priceHigh"] = ref_c.get("high")
+                    suggested_zone["priceLow"] = ref_c.get("low")
+
+        # SYNCHRONIZATION GUARANTEE:
+        if verdict == "CORRECT":
             analysis = re.sub(
-                r'(-\s*\*\*Kết luận tổng quan:\*\*\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:CHƯA ĐÚNG|SAI)[^\r\n]*',
+                r'(-\s*\*\*Kết luận tổng quan:\*\*\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:CHƯA ĐÚNG|SAI|ĐÚNG MỘT PHẦN)[^\r\n]*',
                 r'\1Bài vẽ của học viên **ĐÚNG** chuẩn xác theo định nghĩa Smart Money Concepts (SMC/ICT).',
                 analysis,
                 flags=re.IGNORECASE
@@ -2023,14 +1973,29 @@ class AiTutorService:
             if is_user_fvg:
                 analysis = re.sub(r'Hình #\d+ - \[Order Block.*?Học viên đã kéo một vùng phạm vi quá rộng[^\r\n]*', '', analysis)
                 analysis = re.sub(r'Theo nguyên tắc tối thượng của ICT, một Order Block thuần túy chỉ là DUY NHẤT MỘT CÂY NẾN ĐƠN LẺ[^\r\n]*', '', analysis)
-
-        elif verdict == "INCORRECT" and score <= 60:
+        elif verdict == "INCORRECT":
             analysis = re.sub(
-                r'(-\s*\*\*Kết luận tổng quan:\*\*\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:ĐÚNG|CHÍNH XÁC)[^\r\n]*',
+                r'(-\s*\*\*Kết luận tổng quan:\*\*\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:ĐÚNG|CHÍNH XÁC|ĐÚNG MỘT PHẦN)[^\r\n]*',
                 r'\1Bài vẽ của học viên **CHƯA ĐÚNG** theo tiêu chuẩn kỹ thuật.',
                 analysis,
                 flags=re.IGNORECASE
             )
+        elif verdict == "PARTIALLY_CORRECT":
+            if "ĐÚNG MỘT PHẦN" not in analysis[:350].upper():
+                analysis = re.sub(
+                    r'(-\s*\*\*Kết luận tổng quan:\*\*\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:ĐÚNG|CHÍNH XÁC|CHƯA ĐÚNG|SAI)[^\r\n]*',
+                    r'\1Bài vẽ của học viên **ĐÚNG MỘT PHẦN** (cần lưu ý hoàn thiện thêm).',
+                    analysis,
+                    flags=re.IGNORECASE
+                )
+
+        # CRITICAL: Always keep Section 5 score synchronized with final score
+        analysis = re.sub(
+            r'((?:Điểm\s*(?:đánh giá|số)?|Score)[:\s*]+)\d{1,3}(\s*(?:/\s*100)?)',
+            rf'\g<1>{score}\g<2>',
+            analysis,
+            flags=re.IGNORECASE
+        )
 
         return {
             "success": True,
