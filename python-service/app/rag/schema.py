@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any, Literal
 
 SourceType = Literal["PRIMARY", "SECONDARY", "AI_GENERATED"]
@@ -43,7 +43,8 @@ class ConceptExplainRequest(BaseModel):
     lang: Optional[str] = "vi"
 
 class TradeInput(BaseModel):
-    tradeId: Optional[str] = "TRD-CUSTOM"
+    model_config = ConfigDict(extra="allow")
+    tradeId: Optional[str] = "TRD-CUSTOM" 
     symbol: str = "BTCUSDT"
     side: Literal["BUY", "SELL", "LONG", "SHORT"] = "BUY"
     entryPrice: float

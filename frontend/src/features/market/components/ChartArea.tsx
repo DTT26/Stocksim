@@ -4883,9 +4883,11 @@ export const ChartArea = ({
             if (event.x !== undefined && event.y !== undefined) {
               const pixelCoords = chart.convertToPixel(pts, { paneId: 'candle_pane' });
               const coords = Array.isArray(pixelCoords) ? pixelCoords : [pixelCoords];
-              if (coords[0] && Math.hypot(coords[0].x - event.x, coords[0].y - event.y) <= 30) {
+              const c0 = coords[0];
+              const cLast = coords[coords.length - 1];
+              if (c0 && typeof c0.x === 'number' && typeof c0.y === 'number' && Math.hypot(c0.x - event.x, c0.y - event.y) <= 30) {
                 dragHandle = 'p0';
-              } else if (coords[coords.length - 1] && Math.hypot(coords[coords.length - 1].x - event.x, coords[coords.length - 1].y - event.y) <= 30) {
+              } else if (cLast && typeof cLast.x === 'number' && typeof cLast.y === 'number' && Math.hypot(cLast.x - event.x, cLast.y - event.y) <= 30) {
                 dragHandle = 'p1';
               } else {
                 dragHandle = 'body';
