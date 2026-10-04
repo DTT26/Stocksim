@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { init, dispose, registerOverlay } from 'klinecharts';
 import type { Chart, KLineData, DataLoaderGetBarsParams, DataLoaderSubscribeBarParams } from 'klinecharts';
 import { Settings2, Trash2, Edit2, Type, Minus, MoreHorizontal, Lock, Unlock, GripVertical, LayoutGrid, Pencil, Plus, ChevronRight, Copy, Settings, X, Layers } from 'lucide-react';
-import { generateOHLCV, getPricePrecision, timeframeToMs, type Stock } from '../data';
+import { generateOHLCV, getPricePrecision, getContractMultiplier, timeframeToMs, type Stock } from '../data';
 import { fetchBinanceKlines, mapTimeframeToBinance, subscribeBinanceKline } from '../../../services/binanceApi';
 import { fetchUnifiedKlines, subscribeUnifiedBar } from '../../../services/marketDataService';
 import type { TradeOrder } from '../TradingTerminal';
@@ -2238,7 +2238,6 @@ registerOverlay({
   }
 });
 registerOverlay({
-
   name: 'tpslZone',
   totalStep: 2,
   needDefaultPointFigure: true,
@@ -2270,6 +2269,131 @@ registerOverlay({
       }
     }
     return [];
+  }
+});
+
+registerOverlay({
+  name: 'tpslLine',
+  totalStep: 2,
+  needDefaultPointFigure: false,
+  needDefaultXAxisFigure: false,
+  needDefaultYAxisFigure: false,
+  performEventPressedMove: ({ points, performPoint }: any) => {
+    if (points && points.length > 0 && performPoint && typeof performPoint.value === 'number') {
+      points[0].value = performPoint.value;
+      if (points[1]) {
+        points[1].value = performPoint.value;
+      }
+    }
+  },
+  createPointFigures: ({ coordinates, bounding, overlay }: any) => {
+    if (!coordinates || coordinates.length === 0 || !coordinates[0]) return [];
+    const py = coordinates[0].y;
+    if (typeof py !== 'number' || isNaN(py)) return [];
+    const width = bounding?.width || 3000;
+
+    const isTP = overlay.extendData?.type === 'tp';
+    const isPreview = !!overlay.extendData?.isPreview;
+    const lineColor = isTP ? '#089981' : '#f23645';
+    const badgeText = overlay.extendData?.badgeText || (isTP ? 'TP' : 'SL');
+
+    const figures: any[] = [];
+
+    // 1. Horizontal full-width line
+    figures.push({
+      type: 'line',
+      attrs: {
+        coordinates: [
+          { x: 0, y: py },
+          { x: width, y: py }
+        ]
+      },
+      styles: {
+        style: isPreview ? 'dashed' : 'solid',
+        color: lineColor,
+        size: 2,
+        dashedValue: [5, 5]
+      }
+    });
+
+    // 2. Control Point / Drag Handle (circle)
+    figures.push({
+      type: 'circle',
+      attrs: {
+        x: width - 18,
+        y: py,
+        r: 6
+      },
+      styles: {
+        style: 'fill_stroke',
+        color: lineColor,
+        borderColor: '#ffffff',
+        borderSize: 2
+      }
+    });
+
+    // 3. Profit / Loss Badge Pill (e.g. "TP  +$38.13" or "SL  -$41.27")
+    figures.push({
+      type: 'text',
+      attrs: {
+        x: width - 34,
+        y: py,
+        text: badgeText,
+        align: 'right',
+        baseline: 'middle'
+      },
+      styles: {
+        color: '#ffffff',
+        backgroundColor: lineColor,
+        paddingLeft: 8,
+        paddingRight: 8,
+        paddingTop: 4,
+        paddingBottom: 4,
+        borderRadius: 4,
+        size: 11,
+        weight: 'bold',
+        family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      }
+    });
+
+    return figures;
+  },
+  createYAxisFigures: ({ coordinates, overlay }: any) => {
+    if (!coordinates || coordinates.length === 0 || !coordinates[0]) return [];
+    const py = coordinates[0].y;
+    if (typeof py !== 'number' || isNaN(py)) return [];
+    const isTP = overlay.extendData?.type === 'tp';
+    const price = overlay.points?.[0]?.value || 0;
+    const precision = overlay.extendData?.precision ?? 2;
+    const formattedPrice = price.toLocaleString('en-US', {
+      minimumFractionDigits: precision,
+      maximumFractionDigits: precision
+    });
+    const lineColor = isTP ? '#089981' : '#f23645';
+
+    return [
+      {
+        type: 'text',
+        attrs: {
+          x: 4,
+          y: py,
+          text: formattedPrice,
+          align: 'left',
+          baseline: 'middle'
+        },
+        styles: {
+          color: '#ffffff',
+          backgroundColor: lineColor,
+          paddingLeft: 5,
+          paddingRight: 5,
+          paddingTop: 3,
+          paddingBottom: 3,
+          borderRadius: 3,
+          size: 11,
+          weight: 'bold'
+        }
+      }
+    ];
   }
 });
 
@@ -4233,7 +4357,7 @@ interface ChartAreaProps {
   stayInDrawingMode?: boolean;
   lockDrawing?: boolean;
   hideDrawing?: boolean;
-  previewTPSL?: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP' } | null;
+  previewTPSL?: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; lot?: number; actualQty?: number } | null;
   onTPSLChange?: (type: 'tp' | 'sl' | 'orderPrice', price: number) => void;
   simulatorPositions?: any[];
   undoTrigger?: number;
@@ -5740,6 +5864,9 @@ export const ChartArea = ({
           { timestamp: allData[lastDataIndex].timestamp, value: slToDraw }
         ]
       });
+    } else {
+      chart.removeOverlay({ id: 'tpsl_zone' });
+      chart.removeOverlay({ name: 'tpslZone' });
     }
 
     // 1. Draw main entry price lines
@@ -5840,7 +5967,7 @@ export const ChartArea = ({
             weight: 'bold',
           },
         },
-        extendData: `${previewTPSL.orderType} ${currentSide} (Xem trÆ°á»›c) @ $${previewTPSL.orderPrice.toLocaleString('en-US')} â†• KĂ©o`,
+        extendData: `${previewTPSL.orderType} ${currentSide} (Xem trước) @ $${previewTPSL.orderPrice.toLocaleString('en-US')} ↕ Kéo`,
         onPressedMoveStart: () => {
           isDraggingRef.current = true;
         },
@@ -5852,7 +5979,7 @@ export const ChartArea = ({
             currentOrderPriceRef.current = cleanPrice;
             chart.overrideOverlay({
               id: 'preview_order_line',
-              extendData: `${previewTPSL.orderType} ${currentSide} (Xem trÆ°á»›c) @ $${cleanPrice.toLocaleString('en-US')} â†• KĂ©o`
+              extendData: `${previewTPSL.orderType} ${currentSide} (Xem trước) @ $${cleanPrice.toLocaleString('en-US')} ↕ Kéo`
             });
             if (currentTpRef.current) {
               chart.overrideOverlay({
@@ -5892,52 +6019,68 @@ export const ChartArea = ({
       chart.removeOverlay({ id: 'preview_order_line' });
     }
 
+    const activeMultiplier = getContractMultiplier(selectedStock);
+    const activeSide: 'LONG' | 'SHORT' = effectiveActivePos?.side || previewTPSL?.side || 'LONG';
+    const activeEntryPrice: number = effectiveActivePos?.averagePrice || previewTPSL?.orderPrice || selectedStock.price;
+    const activeQty: number = (effectiveActivePos && effectiveActivePos.quantity > 0)
+      ? (activeSimPos ? (activeSimPos.lot || 1) * activeMultiplier : effectiveActivePos.quantity)
+      : (previewTPSL?.actualQty || (previewTPSL?.lot ? previewTPSL.lot * activeMultiplier : activeMultiplier));
+
+    const formatBadge = (type: 'tp' | 'sl', targetPrice: number) => {
+      const isBuy = activeSide === 'LONG';
+      const diff = isBuy ? (targetPrice - activeEntryPrice) : (activeEntryPrice - targetPrice);
+      const pnl = diff * activeQty;
+      const isProfit = pnl >= 0;
+      const sign = isProfit ? '+' : '-';
+      const prefix = type === 'tp' ? 'TP' : 'SL';
+      const formattedVal = Math.abs(pnl).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+      return `${prefix}  ${sign}$${formattedVal}`;
+    };
+
     // 2. Draw Take Profit line (TP) - Draggable
     if (tpToDraw) {
       const isPreview = previewTPSL?.enabled && previewTPSL.tp && (!effectiveActivePos || effectiveActivePos.quantity <= 0);
+      const tpBadge = formatBadge('tp', tpToDraw);
+      const pricePrecision = getPricePrecision(tpToDraw);
+
       const overlayProps = {
-        name: 'horizontalStraightLine',
+        name: 'tpslLine',
         lock: false,
         points: [
           { timestamp: allData[0].timestamp, value: tpToDraw },
           { timestamp: allData[lastDataIndex].timestamp, value: tpToDraw }
         ],
-        styles: {
-          line: { color: '#089981', size: 2, style: isPreview ? 'dashed' : 'solid', dashedValue: [5, 5] },
-          point: {
-            color: '#089981',
-            borderColor: '#ffffff',
-            borderSize: 2,
-            radius: 5,
-            activeColor: '#ffffff',
-            activeBorderColor: '#089981',
-            activeBorderSize: 3,
-            activeRadius: 7
-          },
-          text: {
-            color: '#ffffff',
-            backgroundColor: '#089981',
-            paddingLeft: 6,
-            paddingRight: 6,
-            paddingTop: 3,
-            paddingBottom: 3,
-            borderRadius: 4,
-            size: 10,
-            family: 'Inter',
-            weight: 'bold',
-          },
+        extendData: {
+          type: 'tp',
+          isPreview,
+          badgeText: tpBadge,
+          precision: pricePrecision
         },
-        extendData: `${isPreview ? 'TP (Xem trÆ°á»›c)' : 'TP (Chá»‘t lá»i)'} @ $${tpToDraw.toLocaleString('en-US')} â†• KĂ©o`,
         onPressedMoveStart: () => {
           isDraggingRef.current = true;
         },
         onPressedMoving: (event: any) => {
-          const newPrice = event.overlay?.points?.[0]?.value;
+          const newPrice = event.overlay?.points?.[0]?.value ?? event.overlay?.points?.[1]?.value;
           if (typeof newPrice === 'number' && !isNaN(newPrice)) {
             const precision = getPricePrecision(newPrice);
             const cleanPrice = Number(newPrice.toFixed(precision));
             currentTpRef.current = cleanPrice;
+            const updatedBadge = formatBadge('tp', cleanPrice);
             const orderP = currentOrderPriceRef.current || previewTPSL?.orderPrice || selectedStock.price;
+
+            chart.overrideOverlay({
+              id: 'preview_tp_line',
+              extendData: {
+                type: 'tp',
+                isPreview,
+                badgeText: updatedBadge,
+                precision
+              }
+            });
+
             chart.overrideOverlay({
               id: 'preview_tp_zone',
               points: [
@@ -5945,19 +6088,27 @@ export const ChartArea = ({
                 { timestamp: allData[lastDataIndex].timestamp, value: cleanPrice }
               ]
             });
-            chart.overrideOverlay({
-              id: 'preview_tp_line',
-              extendData: `TP (Chá»‘t lá»i) @ $${cleanPrice.toLocaleString('en-US')} â†• KĂ©o`
-            });
+
+            if (currentSlRef.current) {
+              chart.overrideOverlay({
+                id: 'tpsl_zone',
+                points: [
+                  { timestamp: allData[lastDataIndex].timestamp, value: cleanPrice },
+                  { timestamp: allData[lastDataIndex].timestamp, value: currentSlRef.current }
+                ]
+              });
+            }
+
             onTPSLChangeRef.current?.('tp', cleanPrice);
           }
         },
         onPressedMoveEnd: (event: any) => {
           isDraggingRef.current = false;
-          const newPrice = event.overlay?.points?.[0]?.value;
+          const newPrice = event.overlay?.points?.[0]?.value ?? event.overlay?.points?.[1]?.value;
           if (typeof newPrice === 'number' && !isNaN(newPrice)) {
             const precision = getPricePrecision(newPrice);
             const cleanPrice = Number(newPrice.toFixed(precision));
+            currentTpRef.current = cleanPrice;
             onTPSLChangeRef.current?.('tp', cleanPrice);
           }
         }
@@ -5987,54 +6138,50 @@ export const ChartArea = ({
     } else {
       chart.removeOverlay({ id: 'preview_tp_line' });
       chart.removeOverlay({ id: 'preview_tp_zone' });
+      chart.removeOverlay({ id: 'tpsl_zone' });
     }
 
     // 3. Draw Stop Loss line (SL) - Draggable
     if (slToDraw) {
       const isPreview = previewTPSL?.enabled && previewTPSL.sl && (!effectiveActivePos || effectiveActivePos.quantity <= 0);
+      const slBadge = formatBadge('sl', slToDraw);
+      const pricePrecision = getPricePrecision(slToDraw);
+
       const overlayProps = {
-        name: 'horizontalStraightLine',
+        name: 'tpslLine',
         lock: false,
         points: [
           { timestamp: allData[0].timestamp, value: slToDraw },
           { timestamp: allData[lastDataIndex].timestamp, value: slToDraw }
         ],
-        styles: {
-          line: { color: '#f23645', size: 2, style: isPreview ? 'dashed' : 'solid', dashedValue: [5, 5] },
-          point: {
-            color: '#f23645',
-            borderColor: '#ffffff',
-            borderSize: 2,
-            radius: 5,
-            activeColor: '#ffffff',
-            activeBorderColor: '#f23645',
-            activeBorderSize: 3,
-            activeRadius: 7
-          },
-          text: {
-            color: '#ffffff',
-            backgroundColor: '#f23645',
-            paddingLeft: 6,
-            paddingRight: 6,
-            paddingTop: 3,
-            paddingBottom: 3,
-            borderRadius: 4,
-            size: 10,
-            family: 'Inter',
-            weight: 'bold',
-          },
+        extendData: {
+          type: 'sl',
+          isPreview,
+          badgeText: slBadge,
+          precision: pricePrecision
         },
-        extendData: `${isPreview ? 'SL (Xem trÆ°á»›c)' : 'SL (Cáº¯t lá»—)'} @ $${slToDraw.toLocaleString('en-US')} â†• KĂ©o`,
         onPressedMoveStart: () => {
           isDraggingRef.current = true;
         },
         onPressedMoving: (event: any) => {
-          const newPrice = event.overlay?.points?.[0]?.value;
+          const newPrice = event.overlay?.points?.[0]?.value ?? event.overlay?.points?.[1]?.value;
           if (typeof newPrice === 'number' && !isNaN(newPrice)) {
             const precision = getPricePrecision(newPrice);
             const cleanPrice = Number(newPrice.toFixed(precision));
             currentSlRef.current = cleanPrice;
+            const updatedBadge = formatBadge('sl', cleanPrice);
             const orderP = currentOrderPriceRef.current || previewTPSL?.orderPrice || selectedStock.price;
+
+            chart.overrideOverlay({
+              id: 'preview_sl_line',
+              extendData: {
+                type: 'sl',
+                isPreview,
+                badgeText: updatedBadge,
+                precision
+              }
+            });
+
             chart.overrideOverlay({
               id: 'preview_sl_zone',
               points: [
@@ -6042,19 +6189,27 @@ export const ChartArea = ({
                 { timestamp: allData[lastDataIndex].timestamp, value: cleanPrice }
               ]
             });
-            chart.overrideOverlay({
-              id: 'preview_sl_line',
-              extendData: `SL (Cáº¯t lá»—) @ $${cleanPrice.toLocaleString('en-US')} â†• KĂ©o`
-            });
+
+            if (currentTpRef.current) {
+              chart.overrideOverlay({
+                id: 'tpsl_zone',
+                points: [
+                  { timestamp: allData[lastDataIndex].timestamp, value: currentTpRef.current },
+                  { timestamp: allData[lastDataIndex].timestamp, value: cleanPrice }
+                ]
+              });
+            }
+
             onTPSLChangeRef.current?.('sl', cleanPrice);
           }
         },
         onPressedMoveEnd: (event: any) => {
           isDraggingRef.current = false;
-          const newPrice = event.overlay?.points?.[0]?.value;
+          const newPrice = event.overlay?.points?.[0]?.value ?? event.overlay?.points?.[1]?.value;
           if (typeof newPrice === 'number' && !isNaN(newPrice)) {
             const precision = getPricePrecision(newPrice);
             const cleanPrice = Number(newPrice.toFixed(precision));
+            currentSlRef.current = cleanPrice;
             onTPSLChangeRef.current?.('sl', cleanPrice);
           }
         }
@@ -6084,6 +6239,7 @@ export const ChartArea = ({
     } else {
       chart.removeOverlay({ id: 'preview_sl_line' });
       chart.removeOverlay({ id: 'preview_sl_zone' });
+      chart.removeOverlay({ id: 'tpsl_zone' });
     }
 
     if (pendingOrders && pendingOrders.length > 0) {

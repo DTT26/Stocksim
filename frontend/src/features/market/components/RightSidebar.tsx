@@ -41,7 +41,7 @@ interface RightSidebarProps {
   onAddMargin?: (symbol: string, side: 'LONG' | 'SHORT', amount: number) => Promise<{ success: boolean; message: string }>;
   isEditing?: boolean;
   onCancelEdit?: () => void;
-  onPreviewTPSLChange?: (tpsl: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP' } | null) => void;
+  onPreviewTPSLChange?: (tpsl: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; lot?: number; actualQty?: number } | null) => void;
   draggedTPSL?: { tp?: number; sl?: number; orderPrice?: number } | null;
   onResetWallet?: () => void;
   totalEquity?: number;
@@ -65,6 +65,7 @@ export const RightSidebar = ({ selectedStock, positions, balance, totalEquity, m
   const [sizingMode, setSizingMode] = useState<'qty' | 'amount' | 'percent'>('qty');
   const prevTpslRef = useRef<string>('');
   const prevSymbolRef = useRef<string>(selectedStock.symbol);
+  const prevPosRef = useRef<boolean>(false);
   const [sizingDropdownOpen, setSizingDropdownOpen] = useState(false);
   const [amountStr, setAmountStr] = useState<string>('');
   const [percentVal, setPercentVal] = useState<number>(0);
@@ -89,16 +90,18 @@ export const RightSidebar = ({ selectedStock, positions, balance, totalEquity, m
       if (pos.tp || pos.sl) {
         setShowTPSL(true);
       }
-    } else if (symbolChanged) {
+    } else if (symbolChanged || prevPosRef.current) {
       setTp('');
       setSl('');
       setShowTPSL(false);
+      onPreviewTPSLChange?.(null);
     }
+    prevPosRef.current = !!pos;
     // Pre-fill limit price string if empty or symbol changed
     if (symbolChanged || !limitPriceStr || parseFloat(limitPriceStr) <= 0) {
       setLimitPriceStr(selectedStock.price.toString());
     }
-  }, [selectedStock.symbol, positions]);
+  }, [selectedStock.symbol, positions, onPreviewTPSLChange]);
 
   // Listen for real-time drag updates from chart
   useEffect(() => {
@@ -290,6 +293,12 @@ export const RightSidebar = ({ selectedStock, positions, balance, totalEquity, m
         (type === 'buy' ? 'stop_buy' : 'stop_sell');
     const result = await onTrade(tradeType, p, requiredMargin, currentLeverage, tpVal, slVal);
     showToast(result.message, result.success);
+    if (result.success) {
+      setShowTPSL(false);
+      setTp('');
+      setSl('');
+      onPreviewTPSLChange?.(null);
+    }
     setIsSubmitting(false);
   };
 
@@ -325,14 +334,16 @@ export const RightSidebar = ({ selectedStock, positions, balance, totalEquity, m
         orderType: orderType === 'limit' ? 'LIMIT' : 'STOP',
         tp: showTPSL && tpNum !== undefined && !isNaN(tpNum) ? tpNum : undefined,
         sl: showTPSL && slNum !== undefined && !isNaN(slNum) ? slNum : undefined,
-        side: currentSide
+        side: currentSide,
+        actualQty: actualQty > 0 ? actualQty : undefined
       };
     } else if (showTPSL) {
       newTpsl = {
         enabled: true,
         tp: (tpNum !== undefined && !isNaN(tpNum)) ? tpNum : undefined,
         sl: (slNum !== undefined && !isNaN(slNum)) ? slNum : undefined,
-        side: currentSide
+        side: currentSide,
+        actualQty: actualQty > 0 ? actualQty : undefined
       };
     }
 
@@ -341,7 +352,7 @@ export const RightSidebar = ({ selectedStock, positions, balance, totalEquity, m
       prevTpslRef.current = newTpslStr;
       onPreviewTPSLChange?.(newTpsl);
     }
-  }, [showTPSL, tp, sl, side, held, orderType, limitPriceStr, selectedStock.price, onPreviewTPSLChange]);
+  }, [showTPSL, tp, sl, side, held, orderType, limitPriceStr, actualQty, selectedStock.price, onPreviewTPSLChange]);
 
   if (!isExpanded) {
     return (

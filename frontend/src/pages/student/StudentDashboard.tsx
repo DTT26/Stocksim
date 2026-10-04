@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { TrendingUp, Target, Activity, BookOpen, Clock, ArrowRight, Trophy, GraduationCap } from 'lucide-react';
+import { Target, BookOpen, Clock, ArrowRight, Trophy, GraduationCap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { challengeApi } from '../../services/challengeApi';
+import { tradingApi } from '../../services/tradingApi';
 
 export const StudentDashboard = () => {
   const { user } = useAuth();
@@ -11,9 +13,19 @@ export const StudentDashboard = () => {
   const isDark = theme === 'dark';
 
   const [wallet, setWallet] = useState<any>(null);
-  const [activeSimulation, setActiveSimulation] = useState<any>(null);
-  const [participations, setParticipations] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [challengeData, setChallengeData] = useState<any>(null);
+  const [challengeStats, setChallengeStats] = useState<{
+    totalTrades: number;
+    winTrades: number;
+    winRate: number;
+    totalParticipatedChallenges: number;
+  }>({
+    totalTrades: 0,
+    winTrades: 0,
+    winRate: 0,
+    totalParticipatedChallenges: 0
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,10 +39,11 @@ export const StudentDashboard = () => {
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         };
 
-        const [walletRes, partRes, assRes] = await Promise.all([
+        const [walletRes, assRes, chalRes, txRes] = await Promise.all([
           fetch(`${apiUrl}/wallet`, { credentials: 'include', headers }).catch(() => null),
-          fetch(`${apiUrl}/simulations/participations/me`, { credentials: 'include', headers }).catch(() => null),
-          fetch(`${apiUrl}/assignments/my`, { credentials: 'include', headers }).catch(() => null)
+          fetch(`${apiUrl}/assignments/my`, { credentials: 'include', headers }).catch(() => null),
+          challengeApi.getMyChallenge().catch(() => null),
+          tradingApi.getTransactions().catch(() => null)
         ]);
 
         if (walletRes && walletRes.ok) {
@@ -38,21 +51,35 @@ export const StudentDashboard = () => {
           setWallet(wData);
         }
 
-        if (partRes && partRes.ok) {
-          const pData = await partRes.json();
-          if (Array.isArray(pData)) {
-            setParticipations(pData);
-            const approved = pData.find(p => p.status === 'APPROVED' || p.status === 'ACTIVE');
-            if (approved && approved.simulationId) {
-              setActiveSimulation(approved.simulationId);
-            }
-          }
-        }
-
         if (assRes && assRes.ok) {
           const aData = await assRes.json();
           if (Array.isArray(aData)) {
             setAssignments(aData);
+          }
+        }
+
+        if (chalRes && chalRes.success) {
+          setChallengeData(chalRes.challenge);
+          if (chalRes.stats) {
+            setChallengeStats(chalRes.stats);
+          }
+        }
+
+        // Tự động đối soát từ lịch sử giao dịch đóng của Thử Thách Quỹ (CHALLENGE)
+        if (txRes && txRes.success && Array.isArray(txRes.data)) {
+          const chalClosedTrades = txRes.data.filter(
+            (t: any) => t.accountType === 'CHALLENGE' && (t.type === 'CLOSE_POSITION' || t.description?.includes('Đóng'))
+          );
+          if (chalClosedTrades.length > 0) {
+            const total = chalClosedTrades.length;
+            const wins = chalClosedTrades.filter((t: any) => (t.amount || 0) > 0 || (t.metadata?.pnl || 0) > 0).length;
+            const rate = parseFloat(((wins / total) * 100).toFixed(1));
+            setChallengeStats(prev => ({
+              ...prev,
+              totalTrades: total,
+              winTrades: wins,
+              winRate: rate
+            }));
           }
         }
       } catch (e) {
@@ -70,6 +97,30 @@ export const StudentDashboard = () => {
     a => a.studentStatus === 'NOT_STARTED' || a.studentStatus === 'IN_PROGRESS' || a.status === 'OPEN'
   ).slice(0, 3);
 
+  // Tính số lượng thử thách quỹ đã tham gia
+  const totalChallengesJoined = challengeStats.totalParticipatedChallenges > 0
+    ? challengeStats.totalParticipatedChallenges
+    : ((challengeData?.history?.length || 0) + (challengeData?.status && challengeData.status !== 'NOT_STARTED' ? 1 : 0));
+
+  const getChallengeStatusBadge = () => {
+    if (!challengeData || challengeData.status === 'NOT_STARTED') {
+      return 'Chưa tham gia quỹ';
+    }
+    if (challengeData.status === 'ACTIVE') {
+      return `Đang tham gia Cấp ${challengeData.currentLevel || 1}`;
+    }
+    if (challengeData.status === 'PAUSED') {
+      return `Tạm dừng Cấp ${challengeData.currentLevel || 1}`;
+    }
+    if (challengeData.status === 'PASSED') {
+      return `Đã hoàn thành Cấp ${challengeData.currentLevel || 1}`;
+    }
+    if (challengeData.status === 'FAILED') {
+      return `Đã dừng ở Cấp ${challengeData.currentLevel || 1}`;
+    }
+    return `${totalChallengesJoined} thử thách`;
+  };
+
   // Performance history: nếu chưa có giao dịch, hiển thị đường gốc ổn định
   const performanceHistory = [
     { date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), value: currentBalance },
@@ -86,68 +137,72 @@ export const StudentDashboard = () => {
           Xin chào, {user?.name || 'Học viên'}
         </h1>
         <p className="text-slate-500 dark:text-slate-400 mt-1 sm:mt-2 text-sm sm:text-base">
-          Tổng quan danh mục đầu tư mô phỏng và các nhiệm vụ học tập của bạn.
+          Tổng quan thử thách quỹ và các nhiệm vụ học tập của bạn.
         </p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-6">
-        <div className="bg-white dark:bg-[#111827] p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-[#253047] shadow-sm dark:shadow-lg relative overflow-hidden group transition-colors">
-          <div className="absolute top-0 right-0 p-3 sm:p-4 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
-            <Activity className="w-12 h-12 sm:w-16 sm:h-16 text-indigo-500" />
+      {/* KPI Cards: 3 cards (đã xóa card tài sản mô phỏng, thay thế kỳ thi bằng thử thách quỹ) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-6">
+        {/* Card 1: Thử thách quỹ tham gia */}
+        <Link to="/trade/btcusdt?challenge=true" className="block group">
+          <div className="bg-white dark:bg-[#111827] p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-[#253047] shadow-sm dark:shadow-lg relative overflow-hidden transition-all group-hover:border-emerald-500/50">
+            <div className="absolute top-0 right-0 p-3 sm:p-4 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
+              <Target className="w-12 h-12 sm:w-16 sm:h-16 text-emerald-500" />
+            </div>
+            <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">
+              Thử thách quỹ tham gia
+            </p>
+            <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white relative z-10 font-mono">
+              {totalChallengesJoined}
+            </h3>
+            <div className="mt-3 sm:mt-4 flex items-center gap-2 relative z-10">
+              <span className="flex items-center text-xs font-semibold text-emerald-600 dark:text-emerald-500 bg-emerald-500/10 px-2 py-0.5 sm:py-1 rounded">
+                <Target className="w-3 h-3 mr-1" />
+                {getChallengeStatusBadge()}
+              </span>
+            </div>
           </div>
-          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Tài sản mô phỏng</p>
-          <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white relative z-10 break-words font-mono">
-            ${Number(currentBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </h3>
-          <div className="mt-3 sm:mt-4 flex items-center gap-2 relative z-10">
-            <span className="flex items-center text-xs font-semibold text-emerald-600 dark:text-emerald-500 bg-emerald-500/10 px-2 py-0.5 sm:py-1 rounded">
-              <TrendingUp className="w-3 h-3 mr-1" />
-              Sẵn sàng giao dịch
-            </span>
-          </div>
-        </div>
+        </Link>
 
-        <div className="bg-white dark:bg-[#111827] p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-[#253047] shadow-sm dark:shadow-lg relative overflow-hidden group transition-colors">
-          <div className="absolute top-0 right-0 p-3 sm:p-4 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
-            <Target className="w-12 h-12 sm:w-16 sm:h-16 text-emerald-500" />
-          </div>
-          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Kỳ thi tham gia</p>
-          <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white relative z-10 font-mono">
-            {participations.length}
-          </h3>
-          <div className="mt-3 sm:mt-4 flex items-center gap-2 relative z-10">
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              {activeSimulation ? 'Đang hoạt động' : 'Chưa có kỳ thi'}
-            </span>
-          </div>
-        </div>
-
+        {/* Card 2: Tỷ lệ thắng (Win Rate) tham gia thử thách quỹ */}
         <div className="bg-white dark:bg-[#111827] p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-[#253047] shadow-sm dark:shadow-lg relative overflow-hidden group transition-colors">
           <div className="absolute top-0 right-0 p-3 sm:p-4 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
             <Trophy className="w-12 h-12 sm:w-16 sm:h-16 text-amber-500" />
           </div>
-          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Tỷ lệ thắng (Win Rate)</p>
+          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">
+            Tỷ lệ thắng (Win Rate)
+          </p>
           <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white relative z-10 font-mono">
-            0%
+            {challengeStats.winRate}%
           </h3>
           <div className="mt-3 sm:mt-4 flex items-center gap-2 relative z-10">
-            <span className="text-xs text-slate-500 dark:text-slate-400">Cập nhật theo lệnh đóng</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {challengeStats.totalTrades > 0
+                ? `${challengeStats.winTrades}/${challengeStats.totalTrades} lệnh thắng (Thử thách quỹ)`
+                : 'Cập nhật theo lệnh đóng thử thách quỹ'}
+            </span>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#111827] p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-[#253047] shadow-sm dark:shadow-lg relative overflow-hidden group transition-colors">
-          <div className="absolute top-0 right-0 p-3 sm:p-4 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
-            <BookOpen className="w-12 h-12 sm:w-16 sm:h-16 text-rose-500" />
+        {/* Card 3: Bài tập cần nộp */}
+        <Link to="/student/assignments" className="block group">
+          <div className="bg-white dark:bg-[#111827] p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-[#253047] shadow-sm dark:shadow-lg relative overflow-hidden transition-all group-hover:border-rose-500/50">
+            <div className="absolute top-0 right-0 p-3 sm:p-4 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
+              <BookOpen className="w-12 h-12 sm:w-16 sm:h-16 text-rose-500" />
+            </div>
+            <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">
+              Bài tập cần nộp
+            </p>
+            <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white relative z-10 font-mono">
+              {upcomingAssignments.length}
+            </h3>
+            <div className="mt-3 sm:mt-4 flex items-center gap-2 relative z-10">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                Từ giảng viên phụ trách
+              </span>
+            </div>
           </div>
-          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Bài tập cần nộp</p>
-          <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white relative z-10 font-mono">
-            {upcomingAssignments.length}
-          </h3>
-          <div className="mt-3 sm:mt-4 flex items-center gap-2 relative z-10">
-            <span className="text-xs text-slate-500 dark:text-slate-400">Từ giảng viên phụ trách</span>
-          </div>
-        </div>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

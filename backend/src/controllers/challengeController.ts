@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { ChallengeService } from '../services/challengeService';
+import Transaction, { TransactionType } from '../models/Transaction';
 
 // GET /api/challenge/levels
 export const getLevels = (req: AuthRequest, res: Response) => {
@@ -16,7 +17,29 @@ export const getLevels = (req: AuthRequest, res: Response) => {
 export const getMyChallenge = async (req: AuthRequest, res: Response) => {
   try {
     const challenge = await ChallengeService.getUserChallenge(req.user._id, req.user.name);
-    res.json({ success: true, challenge });
+
+    // Tính toán thống kê các lệnh đã đóng trong Thử Thách Quỹ (accountType: 'CHALLENGE')
+    const challengeTrades = await Transaction.find({
+      userId: req.user._id,
+      accountType: 'CHALLENGE',
+      type: TransactionType.CLOSE_POSITION
+    });
+
+    const totalTrades = challengeTrades.length;
+    const winTrades = challengeTrades.filter(t => (t.amount || 0) > 0).length;
+    const winRate = totalTrades > 0 ? Number(((winTrades / totalTrades) * 100).toFixed(1)) : 0;
+    const totalParticipatedChallenges = (challenge.history?.length || 0) + (challenge.status && challenge.status !== 'NOT_STARTED' ? 1 : 0);
+
+    res.json({ 
+      success: true, 
+      challenge,
+      stats: {
+        totalTrades,
+        winTrades,
+        winRate,
+        totalParticipatedChallenges
+      }
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
