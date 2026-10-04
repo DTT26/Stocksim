@@ -573,3 +573,199 @@ def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             })
 
     return obs
+
+
+def detect_breaker_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện Breaker Block (BB) theo chuẩn ICT:
+    - Là một Order Block thất bại bị giá đâm xuyên qua dứt khoát làm thay đổi cấu trúc thị trường (MSS).
+    - Lật ngược vai trò hỗ trợ <-> kháng cự (Polarity).
+    """
+    breakers = []
+    if not klines or len(klines) < 5:
+        return breakers
+
+    obs = detect_order_blocks(klines)
+    for ob in obs:
+        c_idx = ob.get("candle_index", 0)
+        ob_high = ob["priceHigh"]
+        ob_low = ob["priceLow"]
+        ob_type = ob["type"]
+
+        # Check subsequent candles if price breaks through the OB
+        for j in range(c_idx + 2, len(klines)):
+            k = klines[j]
+            c_close = k.get("close", 0)
+            if "Bullish" in ob_type and c_close < ob_low:
+                # Broken Bullish OB becomes Bearish Breaker Block
+                breakers.append({
+                    "type": "Bearish Breaker Block",
+                    "priceHigh": ob_high,
+                    "priceLow": ob_low,
+                    "startTimestamp": ob.get("startTimestamp"),
+                    "break_timestamp": k.get("timestamp"),
+                    "rule": "Khối Bullish OB thất bại bị giá đâm thủng xuống dưới kèm phá vỡ cấu trúc (MSS), lật thành Kháng cự Bearish Breaker."
+                })
+                break
+            elif "Bearish" in ob_type and c_close > ob_high:
+                # Broken Bearish OB becomes Bullish Breaker Block
+                breakers.append({
+                    "type": "Bullish Breaker Block",
+                    "priceHigh": ob_high,
+                    "priceLow": ob_low,
+                    "startTimestamp": ob.get("startTimestamp"),
+                    "break_timestamp": k.get("timestamp"),
+                    "rule": "Khối Bearish OB thất bại bị giá đâm thủng lên trên kèm phá vỡ cấu trúc (MSS), lật thành Hỗ trợ Bullish Breaker."
+                })
+                break
+
+    return breakers
+
+
+def detect_mitigation_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện Mitigation Block (MB) theo chuẩn ICT:
+    - Vùng giá thể chế quay lại khớp nốt lệnh dở dang / giảm thiểu rủi ro vị thế.
+    - KHÔNG yêu cầu phá vỡ cấu trúc (Structure Break) trước đó và đóng vai trò tiếp diễn xu hướng (Continuation).
+    """
+    mits = []
+    if not klines or len(klines) < 4:
+        return mits
+
+    for i in range(1, len(klines) - 2):
+        c0 = klines[i - 1]
+        c1 = klines[i]
+        c2 = klines[i + 1]
+
+        # Swing failed to make new extreme, then pierced through
+        if c1.get("high", 0) > c0.get("high", 0) and c2.get("close", 0) < c0.get("low", 0):
+            mits.append({
+                "type": "Bearish Mitigation Block",
+                "priceHigh": c1.get("high"),
+                "priceLow": c0.get("low"),
+                "startTimestamp": c1.get("timestamp"),
+                "rule": "Khối giảm thải không tạo đỉnh cao hơn bị đâm xuyên, đóng vai trò giảm thiểu rủi ro tiếp diễn xu hướng."
+            })
+        elif c1.get("low", 0) < c0.get("low", 0) and c2.get("close", 0) > c0.get("high", 0):
+            mits.append({
+                "type": "Bullish Mitigation Block",
+                "priceHigh": c0.get("high"),
+                "priceLow": c1.get("low"),
+                "startTimestamp": c1.get("timestamp"),
+                "rule": "Khối giảm thải không tạo đáy thấp hơn bị đâm xuyên, đóng vai trò giảm thiểu rủi ro tiếp diễn xu hướng."
+            })
+
+    return mits
+
+
+def detect_inversion_fvgs(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện Inversion Fair Value Gap (IFVG) theo chuẩn ICT:
+    - Khoảng trống FVG bị nến sau đâm thủng dứt khoát và lật ngược vai trò hỗ trợ <-> kháng cự.
+    """
+    ifvgs = []
+    fvgs = detect_fair_value_gaps(klines)
+    if not fvgs or not klines:
+        return ifvgs
+
+    for f in fvgs:
+        c3_idx = len(klines) - 1 - f.get("candles_ago", 0)
+        f_top = f["top"]
+        f_bot = f["bottom"]
+        f_type = f["type"]
+
+        for j in range(c3_idx + 1, len(klines)):
+            k = klines[j]
+            c_close = k.get("close", 0)
+            if "Bullish" in f_type and c_close < f_bot:
+                ifvgs.append({
+                    "type": "Bearish Inversion FVG (IFVG)",
+                    "priceHigh": f_top,
+                    "priceLow": f_bot,
+                    "startTimestamp": f.get("startTimestamp"),
+                    "rule": "Bullish FVG bị nến đâm thủng dứt khoát qua biên dưới, lật ngược vai trò thành Kháng cự Bearish IFVG."
+                })
+                break
+            elif "Bearish" in f_type and c_close > f_top:
+                ifvgs.append({
+                    "type": "Bullish Inversion FVG (IFVG)",
+                    "priceHigh": f_top,
+                    "priceLow": f_bot,
+                    "startTimestamp": f.get("startTimestamp"),
+                    "rule": "Bearish FVG bị nến đâm thủng dứt khoát qua biên trên, lật ngược vai trò thành Hỗ trợ Bullish IFVG."
+                })
+                break
+
+    return ifvgs
+
+
+def detect_volume_imbalances(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện Volume Imbalance (VI) theo chuẩn ICT:
+    - Khoảng trống hình thành giữa giá Đóng cửa nến trước và giá Mở cửa nến sau (khoảng hở giữa 2 thân nến).
+    """
+    vis = []
+    if not klines or len(klines) < 2:
+        return vis
+
+    for i in range(1, len(klines)):
+        c0 = klines[i - 1]
+        c1 = klines[i]
+        c0_c = c0.get("close", 0)
+        c1_o = c1.get("open", 0)
+
+        # Bullish VI: c1 opens higher than c0 closes with gap
+        if c1_o > c0_c and abs(c1_o - c0_c) / max(1.0, c0_c) > 0.0008:
+            vis.append({
+                "type": "Bullish Volume Imbalance (VI)",
+                "priceHigh": c1_o,
+                "priceLow": c0_c,
+                "startTimestamp": c0.get("timestamp"),
+                "rule": "Khoảng trống giữa giá Đóng cửa Nến 1 và giá Mở cửa Nến 2 (khoảng hở giữa 2 thân nến)."
+            })
+        elif c1_o < c0_c and abs(c0_c - c1_o) / max(1.0, c0_c) > 0.0008:
+            vis.append({
+                "type": "Bearish Volume Imbalance (VI)",
+                "priceHigh": c0_c,
+                "priceLow": c1_o,
+                "startTimestamp": c0.get("timestamp"),
+                "rule": "Khoảng trống giữa giá Đóng cửa Nến 1 và giá Mở cửa Nến 2 (khoảng hở giữa 2 thân nến)."
+            })
+
+    return vis
+
+
+def detect_rejection_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện Rejection Block theo chuẩn ICT:
+    - Vùng râu nến dài thể hiện sự từ chối giá dứt khoát tại đỉnh/đáy cực trị.
+    - Biên độ: Chỉ bao gồm phần râu nến dài bị từ chối đó.
+    """
+    rbs = []
+    if not klines:
+        return rbs
+
+    for k in klines:
+        o, c, h, l = k.get("open", 0), k.get("close", 0), k.get("high", 0), k.get("low", 0)
+        body = abs(c - o)
+        upper_wick = h - max(o, c)
+        lower_wick = min(o, c) - l
+
+        if upper_wick >= max(1.0, body * 2.0) and upper_wick > 0:
+            rbs.append({
+                "type": "Bearish Rejection Block",
+                "priceHigh": h,
+                "priceLow": max(o, c),
+                "startTimestamp": k.get("timestamp"),
+                "rule": "Phần râu nến trên dài thể hiện sự từ chối giá quyết liệt của thể chế tại đỉnh."
+            })
+        if lower_wick >= max(1.0, body * 2.0) and lower_wick > 0:
+            rbs.append({
+                "type": "Bullish Rejection Block",
+                "priceHigh": min(o, c),
+                "priceLow": l,
+                "startTimestamp": k.get("timestamp"),
+                "rule": "Phần râu nến dưới dài thể hiện sự từ chối giá quyết liệt của thể chế tại đáy."
+            })
+
+    return rbs
