@@ -32,6 +32,7 @@ export interface TradeAnalysisSummary {
   stopLoss?: number;
   takeProfit?: number;
   quantity: number;
+  accountBalance?: number;
   pnl: number;
   returnPct: number;
   plannedRR: string;

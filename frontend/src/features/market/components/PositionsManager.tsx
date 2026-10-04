@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useSimulatorStore } from '../engine/useSimulatorStore';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { getContractMultiplier, getAssetUnit } from '../data';
+import { TradeReviewModal } from '../../ai/TradeReviewModal';
 
 interface PositionsManagerProps {
   currentPrice: number;
@@ -11,6 +12,7 @@ export const PositionsManager = ({ currentPrice }: PositionsManagerProps) => {
   const store = useSimulatorStore();
   const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'history'>('positions');
   const [isExpanded, setIsExpanded] = useState(true);
+  const [reviewTradeData, setReviewTradeData] = useState<any | null>(null);
 
   if (!store.isActive || !store.session) return null;
 
@@ -116,13 +118,39 @@ export const PositionsManager = ({ currentPrice }: PositionsManagerProps) => {
                         {p.tp ? p.tp.toLocaleString('vi-VN') : '-'} / {p.sl ? p.sl.toLocaleString('vi-VN') : '-'}
                       </td>
                       <td className="px-4 py-2 text-center">
-                        <button 
-                          data-tour="close-position-btn"
-                          onClick={() => store.closePosition(p.id)}
-                          className="bg-[#f0f3fa] hover:bg-[#e0e5f2] text-[#4b5563] hover:text-[#1e2329] dark:bg-[#2a2e39] dark:hover:bg-[#363a45] dark:text-[#d1d4dc] dark:hover:text-white px-3 py-1 rounded text-[11px] font-medium transition-colors"
-                        >
-                          Đóng lệnh
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              setReviewTradeData({
+                                symbol: p.symbol || 'BTCUSDT',
+                                side: p.side === 'LONG' ? 'BUY' : 'SELL',
+                                entryPrice: p.entryPrice,
+                                currentPrice: pnlInfo.markPrice,
+                                stopLoss: p.sl,
+                                takeProfit: p.tp,
+                                quantity: pnlInfo.actualQty,
+                                accountBalance: store.session?.balance || 100000,
+                                realPnL: pnlInfo.netPnl,
+                                isOpen: true,
+                                timeframe: store.session?.timeframe || '15m',
+                                strategy: 'Phiên Giao Dịch Giả Lập (Simulation)',
+                                setupName: p.sl ? 'Vị thế Giả Lập có SL' : 'Vị thế Giả Lập chưa có SL/TP',
+                                reason: 'Giao dịch theo nến Replay / Backtest phiên giả lập'
+                              });
+                            }}
+                            className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 px-2 py-1 rounded text-[11px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                            title="Đánh giá lệnh bằng AI"
+                          >
+                            <Sparkles className="w-3 h-3" /> AI
+                          </button>
+                          <button 
+                            data-tour="close-position-btn"
+                            onClick={() => store.closePosition(p.id)}
+                            className="bg-[#f0f3fa] hover:bg-[#e0e5f2] text-[#4b5563] hover:text-[#1e2329] dark:bg-[#2a2e39] dark:hover:bg-[#363a45] dark:text-[#d1d4dc] dark:hover:text-white px-3 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer"
+                          >
+                            Đóng lệnh
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -181,6 +209,7 @@ export const PositionsManager = ({ currentPrice }: PositionsManagerProps) => {
                 <th className="px-4 py-2 font-medium">Giá mở/đóng</th>
                 <th className="px-4 py-2 font-medium text-right">Lợi nhuận</th>
                 <th className="px-4 py-2 font-medium">Lý do đóng</th>
+                <th className="px-4 py-2 font-medium text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e6e8ea] dark:divide-[#2a2e39]/50">
@@ -203,6 +232,35 @@ export const PositionsManager = ({ currentPrice }: PositionsManagerProps) => {
                       {tx.netPnL >= 0 ? '+' : '-'}${Math.abs(tx.netPnL).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="px-4 py-2 text-[#787b86]">{tx.closeReason}</td>
+                    <td className="px-4 py-2 text-center">
+                      <button
+                        onClick={() => {
+                          const mult = getContractMultiplier(tx.symbol);
+                          const qty = tx.lot * mult;
+                          setReviewTradeData({
+                            symbol: tx.symbol || 'BTCUSDT',
+                            side: tx.side === 'LONG' ? 'BUY' : 'SELL',
+                            entryPrice: tx.entryPrice,
+                            exitPrice: tx.exitPrice,
+                            quantity: qty,
+                            accountBalance: store.session?.balance || 100000,
+                            realPnL: tx.netPnL,
+                            isOpen: false,
+                            timeframe: store.session?.timeframe || '15m',
+                            strategy: 'Phiên Giao Dịch Giả Lập (Simulation)',
+                            setupName: 'Lệnh Đã Đóng trong Phiên',
+                            reason: tx.closeReason || 'Giao dịch trong phiên backtest / replay giả lập',
+                            entryTime: tx.openTime ? new Date(tx.openTime).toLocaleString('vi-VN') : undefined,
+                            exitTime: tx.closeTime ? new Date(tx.closeTime).toLocaleString('vi-VN') : undefined,
+                            duration: (tx.openTime && tx.closeTime) ? `${Math.max(1, Math.round((new Date(tx.closeTime).getTime() - new Date(tx.openTime).getTime()) / 60000))} phút` : undefined
+                          });
+                        }}
+                        className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        title="Đánh giá lệnh bằng AI"
+                      >
+                        <Sparkles className="w-2.5 h-2.5" /> AI Review
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -210,6 +268,14 @@ export const PositionsManager = ({ currentPrice }: PositionsManagerProps) => {
           </table>
         )}
       </div>
+
+      {reviewTradeData && (
+        <TradeReviewModal
+          isOpen={true}
+          onClose={() => setReviewTradeData(null)}
+          tradeData={reviewTradeData}
+        />
+      )}
     </div>
   );
 };
