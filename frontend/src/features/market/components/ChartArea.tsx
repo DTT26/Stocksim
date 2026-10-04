@@ -15,6 +15,8 @@ import { measureOverlay } from './MeasureOverlay';
 import { zoomInOverlay } from './ZoomInOverlay';
 import { FibonacciSettingsModal, DEFAULT_FIBONACCI_CONFIG, type FibonacciConfig } from './FibonacciSettingsModal';
 import { useI18n } from '../../../contexts/I18nContext';
+import { useAuth } from '../../../contexts/AuthContext';
+
 const COLOR_PALETTE_GRID = [
   ['#ffffff', '#e0e0e0', '#d6d6d6', '#c2c2c2', '#a8a8a8', '#8f8f8f', '#666666', '#000000'],
   ['#f23645', '#ff9800', '#ffd700', '#089981', '#26a69a', '#2962ff', '#8e7cc3', '#e91e63'],
@@ -82,6 +84,10 @@ export const isUserDrawingOverlay = (ov: any): boolean => {
 export interface UserChartDrawing {
   id?: string;
   name: string;
+  label?: string;            // Display title: e.g. "Order Block (OB)" or user-defined text
+  userLabel?: string;        // Raw text annotated on the chart
+  tag?: string;              // Normalized SMC tag: 'OB' | 'FVG' | 'BOS' | 'CHOCH' | 'LIQUIDITY' | 'BREAKER' | 'SUPPLY_DEMAND' | ''
+  detectedConcept?: string;  // Detailed SMC concept classification
   points: Array<{
     timestamp?: number;
     price?: number;
@@ -89,9 +95,113 @@ export interface UserChartDrawing {
   }>;
   priceHigh?: number;
   priceLow?: number;
+  priceMid?: number;
+  rangeAmount?: number;
   priceStart?: number;
   priceEnd?: number;
+  timeStart?: number;
+  timeEnd?: number;
 }
+
+export const extractOverlayText = (ov: any): string => {
+  if (!ov) return '';
+  if (typeof ov.extendData === 'string' && ov.extendData.trim()) {
+    return ov.extendData.trim();
+  }
+  if (typeof ov.extendData === 'object' && ov.extendData !== null) {
+    const txt = ov.extendData.textContent || ov.extendData.text || ov.extendData.label || ov.extendData.name || ov.extendData.note;
+    if (typeof txt === 'string' && txt.trim()) return txt.trim();
+  }
+  if (typeof ov.text === 'string' && ov.text.trim()) {
+    return ov.text.trim();
+  }
+  const styleTxt = (ov.styles as any)?.text?.content || (ov.styles as any)?.text;
+  if (typeof styleTxt === 'string' && styleTxt.trim()) {
+    return styleTxt.trim();
+  }
+  return '';
+};
+
+export const detectSmcConcept = (text: string, overlayName: string): { tag: string; detectedConcept: string; displayLabel: string } => {
+  const clean = (text || '').trim();
+  const lower = clean.toLowerCase();
+
+  if (/\b(fvg|fair\s*value\s*gap|imbalance|khoảng\s*trống|mất\s*cân\s*bằng)\b/i.test(lower)) {
+    return {
+      tag: 'FVG',
+      detectedConcept: 'Fair Value Gap (FVG)',
+      displayLabel: clean ? `Fair Value Gap (${clean})` : 'Fair Value Gap (FVG)'
+    };
+  }
+  if (/\b(ob|order\s*block|orderblock|khối\s*lệnh|khe\s*lệnh)\b/i.test(lower)) {
+    return {
+      tag: 'OB',
+      detectedConcept: 'Order Block (OB)',
+      displayLabel: clean ? `Order Block (${clean})` : 'Order Block (OB)'
+    };
+  }
+  if (/\b(bos|break\s*of\s*structure|phá\s*vỡ\s*cấu\s*trúc)\b/i.test(lower)) {
+    return {
+      tag: 'BOS',
+      detectedConcept: 'Break of Structure (BOS)',
+      displayLabel: clean ? `Break of Structure (${clean})` : 'Break of Structure (BOS)'
+    };
+  }
+  if (/\b(choch|ch|change\s*of\s*character|đổi\s*tính\s*chất)\b/i.test(lower)) {
+    return {
+      tag: 'CHOCH',
+      detectedConcept: 'Change of Character (CHoCH)',
+      displayLabel: clean ? `Change of Character (${clean})` : 'Change of Character (CHoCH)'
+    };
+  }
+  if (/\b(liq|liquidity|bsl|ssl|pool|thanh\s*khoản)\b/i.test(lower)) {
+    return {
+      tag: 'LIQUIDITY',
+      detectedConcept: 'Liquidity Pool (Thanh khoản)',
+      displayLabel: clean ? `Liquidity (${clean})` : 'Liquidity Pool (Thanh khoản)'
+    };
+  }
+  if (/\b(bb|breaker|breaker\s*block)\b/i.test(lower)) {
+    return {
+      tag: 'BREAKER',
+      detectedConcept: 'Breaker Block',
+      displayLabel: clean ? `Breaker Block (${clean})` : 'Breaker Block'
+    };
+  }
+  if (/\b(mb|mitigation|mitigation\s*block)\b/i.test(lower)) {
+    return {
+      tag: 'MITIGATION',
+      detectedConcept: 'Mitigation Block',
+      displayLabel: clean ? `Mitigation Block (${clean})` : 'Mitigation Block'
+    };
+  }
+  if (/\b(sd|supply|demand|cung|cầu)\b/i.test(lower)) {
+    return {
+      tag: 'SUPPLY_DEMAND',
+      detectedConcept: 'Vùng Cung / Cầu (Supply / Demand)',
+      displayLabel: clean ? `Supply/Demand (${clean})` : 'Vùng Cung / Cầu (Supply/Demand)'
+    };
+  }
+
+  const nameMap: Record<string, string> = {
+    rect: 'Hộp Vùng Giá (Rectangle)',
+    segment: 'Đường Xu Hướng (Trendline)',
+    straightLine: 'Đường Kẻ Dài (Straight Line)',
+    rayLine: 'Tia Xu Hướng (Ray Line)',
+    horizontalStraightLine: 'Mức Giá Ngang (Support/Resistance)',
+    fibonacciLine: 'Mức Hồi Quy Fibonacci (Fibonacci)',
+    priceChannelLine: 'Kênh Giá Song Song (Parallel Channel)',
+    simpleAnnotation: 'Văn Bản Chú Thích (Annotation)',
+  };
+
+  const defaultName = nameMap[overlayName] || overlayName;
+  return {
+    tag: clean ? 'CUSTOM' : '',
+    detectedConcept: clean || defaultName,
+    displayLabel: clean ? `${defaultName}: "${clean}"` : defaultName
+  };
+};
+
 export const getChartDrawingsData = (): { drawings: UserChartDrawing[]; klines: any[] } => {
   if (!globalChartInstance) return { drawings: [], klines: [] };
   try {
@@ -99,40 +209,78 @@ export const getChartDrawingsData = (): { drawings: UserChartDrawing[]; klines: 
       ? globalChartInstance.getOverlays()
       : [];
     const klines = typeof globalChartInstance.getDataList === 'function'
-      ? (globalChartInstance.getDataList() || []).slice(-60)
+      ? (globalChartInstance.getDataList() || []).slice(-120)
       : [];
+
+    const allUserOverlays = (Array.isArray(rawOverlays) ? rawOverlays : []).filter(isUserDrawingOverlay);
+    const annotationOverlays = allUserOverlays.filter((ov: any) =>
+      ['simpleAnnotation', 'comment', 'note', 'callout', 'priceNote', 'signpost'].includes(ov.name)
+    );
+
     const drawings: UserChartDrawing[] = [];
-    if (Array.isArray(rawOverlays)) {
-      rawOverlays.forEach((ov: any) => {
-        if (!isUserDrawingOverlay(ov)) return;
-        const pts = (ov.points || []).map((p: any) => ({
-          timestamp: p.timestamp,
-          price: p.value !== undefined ? p.value : p.price,
-          dataIndex: p.dataIndex
-        }));
-        if (pts.length > 0) {
-          const prices = pts.map((p: any) => p.price).filter((v: any) => typeof v === 'number');
-          const priceHigh = prices.length > 0 ? Math.max(...prices) : undefined;
-          const priceLow = prices.length > 0 ? Math.min(...prices) : undefined;
-          drawings.push({
-            id: ov.id,
-            name: ov.name,
-            points: pts,
-            priceHigh,
-            priceLow,
-            priceStart: pts[0]?.price,
-            priceEnd: pts[pts.length - 1]?.price
+    allUserOverlays.forEach((ov: any) => {
+      const pts = (ov.points || []).map((p: any) => ({
+        timestamp: p.timestamp,
+        price: p.value !== undefined ? p.value : p.price,
+        dataIndex: p.dataIndex
+      }));
+      if (pts.length > 0) {
+        const prices = pts.map((p: any) => p.price).filter((v: any) => typeof v === 'number');
+        const priceHigh = prices.length > 0 ? Math.max(...prices) : undefined;
+        const priceLow = prices.length > 0 ? Math.min(...prices) : undefined;
+        const priceMid = (priceHigh !== undefined && priceLow !== undefined) ? (priceHigh + priceLow) / 2 : undefined;
+        const rangeAmount = (priceHigh !== undefined && priceLow !== undefined) ? Math.abs(priceHigh - priceLow) : undefined;
+
+        // 1. Extract text from overlay's own extendData / text / style
+        let rawText = extractOverlayText(ov);
+
+        // 2. If no direct text, check if any annotation overlay sits near or inside this zone
+        if (!rawText && priceHigh !== undefined && priceLow !== undefined) {
+          const margin = rangeAmount ? rangeAmount * 0.35 : (priceHigh * 0.015);
+          const nearbyAnn = annotationOverlays.find((ann: any) => {
+            if (ann.id === ov.id) return false;
+            const annPts = ann.points || [];
+            const annPrice = annPts[0]?.value !== undefined ? annPts[0].value : annPts[0]?.price;
+            if (typeof annPrice === 'number') {
+              return annPrice >= (priceLow - margin) && annPrice <= (priceHigh + margin);
+            }
+            return false;
           });
+          if (nearbyAnn) {
+            rawText = extractOverlayText(nearbyAnn);
+          }
         }
-      });
-    }
+
+        const { tag, detectedConcept, displayLabel } = detectSmcConcept(rawText, ov.name);
+
+        drawings.push({
+          id: ov.id,
+          name: ov.name,
+          label: displayLabel,
+          userLabel: rawText,
+          tag,
+          detectedConcept,
+          points: pts,
+          priceHigh,
+          priceLow,
+          priceMid,
+          rangeAmount,
+          priceStart: pts[0]?.price,
+          priceEnd: pts[pts.length - 1]?.price,
+          timeStart: pts[0]?.timestamp,
+          timeEnd: pts[pts.length - 1]?.timestamp
+        });
+      }
+    });
+
     return { drawings, klines };
   } catch (err) {
     console.error('Error getting chart drawings data:', err);
     return { drawings: [], klines: [] };
   }
 };
-// ÄÄƒng kĂ½ VĂ¹ng AI Sá»­a Láº¡i (aiCorrectionZone) vá»›i nhĂ£n tĂªn vĂ¹ng trá»±c quan trĂªn biá»ƒu Ä‘á»“
+
+
 registerOverlay({
   name: 'aiCorrectionZone',
   totalStep: 3,
@@ -197,10 +345,53 @@ registerOverlay({
     return figures;
   }
 });
-export const clearAiCorrectionOverlay = () => {
-  if (!globalChartInstance) return;
+
+let globalTriggerAutoSave: (() => void) | null = null;
+
+export const removeChartDrawing = (overlayId: string) => {
+  const chart = globalChartInstance || (typeof window !== 'undefined' ? (window as any).__STOCKSIM_CHART__ : null);
+  if (!chart || !overlayId) return;
   try {
-    globalChartInstance.removeOverlay({ name: 'aiCorrectionZone' });
+    chart.removeOverlay({ id: overlayId });
+    if (globalTriggerAutoSave) {
+      globalTriggerAutoSave();
+    }
+    window.dispatchEvent(new CustomEvent('stocksim-drawings-changed', { detail: { removedId: overlayId } }));
+  } catch (err) {
+    console.error('Error removing chart drawing:', err);
+  }
+};
+
+export const clearAllChartDrawings = () => {
+  const chart = globalChartInstance || (typeof window !== 'undefined' ? (window as any).__STOCKSIM_CHART__ : null);
+  if (!chart) return;
+  try {
+    const raw = typeof chart.getOverlays === 'function' ? chart.getOverlays() : [];
+    if (Array.isArray(raw)) {
+      raw.forEach((ov: any) => {
+        if (isUserDrawingOverlay(ov)) {
+          chart.removeOverlay({ id: ov.id });
+        }
+      });
+    }
+    try {
+      chart.removeOverlay({ name: 'aiCorrectionZone' });
+    } catch (_) {}
+
+    if (globalTriggerAutoSave) {
+      globalTriggerAutoSave();
+    }
+    window.dispatchEvent(new CustomEvent('stocksim-drawings-changed', { detail: { cleared: true } }));
+  } catch (err) {
+    console.error('Error clearing all chart drawings:', err);
+  }
+};
+
+export const clearAiCorrectionOverlay = () => {
+  const chart = globalChartInstance || (typeof window !== 'undefined' ? (window as any).__STOCKSIM_CHART__ : null);
+  if (!chart) return;
+  try {
+    chart.removeOverlay({ name: 'aiCorrectionZone' });
   } catch (err) {
     console.error('Error removing AI correction overlay:', err);
   }
@@ -210,29 +401,139 @@ export const drawAiCorrectionOverlay = (suggestedZone: {
   priceLow: number;
   startTimestamp?: number;
   endTimestamp?: number;
+  userTimeStart?: number;
+  userTimeEnd?: number;
   label?: string;
   type?: string;
   name?: string;
   explanation?: string;
 }) => {
-  if (!globalChartInstance) return null;
+  const chart = globalChartInstance || (typeof window !== 'undefined' ? (window as any).__STOCKSIM_CHART__ : null);
+  if (!chart) return null;
   try {
     // Clear any previous AI correction zone
     try {
-      globalChartInstance.removeOverlay({ name: 'aiCorrectionZone' });
+      chart.removeOverlay({ name: 'aiCorrectionZone' });
     } catch (_) {}
-    const klines = (globalChartInstance.getDataList && globalChartInstance.getDataList()) || [];
+
+    const klines: any[] = (chart.getDataList && chart.getDataList()) || [];
     const lastKline = klines[klines.length - 1];
-    const prevKline = klines[Math.max(0, klines.length - 15)];
-    const t1 = suggestedZone.startTimestamp || prevKline?.timestamp || (Date.now() - 3600000 * 4);
-    const t2 = suggestedZone.endTimestamp || lastKline?.timestamp || Date.now();
-    const zoneLabel = suggestedZone.label || (suggestedZone.type ? `đŸ¯ AI: ${suggestedZone.type}` : (suggestedZone.name ? `đŸ¯ AI: ${suggestedZone.name}` : 'đŸ¯ AI: VĂ¹ng Chuáº©n'));
+
+    let t1 = suggestedZone.startTimestamp || suggestedZone.userTimeStart;
+    let t2 = suggestedZone.endTimestamp || suggestedZone.userTimeEnd;
+
+    const zHigh = suggestedZone.priceHigh;
+    const zLow = suggestedZone.priceLow;
+    const zType = String(suggestedZone.type || suggestedZone.name || '').toUpperCase();
+
+    // Scan klines if t1 is missing: SCAN FROM NEWEST CANDLES BACKWARD (or near userTimeStart), NOT from August!
+    const anchorTime = suggestedZone.userTimeStart;
+    if (!t1 && klines.length >= 2) {
+      // 1. If FVG, scan 3-candle sequence backwards
+      if (zType.includes('FVG') || zType.includes('FAIR VALUE') || zType.includes('GAP') || zType.includes('IMBALANCE')) {
+        let bestCandidateTs: number | undefined;
+        let minTimeDiff = Infinity;
+        for (let i = klines.length - 2; i >= 1; i--) {
+          const c1 = klines[i - 1];
+          const c3 = klines[i + 1];
+          const h1 = c1.high;
+          const l3 = c3.low;
+          let matched = false;
+          if (typeof h1 === 'number' && typeof l3 === 'number') {
+            if (Math.abs(h1 - zLow) / Math.max(1, zLow) < 0.06 && Math.abs(l3 - zHigh) / Math.max(1, zHigh) < 0.06) {
+              matched = true;
+            }
+          }
+          const l1 = c1.low;
+          const h3 = c3.high;
+          if (typeof l1 === 'number' && typeof h3 === 'number') {
+            if (Math.abs(l1 - zHigh) / Math.max(1, zHigh) < 0.06 && Math.abs(h3 - zLow) / Math.max(1, zLow) < 0.06) {
+              matched = true;
+            }
+          }
+          if (matched) {
+            if (anchorTime) {
+              const diff = Math.abs(c1.timestamp - anchorTime);
+              if (diff < minTimeDiff) {
+                minTimeDiff = diff;
+                bestCandidateTs = c1.timestamp;
+              }
+            } else {
+              bestCandidateTs = c1.timestamp;
+              break;
+            }
+          }
+        }
+        if (bestCandidateTs) t1 = bestCandidateTs;
+      }
+
+      // 2. If Order Block, scan for the exact OB candle backwards
+      if (!t1 && (zType.includes('ORDER BLOCK') || zType.includes('OB') || zType.includes('BLOCK'))) {
+        let bestCandidateTs: number | undefined;
+        let minTimeDiff = Infinity;
+        for (let i = klines.length - 1; i >= 1; i--) {
+          const c = klines[i - 1];
+          if (typeof c.high === 'number' && typeof c.low === 'number') {
+            const hMatch = Math.abs(c.high - zHigh) / Math.max(1, zHigh) < 0.06;
+            const lMatch = Math.abs(c.low - zLow) / Math.max(1, zLow) < 0.06;
+            if (hMatch || lMatch) {
+              if (anchorTime) {
+                const diff = Math.abs(c.timestamp - anchorTime);
+                if (diff < minTimeDiff) {
+                  minTimeDiff = diff;
+                  bestCandidateTs = c.timestamp;
+                }
+              } else {
+                bestCandidateTs = c.timestamp;
+                break;
+              }
+            }
+          }
+        }
+        if (bestCandidateTs) t1 = bestCandidateTs;
+      }
+
+      // 3. Fallback: match any swing candle backwards
+      if (!t1) {
+        for (let i = klines.length - 1; i >= 0; i--) {
+          const c = klines[i];
+          if (typeof c.high === 'number' && typeof c.low === 'number') {
+            if (Math.abs(c.high - zHigh) / Math.max(1, zHigh) < 0.04 || Math.abs(c.low - zLow) / Math.max(1, zLow) < 0.04) {
+              t1 = c.timestamp;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    const finalT1: number = t1 || (klines[Math.max(0, klines.length - 15)]?.timestamp) || (Date.now() - 3600000 * 4);
+    const finalT2: number = (!t2 || t2 <= finalT1)
+      ? ((lastKline?.timestamp && lastKline.timestamp > finalT1) ? lastKline.timestamp : (finalT1 + 3600000 * 24 * 7))
+      : t2;
+
+    // Determine colors according to concept
+    let fillColor = 'rgba(245, 158, 11, 0.22)';
+    let borderColor = '#f59e0b';
+    if (zType.includes('BULLISH') || zType.includes('TĂNG')) {
+      fillColor = 'rgba(16, 185, 129, 0.22)'; // Emerald
+      borderColor = '#10b981';
+    } else if (zType.includes('BEARISH') || zType.includes('GIẢM')) {
+      fillColor = 'rgba(239, 68, 68, 0.22)'; // Red
+      borderColor = '#ef4444';
+    } else if (zType.includes('LIQUIDITY') || zType.includes('BSL') || zType.includes('SSL')) {
+      fillColor = 'rgba(59, 130, 246, 0.22)'; // Blue
+      borderColor = '#3b82f6';
+    }
+
+    const zoneLabel = suggestedZone.label || (suggestedZone.type ? `🎯 AI: ${suggestedZone.type}` : (suggestedZone.name ? `🎯 AI: ${suggestedZone.name}` : '🎯 AI: Vùng Chuẩn'));
     const priceText = `$${suggestedZone.priceLow?.toLocaleString('en-US')} - $${suggestedZone.priceHigh?.toLocaleString('en-US')}`;
-    const newId = globalChartInstance.createOverlay({
+
+    const newId = chart.createOverlay({
       name: 'aiCorrectionZone',
       points: [
-        { timestamp: t1, value: suggestedZone.priceHigh },
-        { timestamp: t2, value: suggestedZone.priceLow }
+        { timestamp: finalT1, value: suggestedZone.priceHigh },
+        { timestamp: finalT2, value: suggestedZone.priceLow }
       ],
       extendData: {
         label: zoneLabel,
@@ -246,8 +547,8 @@ export const drawAiCorrectionOverlay = (suggestedZone: {
       styles: {
         rect: {
           style: 'stroke_fill',
-          color: 'rgba(245, 158, 11, 0.22)',
-          borderColor: '#f59e0b',
+          color: fillColor,
+          borderColor: borderColor,
           borderSize: 2,
           borderStyle: 'dashed'
         }
@@ -468,7 +769,8 @@ export function handleRectPressedMoveEnd(event: any) {
     delete rectDragStateMap[event.overlay.id];
   }
 };
-// ÄÄƒng kĂ½ Há»™p Gann (Gann Box)
+
+// ÄÄƒng kĂ½ cĂ´ng cá»¥ váº½ Hình chữ nhật (rect)
 registerOverlay({
   name: 'gannBox',
   totalStep: 3,
@@ -1126,7 +1428,8 @@ registerOverlay({
     ];
   }
 });
-// HĂ¬nh chá»¯ nháº­t xoay (rotatedRect)
+
+// Hình chữ nhật xoay (rotatedRect)
 registerOverlay({
   name: 'rotatedRect',
   totalStep: 4,
@@ -1194,7 +1497,8 @@ registerOverlay({
     ];
   }
 });
-// VĂ²ng trĂ²n (circleMark)
+
+// Vòng tròn (circleMark)
 registerOverlay({
   name: 'circleMark',
   totalStep: 3,
@@ -1434,7 +1738,12 @@ registerOverlay({
     return figures;
   }
 });
-// ÄÄƒng kĂ½ Dá»± Ä‘oĂ¡n (forecast) - Screenshot 3
+
+
+
+
+
+// ÄÄƒng kĂ½ Dự đoán (forecast) - Screenshot 3
 registerOverlay({
   name: 'forecast',
   totalStep: 2,
@@ -1660,7 +1969,8 @@ registerOverlay({
     return figures;
   }
 });
-// ÄÄƒng kĂ½ cĂ´ng cá»¥ váº½ Tháº¿ giĂ¡ lĂªn (Long Position) - PhĂ©p chiáº¿u
+
+// ÄÄƒng kĂ½ cĂ´ng cá»¥ váº½ Thế giá lên (Long Position) - PhĂ©p chiáº¿u
 registerOverlay({
   name: 'longPosition',
   totalStep: 4,
@@ -1736,9 +2046,11 @@ registerOverlay({
       const lossValue = Math.abs(entryPrice - slPrice);
       const lossPercent = entryPrice > 0 ? (lossValue / entryPrice * 100) : 0;
       const rr = lossValue > 0 ? (profitValue / lossValue) : 0;
-      const targetText = `${getTr('chart.target', 'Má»¥c tiĂªu')}: ${profitValue.toFixed(2)} (${profitPercent.toFixed(2)}%) ${tpPrice.toFixed(2)}`;
-      const stopText = `${getTr('chart.stop', 'Dá»«ng')}: ${lossValue.toFixed(2)} (${lossPercent.toFixed(2)}%) ${slPrice.toFixed(2)}`;
-      const rrText = `${getTr('chart.rr', 'Tá»· lá»‡ Rá»§i ro/Lá»£i nhuáº­n')}: ${rr.toFixed(2)}`;
+
+      const targetText = `${getTr('chart.target', 'Mục tiêu')}: ${profitValue.toFixed(2)} (${profitPercent.toFixed(2)}%) ${tpPrice.toFixed(2)}`;
+      const stopText = `${getTr('chart.stop', 'Dừng')}: ${lossValue.toFixed(2)} (${lossPercent.toFixed(2)}%) ${slPrice.toFixed(2)}`;
+      const rrText = `${getTr('chart.rr', 'Tỷ lệ Rủi ro/Lợi nhuận')}: ${rr.toFixed(2)}`;
+
       const centerX = (minX + maxX) / 2;
       // Target Text Box
       figures.push({
@@ -1762,7 +2074,8 @@ registerOverlay({
     return figures;
   }
 });
-// ÄÄƒng kĂ½ cĂ´ng cá»¥ váº½ Tháº¿ giĂ¡ xuá»‘ng (Short Position) - PhĂ©p chiáº¿u
+
+// ÄÄƒng kĂ½ cĂ´ng cá»¥ váº½ Thế giá xuống (Short Position) - PhĂ©p chiáº¿u
 registerOverlay({
   name: 'shortPosition',
   totalStep: 4,
@@ -1839,9 +2152,11 @@ registerOverlay({
       const lossValue = Math.abs(slPrice - entryPrice);
       const lossPercent = entryPrice > 0 ? (lossValue / entryPrice * 100) : 0;
       const rr = lossValue > 0 ? (profitValue / lossValue) : 0;
-      const targetText = `${getTr('chart.target', 'Má»¥c tiĂªu')}: ${profitValue.toFixed(2)} (${profitPercent.toFixed(2)}%) ${tpPrice.toFixed(2)}`;
-      const stopText = `${getTr('chart.stop', 'Dá»«ng')}: ${lossValue.toFixed(2)} (${lossPercent.toFixed(2)}%) ${slPrice.toFixed(2)}`;
-      const rrText = `${getTr('chart.rr', 'Tá»· lá»‡ Rá»§i ro/Lá»£i nhuáº­n')}: ${rr.toFixed(2)}`;
+
+      const targetText = `${getTr('chart.target', 'Mục tiêu')}: ${profitValue.toFixed(2)} (${profitPercent.toFixed(2)}%) ${tpPrice.toFixed(2)}`;
+      const stopText = `${getTr('chart.stop', 'Dừng')}: ${lossValue.toFixed(2)} (${lossPercent.toFixed(2)}%) ${slPrice.toFixed(2)}`;
+      const rrText = `${getTr('chart.rr', 'Tỷ lệ Rủi ro/Lợi nhuận')}: ${rr.toFixed(2)}`;
+
       const centerX = (minX + maxX) / 2;
       // Target Text Box (At bottom for Short)
       figures.push({
@@ -2189,7 +2504,8 @@ registerOverlay({
     return figures;
   }
 });
-// ÄÄƒng kĂ½ VÄƒn báº£n (simpleAnnotation) - Render text directly without vertical pin
+
+// ÄÄƒng kĂ½ Văn bản (simpleAnnotation) - Render text directly without vertical pin
 registerOverlay({
   name: 'simpleAnnotation',
   totalStep: 2,
@@ -2224,7 +2540,8 @@ registerOverlay({
     ];
   }
 });
-// ÄÄƒng kĂ½ Ghi chĂº GiĂ¡ (priceNote) - Screenshot 1
+
+// ÄÄƒng kĂ½ Ghi chú Giá (priceNote) - Screenshot 1
 registerOverlay({
   name: 'priceNote',
   totalStep: 3,
@@ -2292,7 +2609,8 @@ registerOverlay({
     return figures;
   }
 });
-// ÄÄƒng kĂ½ Ghi chĂº (note) - Screenshot 2
+
+// ÄÄƒng kĂ½ Ghi chú (note) - Screenshot 2
 registerOverlay({
   name: 'note',
   totalStep: 3,
@@ -2349,7 +2667,8 @@ registerOverlay({
     return figures;
   }
 });
-// ÄÄƒng kĂ½ MĂ£ Pin (pinMark) - Screenshot 3
+
+// ÄÄƒng kĂ½ Mã Pin (pinMark) - Screenshot 3
 registerOverlay({
   name: 'pinMark',
   totalStep: 2,
@@ -2361,6 +2680,7 @@ registerOverlay({
     if (coordinates.length >= 1) {
       const p = coordinates[0];
       const textContent = String(overlay.extendData || getTr('chart.addText', 'Thêm văn bản'));
+
       // 1. Blue Map Drop Pin Shape at p
       figures.push({
         type: 'circle',
@@ -2422,7 +2742,8 @@ registerOverlay({
     return figures;
   }
 });
-// ÄÄƒng kĂ½ Báº£ng (tableMark) - Screenshot 4
+
+// ÄÄƒng kĂ½ Bảng (tableMark) - Screenshot 4
 registerOverlay({
   name: 'tableMark',
   totalStep: 3,
@@ -2495,7 +2816,8 @@ registerOverlay({
     return figures;
   }
 });
-// ÄÄƒng kĂ½ ChĂº thĂ­ch (callout) - Screenshot 5
+
+// ÄÄƒng kĂ½ Chú thích (callout) - Screenshot 5
 registerOverlay({
   name: 'callout',
   totalStep: 3,
@@ -2508,6 +2830,7 @@ registerOverlay({
       const p1 = coordinates[0];
       const p2 = coordinates[1];
       const textContent = String(overlay.extendData || getTr('chart.addText', 'Thêm văn bản'));
+
       // 1. Target handle at p1
       figures.push({
         type: 'circle',
@@ -2679,6 +3002,7 @@ registerOverlay({
     if (coordinates.length >= 1) {
       const p = coordinates[0];
       const textContent = String(overlay.extendData || getTr('chart.addText', 'Thêm văn bản'));
+
       const poleHeight = 110;
       const topY = p.y - poleHeight;
       // Vertical pole line
@@ -2777,7 +3101,7 @@ registerOverlay({
     return figures;
   }
 });
-// ÄÄƒng kĂ½ MÅ©i tĂªn Ä‘Ă¡nh dáº¥u (arrowMarker) - 2-click thick pointer arrow
+// ÄÄƒng kĂ½ Mũi tên đánh dấu (arrowMarker) - 2-click thick pointer arrow
 registerOverlay({
   name: 'arrowMarker',
   totalStep: 3,
@@ -2815,7 +3139,8 @@ registerOverlay({
     ];
   }
 });
-// ÄÄƒng kĂ½ MÅ©i tĂªn (arrow) - Standard line arrow
+
+// ÄÄƒng kĂ½ Mũi tên (arrow) - Standard line arrow
 registerOverlay({
   name: 'arrow',
   totalStep: 3,
@@ -2852,7 +3177,8 @@ registerOverlay({
     ];
   }
 });
-// ÄÄƒng kĂ½ MÅ©i tĂªn chá»‰ lĂªn (arrowUp)
+
+// ÄÄƒng kĂ½ Mũi tên chỉ lên (arrowUp)
 registerOverlay({
   name: 'arrowUp',
   totalStep: 2,
@@ -2882,7 +3208,8 @@ registerOverlay({
     ];
   }
 });
-// ÄÄƒng kĂ½ MÅ©i tĂªn chá»‰ xuá»‘ng (arrowDown)
+
+// ÄÄƒng kĂ½ Mũi tên chỉ xuống (arrowDown)
 registerOverlay({
   name: 'arrowDown',
   totalStep: 2,
@@ -2912,7 +3239,8 @@ registerOverlay({
     ];
   }
 });
-// ÄÄƒng kĂ½ MÅ©i tĂªn chá»‰ sang trĂ¡i (arrowLeft)
+
+// ÄÄƒng kĂ½ Mũi tên chỉ sang trái (arrowLeft)
 registerOverlay({
   name: 'arrowLeft',
   totalStep: 2,
@@ -2942,7 +3270,8 @@ registerOverlay({
     ];
   }
 });
-// ÄÄƒng kĂ½ MÅ©i tĂªn chá»‰ sang pháº£i (arrowRight)
+
+// ÄÄƒng kĂ½ Mũi tên chỉ sang phải (arrowRight)
 registerOverlay({
   name: 'arrowRight',
   totalStep: 2,
@@ -2977,7 +3306,8 @@ registerOverlay({
     ];
   }
 });
-// ÄÄƒng kĂ½ HĂ¬nh Polyline (polyline & path) - Image 1
+
+// ÄÄƒng kĂ½ Hình Polyline (polyline & path) - Image 1
 registerOverlay({
   name: 'polyline',
   totalStep: 10,
@@ -3176,7 +3506,8 @@ registerOverlay({
     return figures;
   }
 });
-// ÄÄƒng kĂ½ KĂªnh Song song (priceChannelLine) - Image 1
+
+// ÄÄƒng kĂ½ Kênh Song song (priceChannelLine) - Image 1
 registerOverlay({
   name: 'priceChannelLine',
   totalStep: 4,
@@ -3679,7 +4010,8 @@ const drawPitchforkFigures = (coordinates: any[], type: 'standard' | 'schiff' | 
   }
   return figures;
 };
-// ÄÄƒng kĂ½ MĂ´ hĂ¬nh Pitchfork (Image 1)
+
+// ÄÄƒng kĂ½ Mô hình Pitchfork (Image 1)
 registerOverlay({
   name: 'pitchfork',
   totalStep: 4,
@@ -3688,7 +4020,8 @@ registerOverlay({
   needDefaultYAxisFigure: true,
   createPointFigures: ({ coordinates }) => drawPitchforkFigures(coordinates, 'standard')
 });
-// ÄÄƒng kĂ½ MĂ´ hĂ¬nh Schiff Pitchfork (Image 2)
+
+// ÄÄƒng kĂ½ Mô hình Schiff Pitchfork (Image 2)
 registerOverlay({
   name: 'schiffPitchfork',
   totalStep: 4,
@@ -3697,7 +4030,8 @@ registerOverlay({
   needDefaultYAxisFigure: true,
   createPointFigures: ({ coordinates }) => drawPitchforkFigures(coordinates, 'schiff')
 });
-// ÄÄƒng kĂ½ MĂ´ hĂ¬nh Schiff Pitchfork Biáº¿n Ä‘á»•i (Image 3)
+
+// ÄÄƒng kĂ½ Mô hình Schiff Pitchfork Biáº¿n Ä‘á»•i (Image 3)
 registerOverlay({
   name: 'modifiedSchiffPitchfork',
   totalStep: 4,
@@ -3706,7 +4040,8 @@ registerOverlay({
   needDefaultYAxisFigure: true,
   createPointFigures: ({ coordinates }) => drawPitchforkFigures(coordinates, 'modified')
 });
-// ÄÄƒng kĂ½ MĂ´ hĂ¬nh Pitchfork máº·t trong (Image 4)
+
+// ÄÄƒng kĂ½ Mô hình Pitchfork máº·t trong (Image 4)
 registerOverlay({
   name: 'insidePitchfork',
   totalStep: 4,
@@ -3794,6 +4129,22 @@ export const ChartArea = ({
   onUndoRedoChange
 }: ChartAreaProps) => {
   const { t } = useI18n();
+  const { user } = useAuth();
+  const userKey = user?._id || user?.email || 'guest';
+  const userKeyRef = useRef(userKey);
+  userKeyRef.current = userKey;
+
+  const saveDrawingsRef = useRef<() => void>(() => {});
+  const loadDrawingsRef = useRef<() => void>(() => {});
+
+  const debouncedSaveTimerRef = useRef<any>(null);
+  const triggerAutoSaveDrawings = () => {
+    if (debouncedSaveTimerRef.current) clearTimeout(debouncedSaveTimerRef.current);
+    debouncedSaveTimerRef.current = setTimeout(() => {
+      saveDrawingsRef.current?.();
+    }, 150);
+  };
+  globalTriggerAutoSave = triggerAutoSaveDrawings;
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<Chart | null>(null);
   const activeToolRef = useRef<string>('cursor');
@@ -3850,6 +4201,8 @@ export const ChartArea = ({
       });
       redoStackRef.current = [];
       updateUndoRedo();
+      triggerAutoSaveDrawings();
+
       if (ov.name === 'fibonacciLine') {
         const bounding = chartRef.current?.getSize();
         const w = bounding?.width || 800;
@@ -3928,6 +4281,7 @@ export const ChartArea = ({
         extendData: newConfig
       });
       setSelectedOverlay(prev => prev ? { ...prev, extendData: newConfig } : null);
+      triggerAutoSaveDrawings();
     }
   };
   const handleUpdateOverlayConfig = (patch: Partial<FibonacciConfig>) => {
@@ -3940,6 +4294,7 @@ export const ChartArea = ({
     setSelectedOverlay(prev => prev ? { ...prev, extendData: updated } : null);
     setFibConfig(updated);
     fibConfigRef.current = updated;
+    triggerAutoSaveDrawings();
   };
   useEffect(() => {
     onTPSLChangeRef.current = onTPSLChange;
@@ -4318,7 +4673,7 @@ export const ChartArea = ({
           }
         };
       }
-      return originalCreateOverlay(value, paneId);
+      return (originalCreateOverlay as any)(value, paneId);
     };
     // Overlay click state tracking
     const lastOverlayClickTimeRef = { current: 0 };
@@ -4332,7 +4687,12 @@ export const ChartArea = ({
       const now = Date.now();
       // If Eraser tool is active, delete it immediately!
       if (activeToolRef.current === 'eraser') {
-        if (overlayId) chartRef.current?.removeOverlay(overlayId);
+        if (overlayId) {
+          chartRef.current?.removeOverlay({ id: overlayId });
+          if (floatingToolbar?.overlayId === overlayId) setFloatingToolbar(null);
+          if (selectedOverlay?.id === overlayId) setSelectedOverlay(null);
+          triggerAutoSaveDrawings();
+        }
         return true; // prevent default behavior
       }
       if (overlayId && overlayId === lastOverlayClickIdRef.current && (now - lastOverlayClickTimeRef.current) < 500) {
@@ -4364,6 +4724,7 @@ export const ChartArea = ({
     (chart as any).handleOverlayClick = handleOverlayClick;
     // Listen for overlay finished event to re-activate same tool
     chart.subscribeAction('onOverlayDrawEnd' as any, () => {
+      triggerAutoSaveDrawings();
       const currentTool = activeToolRef.current;
       if (currentTool !== 'cursor' && currentTool !== 'clear') {
         // Small delay then re-create overlay to keep tool active
@@ -4415,47 +4776,47 @@ export const ChartArea = ({
         rayLine: 'Tia',
         infoLine: 'ÄÆ°á»ng ThĂ´ng tin',
         straightLine: 'ÄÆ°á»ng Má»Ÿ rá»™ng',
-        trendAngle: 'GĂ³c Xu hÆ°á»›ng',
+        trendAngle: 'Góc Xu hướng',
         horizontalStraightLine: 'ÄÆ°á»ng náº±m ngang',
-        horizontalRayLine: 'Tia náº±m ngang',
+        horizontalRayLine: 'Tia nằm ngang',
         verticalStraightLine: 'ÄÆ°á»ng tháº³ng Ä‘á»©ng',
         crossLine: 'ÄÆ°á»ng giao nhau',
-        priceChannelLine: 'KĂªnh Song song',
-        pitchfork: 'MĂ´ hĂ¬nh Pitchfork',
-        schiffPitchfork: 'MĂ´ hĂ¬nh Schiff Pitchfork',
-        modifiedSchiffPitchfork: 'MĂ´ hĂ¬nh Schiff Pitchfork Biáº¿n Ä‘á»•i',
-        insidePitchfork: 'MĂ´ hĂ¬nh Pitchfork máº·t trong',
-        simpleAnnotation: 'VÄƒn báº£n',
-        callout: 'ChĂº thĂ­ch',
-        note: 'Ghi chĂº',
-        priceNote: 'Ghi chĂº GiĂ¡',
-        pinMark: 'MĂ£ Pin',
-        tableMark: 'Báº£ng',
-        arrow: 'MÅ©i tĂªn',
-        arrowMarker: 'MÅ©i tĂªn Ä‘Ă¡nh dáº¥u',
-        arrowUp: 'MÅ©i tĂªn chá»‰ lĂªn',
-        arrowDown: 'MÅ©i tĂªn chá»‰ xuá»‘ng',
-        arrowLeft: 'MÅ©i tĂªn chá»‰ sang trĂ¡i',
-        arrowRight: 'MÅ©i tĂªn chá»‰ sang pháº£i',
-        rect: 'HĂ¬nh chá»¯ nháº­t',
-        circle: 'VĂ²ng trĂ²n',
-        polyline: 'HĂ¬nh Polyline',
-        triangle: 'HĂ¬nh tam giĂ¡c',
-        xabcd: 'Máº«u hĂ¬nh XABCD',
-        abcd: 'Máº«u hĂ¬nh ABCD',
-        elliottImpulse: 'SĂ³ng Ä‘áº©y Elliott (12345)',
+        priceChannelLine: 'Kênh Song song',
+        pitchfork: 'Mô hình Pitchfork',
+        schiffPitchfork: 'Mô hình Schiff Pitchfork',
+        modifiedSchiffPitchfork: 'Mô hình Schiff Pitchfork Biáº¿n Ä‘á»•i',
+        insidePitchfork: 'Mô hình Pitchfork máº·t trong',
+        simpleAnnotation: 'Văn bản',
+        callout: 'Chú thích',
+        note: 'Ghi chú',
+        priceNote: 'Ghi chú Giá',
+        pinMark: 'Mã Pin',
+        tableMark: 'Bảng',
+        arrow: 'Mũi tên',
+        arrowMarker: 'Mũi tên đánh dấu',
+        arrowUp: 'Mũi tên chỉ lên',
+        arrowDown: 'Mũi tên chỉ xuống',
+        arrowLeft: 'Mũi tên chỉ sang trái',
+        arrowRight: 'Mũi tên chỉ sang phải',
+        rect: 'Hình chữ nhật',
+        circle: 'Vòng tròn',
+        polyline: 'Hình Polyline',
+        triangle: 'Hình tam giác',
+        xabcd: 'Mẫu hình XABCD',
+        abcd: 'Mẫu hình ABCD',
+        elliottImpulse: 'Sóng đẩy Elliott (12345)',
         elliottTriangle: 'SĂ³ng Ä‘iá»u chá»‰nh Elliott (ABC)',
-        elliottABCDE: 'SĂ³ng Elliott Tam giĂ¡c (ABCDE)',
-        elliottWXY: 'SĂ³ng Ä‘Ă´i káº¿t há»£p Elliott (WXY)',
-        elliottTriple: 'SĂ³ng Elliott káº¿t há»£p ba (WXYXZ)',
+        elliottABCDE: 'Sóng Elliott Tam giác (ABCDE)',
+        elliottWXY: 'Sóng đôi kết hợp Elliott (WXY)',
+        elliottTriple: 'Sóng Elliott kết hợp ba (WXYXZ)',
         cycleLines: 'CĂ¡c Ä‘Æ°á»ng chu ká»³',
         timeCycles: 'VĂ²ng thá»i gian',
         sineLine: 'ÄÆ°á»ng Sine',
-        longPosition: 'Tháº¿ giĂ¡ lĂªn',
-        shortPosition: 'Tháº¿ giĂ¡ xuá»‘ng',
-        forecast: 'Dá»± Ä‘oĂ¡n',
-        barsPattern: 'Máº«u hĂ¬nh Thanh',
-        ghostFeed: 'MĂ´ hĂ¬nh Ghost Feed',
+        longPosition: 'Thế giá lên',
+        shortPosition: 'Thế giá xuống',
+        forecast: 'Dự đoán',
+        barsPattern: 'Mẫu hình Thanh',
+        ghostFeed: 'Mô hình Ghost Feed',
         measure: 'Äo lÆ°á»ng'
       };
       setSelectedOverlaySettings({
@@ -4545,10 +4906,18 @@ export const ChartArea = ({
         handleChartContextMenu(e);
       }
     };
+
+    const handleContainerPointerUp = () => {
+      triggerAutoSaveDrawings();
+    };
+
     const container = chartContainerRef.current;
     container?.addEventListener('click', handleChartClick);
     container?.addEventListener('contextmenu', handleChartContextMenu, { capture: true });
     container?.addEventListener('mousedown', handleRightClickMousedown, { capture: true });
+    container?.addEventListener('pointerup', handleContainerPointerUp);
+    container?.addEventListener('mouseup', handleContainerPointerUp);
+
     const handleResize = () => chart?.resize();
     window.addEventListener('resize', handleResize);
     return () => {
@@ -4556,6 +4925,8 @@ export const ChartArea = ({
       container?.removeEventListener('click', handleChartClick);
       container?.removeEventListener('contextmenu', handleChartContextMenu, { capture: true });
       container?.removeEventListener('mousedown', handleRightClickMousedown, { capture: true });
+      container?.removeEventListener('pointerup', handleContainerPointerUp);
+      container?.removeEventListener('mouseup', handleContainerPointerUp);
       if (chartContainerRef.current) {
         dispose(chartContainerRef.current);
       }
@@ -4568,6 +4939,8 @@ export const ChartArea = ({
   const handleSaveOverlaySettings = (settings: OverlaySettings) => {
     const chart = chartRef.current;
     if (!chart || !selectedOverlayId) return;
+
+    triggerAutoSaveDrawings();
     chart.overrideOverlay({
       id: selectedOverlayId,
       extendData: settings.textContent || settings.enableText ? settings.textContent : '',
@@ -4613,7 +4986,7 @@ export const ChartArea = ({
         const absoluteY = e.clientY - rect.top;
         const chart = chartRef.current;
         const converted = chart.convertFromPixel([{ x: absoluteX, y: absoluteY }], { paneId: 'candle_pane' });
-        const point = converted && converted[0];
+        const point = converted && (converted as any)[0];
         if (point) {
           isShiftMeasuringRef.current = true;
           shiftStartPointRef.current = { ...point };
@@ -4637,7 +5010,7 @@ export const ChartArea = ({
         const absoluteY = e.clientY - rect.top;
         const chart = chartRef.current;
         const converted = chart.convertFromPixel([{ x: absoluteX, y: absoluteY }], { paneId: 'candle_pane' });
-        const p2 = converted && converted[0];
+        const p2 = converted && (converted as any)[0];
         if (p2) {
           chart.overrideOverlay({
             id: shiftMeasureOverlayIdRef.current,
@@ -4678,7 +5051,24 @@ export const ChartArea = ({
     if (!chart) return;
     updateCrosshairStyles(chart, activeTool);
     if (activeTool === 'clear') {
-      chart.removeOverlay();
+      const activeChart = chartRef.current;
+      if (activeChart) {
+        const raw = typeof activeChart.getOverlays === 'function' ? activeChart.getOverlays() : [];
+        if (Array.isArray(raw)) {
+          raw.forEach((ov: any) => {
+            if (isUserDrawingOverlay(ov)) {
+              activeChart.removeOverlay({ id: ov.id });
+            }
+          });
+        }
+        try {
+          activeChart.removeOverlay({ name: 'aiCorrectionZone' });
+        } catch (_) {}
+      }
+      setFloatingToolbar(null);
+      setSelectedOverlay(null);
+      triggerAutoSaveDrawings();
+      onToolSelect?.('cursor');
     } else if (activeTool === 'cursor' || activeTool === 'cursor_group' || activeTool === 'cursor_dot' || activeTool === 'cursor_arrow' || activeTool === 'eraser') {
       // Cancel active overlay creation mode
     } else if (activeTool.startsWith('emojiMark:')) {
@@ -4727,7 +5117,8 @@ export const ChartArea = ({
             const maxIdx = Math.max(startIdx, endIdx);
             const offset = (dataList.length - 1 - maxIdx) * space;
             chart.setOffsetRightDistance(offset);
-            // XĂ³a há»™p zoom Ä‘i sau khi zoom xong
+
+            // Xóa há»™p zoom Ä‘i sau khi zoom xong
             chart.removeOverlay(overlay.id);
             onToolSelect?.('cursor');
           }
@@ -4885,12 +5276,14 @@ export const ChartArea = ({
             return false;
           },
           onPressedMoveEnd: (event: any) => {
+            triggerAutoSaveDrawings();
             const allowedNames = ['rect', 'gannBox', 'priceRange', 'timeRange', 'timePriceRange'];
             if (allowedNames.includes(event.overlay?.name)) {
               handleRectPressedMoveEnd(event);
             }
           },
           onDrawEnd: (event: any) => {
+            triggerAutoSaveDrawings();
             setTimeout(() => {
               (window as any).__selectedOverlayId = null;
               setSelectedOverlay(null);
@@ -5092,6 +5485,9 @@ export const ChartArea = ({
           }
           // Gá»i láº§n Ä‘áº§u (type === 'init')
           params.callback(visibleData, true);
+          setTimeout(() => {
+            loadDrawingsRef.current?.();
+          }, 80);
         },
         subscribeBar: (params: DataLoaderSubscribeBarParams) => {
           subscriberCallbackRef.current = params.callback;
@@ -5678,7 +6074,8 @@ export const ChartArea = ({
       window.removeEventListener('mouseup', handleMouseUp, { capture: true });
     };
   }, []);
-  // XĂ³a overlay Ä‘ang chá»n báº±ng phĂ­m Backspace / Delete
+
+  // Xóa overlay Ä‘ang chá»n báº±ng phĂ­m Backspace / Delete
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Bá» qua náº¿u Ä‘ang gĂµ chá»¯ trong tháº» input/textarea
@@ -5723,6 +6120,7 @@ export const ChartArea = ({
             styles: data.styles,
             extendData: data.extendData
           });
+          triggerAutoSaveDrawings();
         }
         return;
       }
@@ -5733,16 +6131,20 @@ export const ChartArea = ({
           setFloatingToolbar(null);
           setSelectedOverlay(null);
           (window as any).__selectedOverlayId = null;
+          triggerAutoSaveDrawings();
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [floatingToolbar, selectedOverlay]);
-  // Persist user overlays per symbol across reloads (F5) and clean up when switching symbol/sĂ n
+
+  // Persist user overlays per symbol and per account across reloads (F5) and clean up when switching symbol/user
   useEffect(() => {
     const symbol = selectedStock?.symbol;
     if (!symbol) return;
+    const currentUserKey = userKeyRef.current;
+
     // Helper: remove only user drawings and AI correction zone from chart
     const clearDrawingsFromChart = () => {
       const activeChart = chartRef.current;
@@ -5763,7 +6165,8 @@ export const ChartArea = ({
         console.error('Error clearing drawings from chart:', err);
       }
     };
-    // Helper: save only user drawings for the given symbol to localStorage
+
+    // Helper: save only user drawings for the given symbol to localStorage scoped by userKey
     const saveDrawingsForSymbol = (targetSymbol: string) => {
       const activeChart = chartRef.current;
       if (!activeChart || !targetSymbol) return;
@@ -5781,21 +6184,47 @@ export const ChartArea = ({
             visible: ov.visible,
             zLevel: ov.zLevel
           }));
+
+        const storageKey = `saved-overlays-${userKeyRef.current}-${targetSymbol}`;
         if (userOverlays.length > 0) {
-          localStorage.setItem(`saved-overlays-${targetSymbol}`, JSON.stringify(userOverlays));
+          localStorage.setItem(storageKey, JSON.stringify(userOverlays));
         } else {
-          localStorage.removeItem(`saved-overlays-${targetSymbol}`);
+          localStorage.removeItem(storageKey);
         }
       } catch (err) {
         console.error('Error saving drawings for symbol:', targetSymbol, err);
       }
     };
-    // Helper: load saved drawings for current symbol
-    const loadDrawingsForSymbol = () => {
+
+    saveDrawingsRef.current = () => saveDrawingsForSymbol(symbol);
+
+    // Helper: load saved drawings for current symbol and userKey
+    const loadDrawingsForSymbol = (force = false) => {
       const activeChart = chartRef.current;
       if (!activeChart) return;
+
+      const currentOverlays = typeof activeChart.getOverlays === 'function' ? activeChart.getOverlays() : [];
+      const hasUserOverlays = Array.isArray(currentOverlays) && currentOverlays.some(isUserDrawingOverlay);
+      if (hasUserOverlays && !force) {
+        return;
+      }
+
       clearDrawingsFromChart();
-      const saved = localStorage.getItem(`saved-overlays-${symbol}`);
+
+      const userStorageKey = `saved-overlays-${userKeyRef.current}-${symbol}`;
+      let saved = localStorage.getItem(userStorageKey);
+
+      // Auto-migration: If not found under userKey, check legacy global key and migrate
+      if (!saved && userKeyRef.current !== 'guest') {
+        const legacyKey = `saved-overlays-${symbol}`;
+        const legacySaved = localStorage.getItem(legacyKey);
+        if (legacySaved) {
+          saved = legacySaved;
+          localStorage.setItem(userStorageKey, legacySaved);
+          localStorage.removeItem(legacyKey);
+        }
+      }
+
       if (saved) {
         try {
           const overlays = JSON.parse(saved);
@@ -5810,7 +6239,7 @@ export const ChartArea = ({
                   const val = p.value !== undefined ? p.value : p.price;
                   if (typeof val !== 'number' || val <= 0) return true;
                   const ratio = Math.max(val / currentPrice, currentPrice / val);
-                  return ratio < 8; // If price difference is > 8x, it belongs to another coin/sĂ n!
+                  return ratio < 8; // If price difference is > 8x, it belongs to another coin/market!
                 });
                 if (!hasValidPrice) return;
               }
@@ -5826,23 +6255,30 @@ export const ChartArea = ({
         }
       }
     };
-    // Immediately clear drawings when switching to new symbol so old drawings never linger
+
+    loadDrawingsRef.current = () => loadDrawingsForSymbol(false);
+
+    // Immediately clear drawings when switching to new symbol or switching user so old drawings never linger
     clearDrawingsFromChart();
-    // Load saved drawings for the new symbol after brief tick
-    const timer = setTimeout(loadDrawingsForSymbol, 60);
+
+    // Load saved drawings for the new symbol/user after brief tick
+    const timer = setTimeout(() => loadDrawingsForSymbol(true), 60);
+
     const handleBeforeUnload = () => {
       saveDrawingsForSymbol(symbol);
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       clearTimeout(timer);
-      // 1. Save drawings for the symbol we are leaving
+      // 1. Save drawings for the symbol/user we are leaving
       saveDrawingsForSymbol(symbol);
-      // 2. Immediately strip user drawings from canvas so the next symbol starts completely clean
+      // 2. Immediately strip user drawings from canvas so the next symbol/user starts completely clean
       clearDrawingsFromChart();
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [selectedStock?.symbol]);
+  }, [selectedStock?.symbol, userKey]);
+
+
   const priceColor = selectedStock.percent > 0 ? 'text-[#089981]' : selectedStock.percent < 0 ? 'text-[#f23645]' : 'text-[#787b86]';
   const isDark = theme === 'dark';
   const isDefaultDarkBg = chartSettings.canvas.bgSolid === '#131722' ||
@@ -5971,6 +6407,7 @@ export const ChartArea = ({
               const newLock = !selectedOverlay.lock;
               chartRef.current?.overrideOverlay({ id: selectedOverlay.id, lock: newLock });
               setSelectedOverlay(prev => prev ? { ...prev, lock: newLock } : null);
+              triggerAutoSaveDrawings();
             }}
             className={`p-1.5 rounded transition-colors ${selectedOverlay.lock ? 'text-amber-400 bg-amber-500/10' : 'text-[#787b86] hover:text-white hover:bg-[#2a2e39]'
               }`}
@@ -5983,9 +6420,10 @@ export const ChartArea = ({
             onClick={() => {
               chartRef.current?.removeOverlay({ id: selectedOverlay.id });
               setSelectedOverlay(null);
+              triggerAutoSaveDrawings();
             }}
             className="p-1.5 rounded hover:bg-red-500/20 text-[#787b86] hover:text-red-400 transition-colors"
-            title="XĂ³a Fibonacci nĂ y"
+            title="Xóa Fibonacci này"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -6054,7 +6492,7 @@ export const ChartArea = ({
             </div>
             {/* Templates button (4 squares icon) */}
             <button
-              title="Báº£n máº«u"
+              title="Bản mẫu"
               onClick={() => setOverlayPopup(prev => prev === 'templates' ? null : 'templates')}
               className={`p-1.5 rounded transition-colors ${overlayPopup === 'templates' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500' : 'text-[#787b86] hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] hover:text-[#1e2329] dark:hover:text-[#d1d4dc]'}`}
             >
@@ -6106,6 +6544,7 @@ export const ChartArea = ({
                 const newLockStatus = !floatingToolbar.overlay.lock;
                 chartRef.current?.overrideOverlay({ id: floatingToolbar.overlayId, lock: newLockStatus });
                 setFloatingToolbar(prev => prev ? { ...prev, overlay: { ...prev.overlay, lock: newLockStatus } } : null);
+                triggerAutoSaveDrawings();
               }}
               className={`p-1.5 rounded transition-colors ${floatingToolbar.overlay.lock ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'text-[#787b86] hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] hover:text-blue-500'}`}
             >
@@ -6113,10 +6552,11 @@ export const ChartArea = ({
             </button>
             {/* Trash */}
             <button
-              title="XĂ³a"
+              title="Xóa"
               onClick={() => {
                 chartRef.current?.removeOverlay({ id: floatingToolbar.overlayId });
                 setFloatingToolbar(null);
+                triggerAutoSaveDrawings();
               }}
               className="p-1.5 text-[#787b86] hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] hover:text-red-500 rounded transition-colors"
             >
@@ -6171,7 +6611,7 @@ export const ChartArea = ({
                   input.click();
                 }}
                 className="flex items-center justify-center p-1.5 rounded hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#787b86] dark:text-[#d1d4dc] transition-colors"
-                title="ThĂªm mĂ u tĂ¹y chá»‰nh"
+                title="Thêm màu tùy chỉnh"
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -6272,7 +6712,7 @@ export const ChartArea = ({
               style={{ top: Math.max(10, floatingToolbar.y - 320), left: Math.max(10, floatingToolbar.x + (floatingToolbar.x > window.innerWidth - 320 ? -200 : 80)) }}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Submenu 1: Báº£n máº«u */}
+              {/* Submenu 1: Bản mẫu */}
               <div
                 className="relative group"
                 onMouseEnter={() => setActiveContextMenuSubMenu('templates')}
@@ -6281,14 +6721,14 @@ export const ChartArea = ({
                   onClick={() => setActiveContextMenuSubMenu(prev => prev === 'templates' ? null : 'templates')}
                   className="w-full flex items-center justify-between px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] transition-colors"
                 >
-                  <span>{t('ctx.template', 'Báº£n máº«u')}</span>
+                  <span>{t('ctx.template', 'Bản mẫu')}</span>
                   <ChevronRight className="w-3.5 h-3.5 text-[#787b86]" />
                 </button>
                 {activeContextMenuSubMenu === 'templates' && (
                   <div className={`absolute top-0 ${floatingToolbar.x > window.innerWidth - 320 ? '-left-48' : 'left-full ml-1'} bg-white dark:bg-[#1e222d] border border-[#e6e8ea] dark:border-[#2a2e39] rounded-lg shadow-2xl py-1 w-48 z-50 max-h-64 overflow-y-auto`}>
                     <button
                       onClick={() => {
-                        const name = window.prompt(t('ctx.promptNewTemplate', 'Nháº­p tĂªn báº£n máº«u má»›i:'));
+                        const name = window.prompt(t('ctx.promptNewTemplate', 'Nhập tên bản mẫu mới:'));
                         if (name) {
                           const currentOverlay = floatingToolbar.overlay;
                           const templates = JSON.parse(localStorage.getItem(`overlay-templates-${currentOverlay.name}`) || '{}');
@@ -6299,7 +6739,7 @@ export const ChartArea = ({
                       }}
                       className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc] border-b border-[#e6e8ea] dark:border-[#2a2e39] font-medium"
                     >
-                      {t('ctx.saveAs', 'LÆ°u thĂ nh...')}
+                      {t('ctx.saveAs', 'Lưu thành...')}
                     </button>
                     {Object.keys(JSON.parse(localStorage.getItem(`overlay-templates-${floatingToolbar.overlay.name}`) || '{}')).map((tplName) => (
                       <div key={tplName} className="w-full flex items-center justify-between px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc] group/tpl cursor-pointer">
@@ -6324,7 +6764,7 @@ export const ChartArea = ({
                           className="w-3 h-3 text-[#f23645] opacity-0 group-hover/tpl:opacity-100 transition-opacity shrink-0 ml-2 z-10"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm(`${t('ctx.confirmDeleteTemplate', 'XĂ³a báº£n máº«u')} "${tplName}"?`)) {
+                            if (window.confirm(`${t('ctx.confirmDeleteTemplate', 'Xóa bản mẫu')} "${tplName}"?`)) {
                               const templates = JSON.parse(localStorage.getItem(`overlay-templates-${floatingToolbar.overlay.name}`) || '{}');
                               delete templates[tplName];
                               localStorage.setItem(`overlay-templates-${floatingToolbar.overlay.name}`, JSON.stringify(templates));
@@ -6349,7 +6789,8 @@ export const ChartArea = ({
                   </div>
                 )}
               </div>
-              {/* Submenu 2: Thá»© tá»± Trá»±c quan */}
+
+              {/* Submenu 2: Thứ tự Trực quan */}
               <div
                 className="relative group"
                 onMouseEnter={() => setActiveContextMenuSubMenu('visual_order')}
@@ -6358,7 +6799,7 @@ export const ChartArea = ({
                   onClick={() => setActiveContextMenuSubMenu(prev => prev === 'visual_order' ? null : 'visual_order')}
                   className="w-full flex items-center justify-between px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] transition-colors"
                 >
-                  <span>{t('ctx.visualOrder', 'Thá»© tá»± Trá»±c quan')}</span>
+                  <span>{t('ctx.visualOrder', 'Thứ tự Trực quan')}</span>
                   <ChevronRight className="w-3.5 h-3.5 text-[#787b86]" />
                 </button>
                 {activeContextMenuSubMenu === 'visual_order' && (
@@ -6411,15 +6852,15 @@ export const ChartArea = ({
                   onClick={() => setActiveContextMenuSubMenu(prev => prev === 'timeframe_visibility' ? null : 'timeframe_visibility')}
                   className="w-full flex items-center justify-between px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] transition-colors"
                 >
-                  <span className="truncate pr-2">{t('ctx.visibility', 'Kháº£ nÄƒng hiá»ƒn thá»‹ trong cĂ¡c khoáº£ng thá»i gian')}</span>
+                  <span className="truncate pr-2">{t('ctx.visibility', 'Khả năng hiển thị trong các khoảng thời gian')}</span>
                   <ChevronRight className="w-3.5 h-3.5 text-[#787b86] shrink-0" />
                 </button>
                 {activeContextMenuSubMenu === 'timeframe_visibility' && (
                   <div className={`absolute top-0 ${floatingToolbar.x > window.innerWidth - 320 ? '-left-64' : 'left-full ml-1'} bg-white dark:bg-[#1e222d] border border-[#e6e8ea] dark:border-[#2a2e39] rounded-lg shadow-2xl py-1 w-64 z-50`}>
-                    <button onClick={() => setOverlayPopup(null)} className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc]">{t('ctx.visCurrentAndFuture', 'khoáº£ng thá»i gian hiá»‡n táº¡i trá»Ÿ Ä‘i')}</button>
-                    <button onClick={() => setOverlayPopup(null)} className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc]">{t('ctx.visCurrentAndPast', 'khoáº£ng thá»i gian hiá»‡n táº¡i trá»Ÿ vá» trÆ°á»›c')}</button>
-                    <button onClick={() => setOverlayPopup(null)} className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc]">{t('ctx.visCurrentOnly', 'Chá»‰ á»Ÿ khoáº£ng thá»i gian hiá»‡n táº¡i')}</button>
-                    <button onClick={() => setOverlayPopup(null)} className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc]">{t('ctx.visAll', 'Táº¥t cáº£ khoáº£ng thá»i gian')}</button>
+                    <button onClick={() => setOverlayPopup(null)} className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc]">{t('ctx.visCurrentAndFuture', 'Khoảng thời gian hiện tại trở đi')}</button>
+                    <button onClick={() => setOverlayPopup(null)} className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc]">{t('ctx.visCurrentAndPast', 'Khoảng thời gian hiện tại trở về trước')}</button>
+                    <button onClick={() => setOverlayPopup(null)} className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc]">{t('ctx.visCurrentOnly', 'Chỉ ở khoảng thời gian hiện tại')}</button>
+                    <button onClick={() => setOverlayPopup(null)} className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc]">{t('ctx.visAll', 'Tất cả khoảng thời gian')}</button>
                   </div>
                 )}
               </div>
@@ -6427,7 +6868,8 @@ export const ChartArea = ({
                 {t('ctx.objectTree', 'Danh sách đối tượng...')}
               </button>
               <div className="w-full h-[1px] bg-[#e6e8ea] dark:bg-[#2a2e39] my-1" />
-              {/* Tạo bản sao */}
+
+              {/* Bản sao */}
               <button
                 onClick={() => {
                   const chart = chartRef.current;
@@ -6452,9 +6894,10 @@ export const ChartArea = ({
                 }}
                 className="flex items-center justify-between px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc]"
               >
-                <span>{t('ctx.clone', 'Tạo bản sao')}</span>
+                <span>{t('ctx.clone', 'Bản sao')}</span>
                 <span className="text-[10px] text-[#787b86]">Alt + Drag</span>
               </button>
+
               {/* Sao chép */}
               <button
                 onClick={() => {
@@ -6497,11 +6940,13 @@ export const ChartArea = ({
               <button
                 onClick={() => {
                   chartRef.current?.removeOverlay({ id: floatingToolbar.overlayId });
+                  if (selectedOverlay?.id === floatingToolbar.overlayId) setSelectedOverlay(null);
                   setFloatingToolbar(null);
+                  triggerAutoSaveDrawings();
                 }}
                 className="flex items-center justify-between px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-red-500"
               >
-                <span>{t('ctx.remove', 'Loáº¡i bá»')}</span>
+                <span>{t('ctx.remove', 'Loại bỏ')}</span>
                 <span className="text-[10px] text-[#787b86]">Del</span>
               </button>
               <div className="w-full h-[1px] bg-[#e6e8ea] dark:bg-[#2a2e39] my-1" />
@@ -6521,7 +6966,7 @@ export const ChartArea = ({
                 }}
                 className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc]"
               >
-                {t('ctx.settings', 'CĂ i Ä‘áº·t...')}
+                {t('ctx.settings', 'Cài đặt...')}
               </button>
             </div>
           )}

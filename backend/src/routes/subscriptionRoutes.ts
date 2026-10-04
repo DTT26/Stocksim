@@ -49,24 +49,53 @@ router.get('/me', protect, async (req: any, res: Response) => {
           }
 
           let plan = sub.plan || 'FREE';
-          let limit = sub.daily_ai_limit || (plan === 'PREMIUM' ? 500 : 10);
           const expiresAt = sub.premium_expires_at ? new Date(sub.premium_expires_at) : null;
-          let isPremium = plan === 'PREMIUM';
+          let isPremium = ['PLUS', 'PRO', 'PREMIUM'].includes(plan);
 
           if (isPremium && expiresAt && now > expiresAt) {
             isPremium = false;
             plan = 'FREE';
-            limit = 10;
           }
 
-          const remaining = Math.max(0, limit - dailyUsed);
+          let chatLimit = 10;
+          let chatUsed = dailyUsed;
+          let remainingChat = Math.max(0, chatLimit - chatUsed);
+
+          let inspectLimit = 1;
+          let inspectUsed = sub.daily_inspect_used || 0;
+          let remainingInspect = Math.max(0, inspectLimit - inspectUsed);
+          let isUnlimited = false;
+
+          if (plan === 'PRO') {
+            chatLimit = 999999;
+            chatUsed = sub.monthly_chat_used || 0;
+            remainingChat = 999999;
+            inspectLimit = 999999;
+            inspectUsed = sub.monthly_inspect_used || 0;
+            remainingInspect = 999999;
+            isUnlimited = true;
+          } else if (plan === 'PLUS' || plan === 'PREMIUM') {
+            chatLimit = sub.monthly_chat_limit || 300;
+            chatUsed = sub.monthly_chat_used || 0;
+            remainingChat = Math.max(0, chatLimit - chatUsed);
+            inspectLimit = sub.monthly_inspect_limit || 150;
+            inspectUsed = sub.monthly_inspect_used || 0;
+            remainingInspect = Math.max(0, inspectLimit - inspectUsed);
+          }
 
           return res.json({
             success: true,
             plan,
-            dailyAiLimit: limit,
-            dailyAiUsed: dailyUsed,
-            remainingToday: remaining,
+            dailyAiLimit: chatLimit,
+            dailyAiUsed: chatUsed,
+            remainingToday: remainingChat,
+            chatLimit,
+            chatUsed,
+            remainingChat,
+            inspectLimit,
+            inspectUsed,
+            remainingInspect,
+            isUnlimited,
             premiumExpiresAt: sub.premium_expires_at || null,
             isPremium,
             lastActiveDate: sub.last_active_date || todayStr
@@ -82,6 +111,13 @@ router.get('/me', protect, async (req: any, res: Response) => {
       dailyAiLimit: 10,
       dailyAiUsed: 0,
       remainingToday: 10,
+      chatLimit: 10,
+      chatUsed: 0,
+      remainingChat: 10,
+      inspectLimit: 1,
+      inspectUsed: 0,
+      remainingInspect: 1,
+      isUnlimited: false,
       premiumExpiresAt: null,
       isPremium: false,
       lastActiveDate: new Date().toISOString().split('T')[0]

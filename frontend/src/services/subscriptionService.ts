@@ -16,10 +16,17 @@ function getAuthHeaders(): Record<string, string> {
 
 export interface SubscriptionInfo {
   success: boolean;
-  plan: 'FREE' | 'PREMIUM';
+  plan: 'FREE' | 'PLUS' | 'PRO' | 'PREMIUM';
   dailyAiLimit: number;
   dailyAiUsed: number;
   remainingToday: number;
+  chatLimit?: number;
+  chatUsed?: number;
+  remainingChat?: number;
+  inspectLimit?: number;
+  inspectUsed?: number;
+  remainingInspect?: number;
+  isUnlimited?: boolean;
   premiumExpiresAt?: string | null;
   isPremium: boolean;
   lastActiveDate?: string;
@@ -46,7 +53,7 @@ export const subscriptionService = {
     return json;
   },
 
-  async createCheckout(plan: string = 'PREMIUM_MONTHLY'): Promise<CreateCheckoutResult> {
+  async createCheckout(plan: 'PLUS' | 'PRO' | string = 'PLUS'): Promise<CreateCheckoutResult> {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const res = await fetch(`${getRootApi()}/v1/payment/create-checkout`, {
       method: 'POST',

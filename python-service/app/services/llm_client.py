@@ -30,6 +30,9 @@ class LLMClient:
                 load_dotenv(dotenv_path=env_path, override=True)
         self.gemini_key = os.getenv("GEMINI_API_KEY", "").strip().strip("'\"")
         self.openai_key = os.getenv("OPENAI_API_KEY", "").strip().strip("'\"")
+        self.openai_base_url = os.getenv("OPENAI_BASE_URL", "").strip().rstrip("/")
+        self.openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+        self.preferred_provider = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
 
     def is_configured(self) -> bool:
         self._reload_env()
@@ -41,7 +44,21 @@ class LLMClient:
         if not self.is_configured():
             return
 
-        # Priority 1: Google Gemini Streaming (Fastest TTFT)
+        # If user explicitly chose OpenAI
+        if self.preferred_provider == "openai" and self.openai_key:
+            try:
+                has_yielded = False
+                for chunk in self._stream_openai(system_prompt, user_prompt, max_tokens):
+                    has_yielded = True
+                    self.active_provider = "openai"
+                    yield chunk
+                if has_yielded:
+                    return
+            except Exception as e:
+                self.last_error = str(e)
+                print(f"OpenAI Streaming error, falling back to Gemini: {e}")
+
+        # Gemini Streaming
         if self.gemini_key:
             try:
                 has_yielded = False
@@ -55,6 +72,20 @@ class LLMClient:
                 self.last_error = str(e)
                 print(f"Gemini Streaming error, falling back: {e}")
 
+        # OpenAI fallback if not already tried first
+        if self.preferred_provider != "openai" and self.openai_key:
+            try:
+                has_yielded = False
+                for chunk in self._stream_openai(system_prompt, user_prompt, max_tokens):
+                    has_yielded = True
+                    self.active_provider = "openai"
+                    yield chunk
+                if has_yielded:
+                    return
+            except Exception as e:
+                self.last_error = str(e)
+                print(f"OpenAI Streaming error: {e}")
+
         # Fallback to standard generation if streaming fails
         full_text = self.generate_text(system_prompt, user_prompt, max_tokens)
         if full_text:
@@ -66,7 +97,18 @@ class LLMClient:
         if not self.is_configured():
             return None
 
-        # Priority 1: Google Gemini (Fast, active models)
+        # If user chose OpenAI as preferred
+        if self.preferred_provider == "openai" and self.openai_key:
+            try:
+                res = self._call_openai(system_prompt, user_prompt, max_tokens)
+                if res:
+                    self.active_provider = "openai"
+                    return res
+            except Exception as e:
+                self.last_error = str(e)
+                print(f"OpenAI call failed, falling back to Gemini: {e}")
+
+        # Gemini
         if self.gemini_key:
             try:
                 res = self._call_gemini(system_prompt, user_prompt, max_tokens)
@@ -77,8 +119,8 @@ class LLMClient:
                 self.last_error = str(e)
                 print(f"Gemini API call failed, attempting fallback: {e}")
 
-        # Priority 2: OpenAI (GPT-4o-mini)
-        if self.openai_key:
+        # OpenAI fallback if Gemini was primary
+        if self.preferred_provider != "openai" and self.openai_key:
             try:
                 res = self._call_openai(system_prompt, user_prompt, max_tokens)
                 if res:
@@ -116,7 +158,7 @@ class LLMClient:
 
         image_data = {"mimeType": detected_mime, "data": clean_b64.strip()}
 
-        # Priority 1: Google Gemini Vision
+        # Phương án 1: Gemini làm "Mắt thần" soi ảnh biểu đồ (Ưu tiên số 1 vì tốc độ cao, nhận diện hình ảnh tốt và rẻ)
         if self.gemini_key:
             try:
                 res = self._call_gemini(system_prompt, user_prompt, max_tokens, image_data=image_data)
@@ -125,9 +167,9 @@ class LLMClient:
                     return res
             except Exception as e:
                 self.last_error = str(e)
-                print(f"Gemini Vision call failed, attempting fallback: {e}")
+                print(f"Gemini Vision failed, falling back to OpenAI: {e}")
 
-        # Priority 2: OpenAI GPT-4o-mini Vision
+        # Dự phòng: OpenAI GPT-4o-mini Vision nếu Gemini gặp lỗi
         if self.openai_key:
             try:
                 res = self._call_openai_vision(system_prompt, user_prompt, clean_b64, detected_mime, max_tokens)
@@ -136,7 +178,47 @@ class LLMClient:
                     return res
             except Exception as e:
                 self.last_error = str(e)
-                print(f"OpenAI Vision call failed: {e}")
+                print(f"OpenAI Vision failed: {e}")
+
+        return None
+
+    def generate_inspection_text(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int = 4000
+    ) -> Optional[str]:
+        """
+        Chuyên biệt cho tính năng Chấm Bài Phân Tích Kỹ Thuật (SMC / ICT / Chart Grading).
+        Ưu tiên Google Gemini theo cấu hình phân nhiệm (Gemini Chấm Bài, OpenAI Chat),
+        dự phòng tự động sang OpenAI nếu Gemini gặp sự cố.
+        """
+        self.last_error = None
+        self.active_provider = None
+        if not self.is_configured():
+            return None
+
+        # 1. Ưu tiên số 1: Google Gemini chấm bài
+        if self.gemini_key:
+            try:
+                res = self._call_gemini(system_prompt, user_prompt, max_tokens)
+                if res:
+                    self.active_provider = "gemini"
+                    return res
+            except Exception as e:
+                self.last_error = str(e)
+                print(f"Gemini chart inspection failed, falling back to OpenAI: {e}")
+
+        # 2. Dự phòng: OpenAI GPT-4o nếu Gemini gặp lỗi
+        if self.openai_key:
+            try:
+                res = self._call_openai(system_prompt, user_prompt, max_tokens)
+                if res:
+                    self.active_provider = "openai"
+                    return res
+            except Exception as e:
+                self.last_error = str(e)
+                print(f"OpenAI inspection fallback failed: {e}")
 
         return None
 
@@ -270,15 +352,60 @@ class LLMClient:
                 print(f"Error streaming {model}: {ex}")
                 continue
 
+    def _stream_openai(self, system_prompt: str, user_prompt: str, max_tokens: int) -> Iterator[str]:
+        base_url = self.openai_base_url or "https://api.openai.com/v1"
+        url = f"{base_url}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.openai_key}",
+            "Content-Type": "application/json"
+        }
+        model = self.openai_model or "gpt-4o-mini"
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": 0.4,
+            "max_tokens": max_tokens,
+            "stream": True
+        }
+        try:
+            with self.client.stream("POST", url, headers=headers, json=payload, timeout=30.0) as resp:
+                if resp.status_code == 200:
+                    for line in resp.iter_lines():
+                        if line.startswith("data: "):
+                            data_str = line[6:].strip()
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(data_str)
+                                delta = chunk.get("choices", [{}])[0].get("delta", {})
+                                content = delta.get("content", "")
+                                if content:
+                                    yield content
+                            except Exception:
+                                continue
+                else:
+                    err_msg = f"OpenAI Stream HTTP {resp.status_code}"
+                    self.last_error = err_msg
+                    print(err_msg)
+                    raise RuntimeError(err_msg)
+        except Exception as ex:
+            self.last_error = str(ex)
+            print(f"OpenAI stream error: {ex}")
+            raise ex
+
     def _call_openai(self, system_prompt: str, user_prompt: str, max_tokens: int) -> Optional[str]:
-        url = "https://api.openai.com/v1/chat/completions"
+        base_url = self.openai_base_url or "https://api.openai.com/v1"
+        url = f"{base_url}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.openai_key}",
             "Content-Type": "application/json"
         }
 
         payload = {
-            "model": "gpt-4o-mini",
+            "model": self.openai_model or "gpt-4o-mini",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -310,7 +437,8 @@ class LLMClient:
         mime_type: str, 
         max_tokens: int
     ) -> Optional[str]:
-        url = "https://api.openai.com/v1/chat/completions"
+        base_url = self.openai_base_url or "https://api.openai.com/v1"
+        url = f"{base_url}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.openai_key}",
             "Content-Type": "application/json"
@@ -318,7 +446,7 @@ class LLMClient:
 
         data_url = f"data:{mime_type};base64,{image_base64}"
         payload = {
-            "model": "gpt-4o-mini",
+            "model": self.openai_model or "gpt-4o-mini",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {

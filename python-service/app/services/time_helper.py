@@ -85,12 +85,9 @@ def is_time_query(query: str) -> bool:
     """Kiểm tra câu hỏi có đang hỏi về thời gian/giờ giấc/ngày tháng không."""
     lower = query.lower()
     time_keywords = [
-        "mấy giờ", "may gio", "mấy giờ rồi", "may gio roi", "mấy giờ rồi em", "may gio roi em",
-        "bây giờ là mấy giờ", "bay gio la may gio", "mấy giờ vậy", "may gio vay",
-        "giờ mấy giờ", "gio may gio", "thời gian", "thoi gian", "giờ hiện tại", "gio hien tai",
-        "hôm nay ngày mấy", "hom nay ngay may", "hôm nay thứ mấy", "hom nay thu may",
-        "ngày bao nhiêu", "ngay bao nhieu", "đang là phiên nào", "dang la phien nao",
-        "phiên nào đang mở", "phien nao dang mo", "mấy giờ mở cửa", "may gio mo cua",
-        "giờ giao dịch", "gio giao dich", "killzone", "mấy giờ phiên", "may gio phien"
+        "hôm nay", "hom nay", "bây giờ", "bay gio", "ngày mấy", "ngay may", "thứ mấy", "thu may",
+        "ngày bao nhiêu", "ngay bao nhieu", "năm nay", "nam nay", "năm bao nhiêu", "mấy giờ", "may gio",
+        "thời gian", "thoi gian", "giờ hiện tại", "gio hien tai", "phiên", "phien", "killzone",
+        "mở cửa", "mo cua", "đóng cửa", "dong cua", "what time", "what day", "what date", "today"
     ]
     return any(kw in lower for kw in time_keywords)

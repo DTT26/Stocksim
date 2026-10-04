@@ -188,3 +188,313 @@ def classify_user_intent(query: str, has_positions: bool = False) -> Tuple[str, 
     """
     active_method: TradingMethod = route_query_to_method(query, has_positions=has_positions)
     return active_method.code, active_method.to_prompt_text()
+
+
+# ==========================================
+# 5. TRÍCH XUẤT ĐỈNH & ĐÁY BIỂU ĐỒ CHUẨN XÁC (SWING HIGHS / SWING LOWS)
+# ==========================================
+def extract_chart_swings_and_extrema(klines: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Trích xuất chính xác Đỉnh cao nhất (Global High), Đáy thấp nhất (Global Low),
+    và các Đỉnh đảo chiều (Swing Highs / Fractals) & Đáy đảo chiều (Swing Lows / Fractals)
+    từ chuỗi nến thực tế trên biểu đồ.
+    """
+    if not klines or len(klines) < 3:
+        return {
+            "global_high": None,
+            "global_low": None,
+            "latest_close": None,
+            "swing_highs": [],
+            "swing_lows": []
+        }
+
+    highs = [k.get("high") for k in klines if isinstance(k.get("high"), (int, float))]
+    lows = [k.get("low") for k in klines if isinstance(k.get("low"), (int, float))]
+    global_high = max(highs) if highs else None
+    global_low = min(lows) if lows else None
+    latest_close = klines[-1].get("close") if klines else None
+
+    swing_highs = []
+    swing_lows = []
+    n = len(klines)
+
+    # 3-bar and 5-bar pivot detection
+    for i in range(1, n - 1):
+        k = klines[i]
+        h = k.get("high")
+        l = k.get("low")
+        if not isinstance(h, (int, float)) or not isinstance(l, (int, float)):
+            continue
+
+        prev_h = klines[i-1].get("high", -1e9)
+        next_h = klines[i+1].get("high", -1e9)
+        prev_l = klines[i-1].get("low", 1e9)
+        next_l = klines[i+1].get("low", 1e9)
+
+        # Swing High
+        if h >= prev_h and h >= next_h:
+            is_strong = False
+            if i >= 2 and i + 2 < n:
+                is_strong = (h >= klines[i-2].get("high", -1e9) and h >= klines[i+2].get("high", -1e9))
+            swing_highs.append({
+                "price": h,
+                "candles_ago": n - 1 - i,
+                "is_strong": is_strong,
+                "timestamp": k.get("timestamp")
+            })
+
+        # Swing Low
+        if l <= prev_l and l <= next_l:
+            is_strong = False
+            if i >= 2 and i + 2 < n:
+                is_strong = (l <= klines[i-2].get("low", 1e9) and l <= klines[i+2].get("low", 1e9))
+            swing_lows.append({
+                "price": l,
+                "candles_ago": n - 1 - i,
+                "is_strong": is_strong,
+                "timestamp": k.get("timestamp")
+            })
+
+    return {
+        "global_high": global_high,
+        "global_low": global_low,
+        "latest_close": latest_close,
+        "swing_highs": swing_highs,
+        "swing_lows": swing_lows
+    }
+
+def format_detailed_chart_context(
+    symbol: Optional[str] = None,
+    current_price: Optional[float] = None,
+    timeframe: Optional[str] = None,
+    market_context: Optional[Dict[str, Any]] = None,
+    klines: Optional[List[Dict[str, Any]]] = None,
+    is_en: bool = False
+) -> str:
+    """
+    Tạo khối ngữ cảnh biểu đồ thực tế bao gồm đỉnh/đáy chính xác để nạp vào prompt cho LLM.
+    """
+    lines = []
+    if symbol:
+        lines.append(f"- Mã tài sản đang mở biểu đồ: {symbol}")
+    if current_price is not None:
+        p_fmt = f"${current_price:,.4f}".rstrip('0').rstrip('.') if current_price < 1 else f"${current_price:,.2f}"
+        lines.append(f"- Giá thị trường thực tế: {p_fmt}")
+    if timeframe:
+        lines.append(f"- Khung thời gian: {timeframe}")
+
+    mc = market_context or {}
+    if mc.get("change24h") is not None:
+        lines.append(f"- Biến động 24h: {mc.get('change24h')}%")
+    if mc.get("exchange"):
+        lines.append(f"- Sàn giao dịch: {mc.get('exchange')}")
+    if mc.get("high24h") is not None:
+        lines.append(f"- Đỉnh cao nhất 24h (24h High): ${mc.get('high24h'):,.2f}")
+    if mc.get("low24h") is not None:
+        lines.append(f"- Đáy thấp nhất 24h (24h Low): ${mc.get('low24h'):,.2f}")
+
+    # Process klines if available
+    chart_klines = klines or mc.get("klines") or []
+    swings = extract_chart_swings_and_extrema(chart_klines) if chart_klines else None
+
+    g_high = (swings and swings["global_high"]) or mc.get("chartHigh")
+    g_low = (swings and swings["global_low"]) or mc.get("chartLow")
+
+    if g_high is not None:
+        lines.append(f"- Đỉnh cao nhất trên biểu đồ (Highest High): ${g_high:,.2f}")
+    if g_low is not None:
+        lines.append(f"- Đáy thấp nhất trên biểu đồ (Lowest Low): ${g_low:,.2f}")
+
+    recent_sh = (swings and swings["swing_highs"]) or mc.get("recentSwingHighs") or []
+    if recent_sh:
+        sh_items = recent_sh[-4:]
+        sh_strs = [f"${sh.get('price'):,.2f} ({sh.get('candles_ago', sh.get('candlesAgo', 0))} nến trước)" for sh in reversed(sh_items)]
+        lines.append(f"- Các Đỉnh đảo chiều gần nhất (Swing Highs): {', '.join(sh_strs)}")
+
+    recent_sl = (swings and swings["swing_lows"]) or mc.get("recentSwingLows") or []
+    if recent_sl:
+        sl_items = recent_sl[-4:]
+        sl_strs = [f"${sl.get('price'):,.2f} ({sl.get('candles_ago', sl.get('candlesAgo', 0))} nến trước)" for sl in reversed(sl_items)]
+        lines.append(f"- Các Đáy đảo chiều gần nhất (Swing Lows): {', '.join(sl_strs)}")
+
+    user_drawings = mc.get("userDrawingsSummary") or []
+    if user_drawings:
+        draw_strs = [f"{d.get('label', d.get('name'))} [Vùng giá: ${d.get('priceLow')}-${d.get('priceHigh')}]" for d in user_drawings]
+        lines.append(f"- Các vùng hình vẽ học viên đã đánh dấu trên biểu đồ: {'; '.join(draw_strs)}")
+
+    if not lines:
+        return ""
+
+    if is_en:
+        rule = (
+            "\n\n⚠️ MANDATORY ACCURACY RULE FOR PEAKS & TROUGHS:\n"
+            "When analyzing market structure, swing highs/lows, support, and resistance, you MUST use the EXACT "
+            "factual High/Low numbers provided above. DO NOT invent or estimate random prices for peaks and troughs."
+        )
+        return "\n\n📊 [FACTUAL CHART & SWING HIGH/LOW DATA]:\n" + "\n".join(lines) + rule
+    else:
+        rule = (
+            "\n\n⚠️ QUY TẮC BẮT BUỘC VỀ ĐỈNH & ĐÁY BIỂU ĐỒ:\n"
+            "Khi phân tích cấu trúc thị trường, đỉnh/đáy, hỗ trợ/kháng cự, bạn BẮT BUỘC sử dụng CHÍNH XÁC "
+            "các mức giá Đỉnh và Đáy thực tế được cung cấp cụ thể ở trên. "
+            "TUYỆT ĐỐI KHÔNG tự bịa hoặc đoán mò giá đỉnh đáy khác xa với dữ liệu thật."
+        )
+        return "\n\n📊 [DỮ LIỆU ĐỈNH/ĐÁY VÀ CẤU TRÚC BIỂU ĐỒ THỰC TẾ]:\n" + "\n".join(lines) + rule
+
+
+# ==========================================
+# ==========================================
+# ==========================================
+# 6. NHẬN DIỆN FAIR VALUE GAP (FVG) CHUẨN XÁC THEO RÂU NẾN (WICKS)
+# ==========================================
+def detect_fair_value_gaps(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện chính xác 100% các khoảng trống giá Fair Value Gap (FVG) theo chuẩn ICT (Michael Huddleston)
+    dựa trên RÂU NẾN (WICKS) của Nến 1 và Nến 3, gắn tọa độ thời gian (timestamp) của 3 cây nến.
+    """
+    fvgs = []
+    if not klines or len(klines) < 3:
+        return fvgs
+
+    n = len(klines)
+    for i in range(1, n - 1):
+        c1 = klines[i - 1]
+        c2 = klines[i]
+        c3 = klines[i + 1]
+
+        h1, l1 = c1.get("high"), c1.get("low")
+        h3, l3 = c3.get("high"), c3.get("low")
+
+        if not all(isinstance(v, (int, float)) for v in [h1, l1, h3, l3]):
+            continue
+
+        # 1. Bullish FVG: Low of candle 3 > High of candle 1
+        # Nến 1 có Đỉnh râu (High) < Đáy râu Nến 3 (Low). Nến 2 tăng mạnh ở giữa tạo Displacement.
+        if l3 > h1:
+            gap_size = round(l3 - h1, 4)
+            ce = round((l3 + h1) / 2, 4)
+            fvgs.append({
+                "type": "Bullish FVG",
+                "top": l3,         # Đáy râu Nến 3
+                "bottom": h1,      # Đỉnh râu Nến 1
+                "midpoint_ce": ce, # 50% Consequent Encroachment
+                "gap_size": gap_size,
+                "candle_index": i,
+                "candles_ago": n - 1 - i,
+                "startTimestamp": c1.get("timestamp"),
+                "c1_timestamp": c1.get("timestamp"),
+                "c2_timestamp": c2.get("timestamp"),
+                "c3_timestamp": c3.get("timestamp"),
+                "c1_info": f"Nến 1 (t:{c1.get('timestamp')}) Đỉnh râu High = {h1}",
+                "c2_info": f"Nến 2 (t:{c2.get('timestamp')}) Thân tăng mạnh Displacement",
+                "c3_info": f"Nến 3 (t:{c3.get('timestamp')}) Đáy râu Low = {l3}",
+                "rule": f"Vùng FVG tăng chuẩn xác: Từ Đỉnh râu Nến 1 ({h1}) đến Đáy râu Nến 3 ({l3}). 50% C.E = {ce}."
+            })
+
+        # 2. Bearish FVG: High of candle 3 < Low of candle 1
+        # Nến 1 có Đáy râu (Low) > Đỉnh râu Nến 3 (High). Nến 2 giảm mạnh ở giữa tạo Displacement.
+        if h3 < l1:
+            gap_size = round(l1 - h3, 4)
+            ce = round((l1 + h3) / 2, 4)
+            fvgs.append({
+                "type": "Bearish FVG",
+                "top": l1,         # Đáy râu Nến 1
+                "bottom": h3,      # Đỉnh râu Nến 3
+                "midpoint_ce": ce,
+                "gap_size": gap_size,
+                "candle_index": i,
+                "candles_ago": n - 1 - i,
+                "startTimestamp": c1.get("timestamp"),
+                "c1_timestamp": c1.get("timestamp"),
+                "c2_timestamp": c2.get("timestamp"),
+                "c3_timestamp": c3.get("timestamp"),
+                "c1_info": f"Nến 1 (t:{c1.get('timestamp')}) Đáy râu Low = {l1}",
+                "c2_info": f"Nến 2 (t:{c2.get('timestamp')}) Thân giảm mạnh Displacement",
+                "c3_info": f"Nến 3 (t:{c3.get('timestamp')}) Đỉnh râu High = {h3}",
+                "rule": f"Vùng FVG giảm chuẩn xác: Từ Đỉnh râu Nến 3 ({h3}) đến Đáy râu Nến 1 ({l1}). 50% C.E = {ce}."
+            })
+
+    return fvgs
+
+# ==========================================
+# 7. NHẬN DIỆN ORDER BLOCK (OB) CHUẨN XÁC THEO ICT/SMC
+# ==========================================
+def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện chính xác 100% các vùng Order Block (OB) theo chuẩn ICT/SMC:
+    - Bullish OB: Cây nến GIẢM cuối cùng (close < open) trước cú bứt phá tăng mạnh (Displacement / FVG).
+      Tọa độ: Đỉnh râu nến (priceHigh) và Đáy râu nến (priceLow). Timestamp: Cây nến giảm này.
+    - Bearish OB: Cây nến TĂNG cuối cùng (close > open) trước cú bứt phá giảm mạnh (Displacement / FVG).
+      Tọa độ: Đỉnh râu nến (priceHigh) và Đáy râu nến (priceLow). Timestamp: Cây nến tăng này.
+    """
+    obs = []
+    if not klines or len(klines) < 3:
+        return obs
+
+    n = len(klines)
+    # Calculate average candle body size to detect strong displacement
+    bodies = [
+        abs(k.get("close", 0) - k.get("open", 0))
+        for k in klines
+        if isinstance(k.get("close"), (int, float)) and isinstance(k.get("open"), (int, float))
+    ]
+    avg_body = sum(bodies) / len(bodies) if bodies else 1.0
+
+    for i in range(1, n - 1):
+        prev_c = klines[i - 1]
+        curr_c = klines[i]
+
+        p_o, p_c = prev_c.get("open"), prev_c.get("close")
+        p_h, p_l = prev_c.get("high"), prev_c.get("low")
+        c_o, c_c = curr_c.get("open"), curr_c.get("close")
+        c_h, c_l = curr_c.get("high"), curr_c.get("low")
+
+        if not all(isinstance(v, (int, float)) for v in [p_o, p_c, p_h, p_l, c_o, c_c, c_h, c_l]):
+            continue
+
+        c_body = abs(c_c - c_o)
+        is_displacement = c_body >= avg_body * 1.15
+
+        # 1. Bullish Order Block (nến giảm trước cây nến tăng mạnh)
+        if p_c <= p_o and c_c > c_o and is_displacement:
+            ob_high = p_h
+            ob_low = p_l
+            ob_mean = round((ob_high + ob_low) / 2, 4)
+            obs.append({
+                "type": "Bullish Order Block (OB)",
+                "priceHigh": ob_high,
+                "priceLow": ob_low,
+                "bodyHigh": p_o,
+                "bodyLow": p_c,
+                "mean_threshold": ob_mean,
+                "startTimestamp": prev_c.get("timestamp"),
+                "c1_timestamp": prev_c.get("timestamp"),
+                "displacement_timestamp": curr_c.get("timestamp"),
+                "candle_index": i - 1,
+                "candles_ago": n - 1 - (i - 1),
+                "info": f"Nến giảm t:{prev_c.get('timestamp')} (High: {ob_high}, Low: {ob_low}, Open: {p_o}) trước cú tăng mạnh t:{curr_c.get('timestamp')}",
+                "rule": "Cây nến giảm cuối cùng trước nhịp tăng mạnh Displacement. Tọa độ bao trùm từ Đáy râu đến Đỉnh râu (hoặc Open)."
+            })
+
+        # 2. Bearish Order Block (nến tăng trước cây nến giảm mạnh)
+        if p_c >= p_o and c_c < c_o and is_displacement:
+            ob_high = p_h
+            ob_low = p_l
+            ob_mean = round((ob_high + ob_low) / 2, 4)
+            obs.append({
+                "type": "Bearish Order Block (OB)",
+                "priceHigh": ob_high,
+                "priceLow": ob_low,
+                "bodyHigh": p_c,
+                "bodyLow": p_o,
+                "mean_threshold": ob_mean,
+                "startTimestamp": prev_c.get("timestamp"),
+                "c1_timestamp": prev_c.get("timestamp"),
+                "displacement_timestamp": curr_c.get("timestamp"),
+                "candle_index": i - 1,
+                "candles_ago": n - 1 - (i - 1),
+                "info": f"Nến tăng t:{prev_c.get('timestamp')} (High: {ob_high}, Low: {ob_low}, Open: {p_o}) trước cú sập mạnh t:{curr_c.get('timestamp')}",
+                "rule": "Cây nến tăng cuối cùng trước nhịp giảm mạnh Displacement. Tọa độ bao trùm từ Đáy râu (hoặc Open) đến Đỉnh râu."
+            })
+
+    return obs

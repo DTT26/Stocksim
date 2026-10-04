@@ -9,7 +9,11 @@ from app.services.market_context_helper import (
     extract_relevant_stocks,
     classify_user_intent,
     get_all_methods_overview,
-    SYMBOL_ALIASES
+    SYMBOL_ALIASES,
+    extract_chart_swings_and_extrema,
+    format_detailed_chart_context,
+    detect_fair_value_gaps,
+    detect_order_blocks
 )
 from app.services.prop_firm_risk_tool import (
     extract_trade_intent,
@@ -25,7 +29,7 @@ from app.services.time_helper import (
 )
 from app.services.subscription_service import subscription_service
 from app.services.intent_router import route_question_intent
-from app.core.config import FREE_DAILY_LIMIT, PREMIUM_DAILY_LIMIT
+from app.core.config import FREE_DAILY_LIMIT, PREMIUM_DAILY_LIMIT, INSPECT_FREE_DAILY_LIMIT, INSPECT_PREMIUM_DAILY_LIMIT
 
 SIGNAL_KEYWORDS = [
   "có nên mua", "có nên bán", "buy hay sell", "mua hay bán", 
@@ -37,6 +41,59 @@ GREETING_KEYWORDS = [
   "hi", "hello", "chào", "xin chào", "hey", "halo", "alo", "chào bạn", "bạn là ai", 
   "who are you", "giới thiệu", "bạn làm được gì", "hướng dẫn", "bắt đầu", "help"
 ]
+
+
+ICT_SMC_CANONICAL_GUIDELINES = """
+==================================================
+📚 BỘ QUY CHUẨN ĐỊNH NGHĨA CHÍNH XÁC ICT / SMC (INNER CIRCLE TRADER & SMART MONEY CONCEPTS):
+==================================================
+Khi giải thích hoặc chấm bài bất kỳ khái niệm nào về ICT / SMC, bạn BẮT BUỘC phải tuân thủ 100% định nghĩa chuẩn xác sau:
+
+1. BSL (Buy-Side Liquidity - Thanh khoản Phía Mua):
+   - VỊ TRÍ: Luôn luôn nằm ở PHÍA TRÊN CÁC ĐỈNH (Old Highs, Swing Highs, Equal Highs - EQH, Previous Day High - PDH, Session Highs).
+   - BẢN CHẤT: Nơi tập trung các lệnh BUY STOP gồm Stop Loss của phe Short và Buy Stop của Breakout Traders.
+   - HÀNH VI SMART MONEY: Smart Money đẩy giá quét vượt đỉnh BSL để khớp lệnh BÁN (Short) của họ ở mức giá cao (Premium).
+   - TUYỆT ĐỐI KHÔNG NÓI: BSL là "lực mua" hay BSL nằm ở dưới đáy (sai hoàn toàn!).
+
+2. SSL (Sell-Side Liquidity - Thanh khoản Phía Bán):
+   - VỊ TRÍ: Luôn luôn nằm ở PHÍA DƯỚI CÁC ĐÁY (Old Lows, Swing Lows, Equal Lows - EQL, Previous Day Low - PDL, Session Lows).
+   - BẢN CHẤT: Nơi tập trung các lệnh SELL STOP gồm Stop Loss của phe Long và Sell Stop của Breakdown Traders.
+   - HÀNH VI SMART MONEY: Smart Money đẩy giá đâm thủng đáy SSL để khớp lệnh MUA (Long) của họ ở mức giá rẻ (Discount).
+   - TUYỆT ĐỐI KHÔNG NÓI: SSL là "lực bán" hay SSL nằm ở trên đỉnh (sai hoàn toàn!).
+
+3. LIQUIDITY SWEEP (Săn / Quét thanh khoản - Raid / Turtle Soup):
+   - Giá chỉ đâm râu nến (Wick) qua đỉnh BSL hoặc đáy SSL để gom thanh khoản rồi lập tức rút chân đóng nến quay ngược lại bên trong (SFP - Swing Failure Pattern) -> Tín hiệu chuẩn bị đảo chiều.
+   - Phân biệt với LIQUIDITY RUN (Expansion): Thân nến đóng cửa dứt khoát vượt qua kèm nến Displacement dài -> Bứt phá tiếp diễn xu hướng.
+
+4. ORDER BLOCK (OB - Khối lệnh của Smart Money):
+   - ĐỊNH NGHĨA & NGUYÊN TẮC BẮT BUỘC:
+     + Bullish Order Block (OB Tăng giá): Là CÂY NẾN GIẢM CUỐI CÙNG (Last Down-close Candle, close <= open) ngay trước nhịp tăng bứt phá với xung lượng cực mạnh (Displacement) tạo ra Fair Value Gap (FVG) và phá vỡ cấu trúc đỉnh (BOS / MSS).
+       * Tọa độ chuẩn xác: Lấy toàn bộ cây nến bao gồm cả râu nến (từ Đỉnh râu High / Open xuống Đáy râu Low).
+       * Mốc 50% Mean Threshold (M.T): Trung điểm (High + Low) / 2 của cây nến OB. Nếu giá hồi về test M.T rồi rút chân, OB giữ được sức mạnh lớn nhất.
+     + Bearish Order Block (OB Giảm giá): Là CÂY NẾN TĂNG CUỐI CÙNG (Last Up-close Candle, close >= open) ngay trước nhịp sập giảm với xung lượng cực mạnh (Displacement) tạo ra Fair Value Gap (FVG) và phá vỡ cấu trúc đáy (BOS / MSS).
+       * Tọa độ chuẩn xác: Lấy toàn bộ cây nến bao gồm cả râu nến (từ Đáy râu Low / Open lên Đỉnh râu High).
+       * Mốc 50% Mean Threshold (M.T): Trung điểm (High + Low) / 2 của cây nến OB.
+   - QUY TẮC CHẤM BÀI CHO ORDER BLOCK:
+     + Nếu học viên khoanh đúng cây nến giảm cuối cùng (với Bullish OB) hoặc cây nến tăng cuối cùng (với Bearish OB) trước nhịp sóng đẩy Displacement, học viên đã vẽ HOÀN TOÀN ĐÚNG CHUẨN XÁC 100% THEO ICT!
+     + KẾT LUẬN: ĐÚNG (Score: 85 - 100).
+     + CẤM TUYỆT ĐỐI không được bảo học viên vẽ sai khi họ đã xác định đúng cây nến cực trị này!
+
+5. FAIR VALUE GAP (FVG - Khoảng trống giá trị công bằng / Imbalance):
+   - ĐỊNH NGHĨA VÀ NGUYÊN TẮC BẮT BUỘC VỀ RÂU NẾN (WICKS):
+     + FVG xuất hiện trong chuỗi 3 nến liên tiếp [Nến 1, Nến 2, Nến 3]. Nến 2 là cây nến tăng/giảm cực mạnh (Displacement).
+     + VÙNG FVG ĐƯỢC XÁC ĐỊNH BỞI KHOẢNG TRỐNG GIỮA RÂU NẾN 1 VÀ RÂU NẾN 3. TUYỆT ĐỐI KHÔNG LẤY THEO THÂN NẾN!
+     + Bullish FVG (FVG Tăng giá): Biên dưới = Đỉnh râu cao nhất của Nến 1 (High Wick). Biên trên = Đáy râu thấp nhất của Nến 3 (Low Wick). Vùng giá giữa 2 đầu râu này chính là Bullish FVG.
+     + Bearish FVG (FVG Giảm giá): Biên trên = Đáy râu thấp nhất của Nến 1 (Low Wick). Biên dưới = Đỉnh râu cao nhất của Nến 3 (High Wick). Vùng giá giữa 2 đầu râu này chính là Bearish FVG.
+     + 50% Consequent Encroachment (C.E): Mốc cân bằng ở chính giữa 2 đầu râu nến: (Râu 1 + Râu 3) / 2.
+   - QUY TẮC CHẤM BÀI: Nếu học viên vẽ vùng FVG nối từ Râu Nến 1 đến Râu Nến 3, học viên vẽ HOÀN TOÀN CHUẨN XÁC 100% THEO ICT (Score: 90 - 100). Cấm trừ điểm vì không lấy theo thân nến!
+
+6. CẤU TRÚC THỊ TRƯỜNG (BOS vs CHoCH / MSS):
+   - BOS (Break of Structure - Phá vỡ cấu trúc tiếp diễn): Giá tiếp tục xu hướng cũ, thân nến đóng cửa vượt qua đỉnh cũ (Uptrend) hoặc đáy cũ (Downtrend).
+   - CHoCH / MSS (Change of Character / Market Structure Shift - Đảo chiều cấu trúc): Giá phá vỡ đỉnh dẫn tới đáy thấp nhất (chuyển từ Giảm sang Tăng) hoặc đáy dẫn tới đỉnh cao nhất (chuyển từ Tăng sang Giảm), mở ra chu kỳ mới kèm Displacement và FVG.
+
+7. BREAKER BLOCK & SUPPLY / DEMAND:
+   - Breaker Block: Một Order Block bị giá đâm xuyên qua không thể đỡ được giá (Failed OB), sau đó quay đầu test lại và đảo ngược vai trò từ Kháng cự thành Hỗ trợ hoặc ngược lại.
+   - Vùng Cung / Cầu (Supply / Demand): Vùng nến tích lũy cơ sở (Base) trước nhịp bứt phá mạnh (Rally/Drop)."""
 
 class AiTutorService:
     """
@@ -133,29 +190,38 @@ class AiTutorService:
         user_id = req.userId or (req.userData and req.userData.get("userId")) or "64f7b1e4a3b9c2d1e8f9a0b1"
         sub = subscription_service.get_or_create_subscription(user_id)
         plan = req.plan or sub.get("plan", "FREE")
-        limit = sub.get("daily_ai_limit", FREE_DAILY_LIMIT if plan == "FREE" else PREMIUM_DAILY_LIMIT)
-        used = sub.get("daily_ai_used", 0)
-
+        
         # 0.1 Scoring-based Question Intent Router (Sections 22 - 28)
         intent_info = route_question_intent(query)
         question_intent = intent_info["intent"]
         matched_tags = intent_info["matchedTags"]
 
-        if used >= limit:
-            limit_str = f"{used}/{limit}"
-            err_msg = (
-                f"⚠️ You have used up your {limit_str} free AI interactions for today!\nPlease upgrade to ✨ AI Tutor PRO to continue analyzing."
-                if is_en else
-                f"⚠️ Bạn đã sử dụng hết {limit_str} lượt tương tác AI miễn phí hôm nay!\nVui lòng nâng cấp lên gói ✨ AI Tutor PRO để tiếp tục phân tích."
-            )
-            return {
-                "success": False,
-                "intent": question_intent,
-                "message": err_msg,
-                "guardrailTriggered": "QUOTA_EXCEEDED",
-                "remainingToday": 0,
-                "plan": plan
-            }
+        limit = 999999
+        used = 0
+        if plan != "PRO":
+            limit = sub.get("monthly_chat_limit", 300) if plan in ["PLUS", "PREMIUM"] else sub.get("daily_ai_limit", FREE_DAILY_LIMIT)
+            used = sub.get("monthly_chat_used", 0) if plan in ["PLUS", "PREMIUM"] else sub.get("daily_ai_used", 0)
+            if used >= limit:
+                if plan in ["PLUS", "PREMIUM"]:
+                    err_msg = (
+                        "⚠️ You have used up your 300 chat quota for this month! Please upgrade to ✨ AI Tutor PRO for unlimited chat."
+                        if is_en else
+                        "⚠️ Bạn đã sử dụng hết 300/300 lượt chat của gói PLUS trong tháng này!\nVui lòng nâng cấp lên gói ✨ AI Tutor PRO để trò chuyện không giới hạn."
+                    )
+                else:
+                    err_msg = (
+                        f"⚠️ You have used up your {used}/{limit} free AI interactions for today!\nPlease upgrade to PLUS (129k - 300 chats) or PRO (299k - Unlimited)."
+                        if is_en else
+                        f"⚠️ Bạn đã sử dụng hết {used}/{limit} lượt tương tác AI miễn phí hôm nay!\nVui lòng nâng cấp gói PLUS (129k - 300 lượt) hoặc PRO (299k - Không giới hạn)."
+                    )
+                return {
+                    "success": False,
+                    "intent": question_intent,
+                    "message": err_msg,
+                    "guardrailTriggered": "QUOTA_EXCEEDED",
+                    "remainingToday": 0,
+                    "plan": plan
+                }
 
         # 1. Kích hoạt Strict Signal Guardrail trước mọi luồng xử lý (kể cả khi có LLM)
         # Ngăn chặn hoàn toàn prompt injection hoặc yêu cầu phím lệnh trực tiếp
@@ -271,11 +337,13 @@ class AiTutorService:
                 "\n\n==================================================\n"
                 "🕒 THỜI GIAN THỰC TẾ HỆ THỐNG & PHIÊN GIAO DỊCH (REAL-TIME CLOCK):\n"
                 "==================================================\n"
-                f"- Giờ Việt Nam (Chuẩn chính hệ thống): {time_ctx['vn_time']}\n"
+                f"- Giờ & Ngày Việt Nam (Chuẩn chính hệ thống): {time_ctx['vn_time']}\n"
                 f"- Giờ Quốc tế (UTC): {time_ctx['utc_time']}\n"
                 f"- Giờ New York (Wall Street): {time_ctx['ny_time']}\n"
                 f"- Phiên thị trường hiện tại: {time_ctx['active_session']}\n"
-                f"- Trạng thái Killzone ICT: {time_ctx['active_killzone']}"
+                f"- Trạng thái Killzone ICT: {time_ctx['active_killzone']}\n"
+                "QUY TẮC BẮT BUỘC: Khi học viên hỏi về thời gian, ngày hôm nay, thứ mấy hoặc năm nay, bạn BẮT BUỘC sử dụng "
+                f"CHÍNH XÁC thời gian thực tế ở trên ({time_ctx['vn_time']}). TUYỆT ĐỐI KHÔNG dùng thời gian cũ trong dữ liệu training (như năm 2023)."
             )
 
             # Tiered Prompting (Section 33: FREE vs PREMIUM)
@@ -328,7 +396,7 @@ class AiTutorService:
                 "==================================================\n"
                 "PHƯƠNG PHÁP ĐƯỢC KÍCH HOẠT CHO CÂU HỎI HIỆN TẠI:\n"
                 "==================================================\n"
-                f"{intent_guidance}\n\n"
+                f"{intent_guidance}\n\n" + f"{ICT_SMC_CANONICAL_GUIDELINES}\n\n"
                 f"{tiered_prompt_section}\n\n"
                 "YÊU CẦU BẮT BUỘC:\n"
                 "1. Tuân thủ nghiêm ngặt các mục trong [Các yếu tố bắt buộc phân tích] và [Quy chuẩn phản hồi] của phương pháp trên.\n"
@@ -382,24 +450,14 @@ class AiTutorService:
                     if history_lines:
                         chat_history_str = "\n\n💬 [LỊCH SỬ HỘI THOẠI GẦN ĐÂY ĐỂ TRẢ LỜI LIÊN TIẾP]:\n" + "\n".join(history_lines)
 
-            # 1. Mã hiện tại đang xem trên biểu đồ
-            current_chart_str = ""
-            if req.symbol or req.currentPrice is not None:
-                market_lines = []
-                if req.symbol:
-                    market_lines.append(f"- Mã tài sản đang mở biểu đồ: {req.symbol}")
-                if req.currentPrice is not None:
-                    formatted_p = f"{req.currentPrice:,.4f}".rstrip('0').rstrip('.') if req.currentPrice < 1 else f"{req.currentPrice:,.2f}"
-                    market_lines.append(f"- Giá thị trường thực tế: ${formatted_p}")
-                if req.timeframe:
-                    market_lines.append(f"- Khung thời gian biểu đồ người dùng đang xem: {req.timeframe}")
-                if req.marketContext:
-                    mc = req.marketContext
-                    if mc.get("change24h") is not None:
-                        market_lines.append(f"- Biến động 24h: {mc.get('change24h')}%")
-                    if mc.get("exchange"):
-                        market_lines.append(f"- Sàn giao dịch: {mc.get('exchange')}")
-                current_chart_str = "\n\n📊 [BIỂU ĐỒ ĐANG XEM]:\n" + "\n".join(market_lines)
+            # 1. Mã hiện tại và cấu trúc Đỉnh/Đáy thực tế trên biểu đồ
+            current_chart_str = format_detailed_chart_context(
+                symbol=req.symbol,
+                current_price=req.currentPrice,
+                timeframe=req.timeframe,
+                market_context=req.marketContext,
+                is_en=is_en
+            )
 
             # 2. Bảng giá lọc thông minh (chỉ nạp 3-5 mã liên quan, chống tràn token & giảm độ trễ)
             all_stocks_str = ""
@@ -499,6 +557,7 @@ class AiTutorService:
                     "success": True,
                     "intent": question_intent,
                     "answer": llm_answer,
+                    "provider": llm_client.active_provider or llm_client.preferred_provider or "openai",
                     "plan": plan,
                     "dailyAiUsed": new_used,
                     "dailyAiLimit": limit,
@@ -811,32 +870,39 @@ class AiTutorService:
         lang = getattr(req, "lang", None) or "vi"
         is_en = str(lang).lower().startswith("en")
 
-        # 0. User Subscription & Daily Quota Guardrail Check
+        # 0. User Subscription & Quota Guardrail Check
         user_id = req.userId or (req.userData and req.userData.get("userId")) or "64f7b1e4a3b9c2d1e8f9a0b1"
         sub = subscription_service.get_or_create_subscription(user_id)
         plan = req.plan or sub.get("plan", "FREE")
-        limit = sub.get("daily_ai_limit", FREE_DAILY_LIMIT if plan == "FREE" else PREMIUM_DAILY_LIMIT)
-        used = sub.get("daily_ai_used", 0)
 
         intent_info = route_question_intent(query)
         question_intent = intent_info["intent"]
 
-        if used >= limit:
-            limit_str = f"{used}/{limit}"
-            err_msg = (
-                f"⚠️ You have used up your {limit_str} free AI interactions for today!\nPlease upgrade to ✨ AI Tutor PRO to continue analyzing."
-                if is_en else
-                f"⚠️ Bạn đã sử dụng hết {limit_str} lượt tương tác AI miễn phí hôm nay!\nVui lòng nâng cấp lên gói ✨ AI Tutor PRO để tiếp tục phân tích."
-            )
-            err_payload = {
-                "type": "error",
-                "message": err_msg,
-                "guardrailTriggered": "QUOTA_EXCEEDED",
-                "remainingToday": 0,
-                "plan": plan
-            }
-            yield f"data: {json.dumps(err_payload, ensure_ascii=False)}\n\n"
-            return
+        if plan != "PRO":
+            limit = sub.get("monthly_chat_limit", 300) if plan in ["PLUS", "PREMIUM"] else sub.get("daily_ai_limit", FREE_DAILY_LIMIT)
+            used = sub.get("monthly_chat_used", 0) if plan in ["PLUS", "PREMIUM"] else sub.get("daily_ai_used", 0)
+            if used >= limit:
+                if plan in ["PLUS", "PREMIUM"]:
+                    err_msg = (
+                        "⚠️ You have used up your 300 chat quota for this month! Please upgrade to ✨ AI Tutor PRO for unlimited chat."
+                        if is_en else
+                        "⚠️ Bạn đã sử dụng hết 300/300 lượt chat của gói PLUS trong tháng này!\nVui lòng nâng cấp lên gói ✨ AI Tutor PRO để trò chuyện không giới hạn."
+                    )
+                else:
+                    err_msg = (
+                        f"⚠️ You have used up your {used}/{limit} free AI interactions for today!\nPlease upgrade to PLUS (129k - 300 chats) or PRO (299k - Unlimited)."
+                        if is_en else
+                        f"⚠️ Bạn đã sử dụng hết {used}/{limit} lượt tương tác AI miễn phí hôm nay!\nVui lòng nâng cấp gói PLUS (129k - 300 lượt) hoặc PRO (299k - Không giới hạn)."
+                    )
+                err_payload = {
+                    "type": "error",
+                    "message": err_msg,
+                    "guardrailTriggered": "QUOTA_EXCEEDED",
+                    "remainingToday": 0,
+                    "plan": plan
+                }
+                yield f"data: {json.dumps(err_payload, ensure_ascii=False)}\n\n"
+                return
 
         # 1. Kích hoạt Strict Signal Guardrail
         strict_guard = check_strict_signal_guardrail(query, req.symbol, lang=lang)
@@ -950,11 +1016,13 @@ class AiTutorService:
                 "\n\n==================================================\n"
                 "🕒 THỜI GIAN THỰC TẾ HỆ THỐNG & PHIÊN GIAO DỊCH (REAL-TIME CLOCK):\n"
                 "==================================================\n"
-                f"- Giờ Việt Nam (Chuẩn chính hệ thống): {time_ctx['vn_time']}\n"
+                f"- Giờ & Ngày Việt Nam (Chuẩn chính hệ thống): {time_ctx['vn_time']}\n"
                 f"- Giờ Quốc tế (UTC): {time_ctx['utc_time']}\n"
                 f"- Giờ New York (Wall Street): {time_ctx['ny_time']}\n"
                 f"- Phiên thị trường hiện tại: {time_ctx['active_session']}\n"
-                f"- Trạng thái Killzone ICT: {time_ctx['active_killzone']}"
+                f"- Trạng thái Killzone ICT: {time_ctx['active_killzone']}\n"
+                "QUY TẮC BẮT BUỘC: Khi học viên hỏi về thời gian, ngày hôm nay, thứ mấy hoặc năm nay, bạn BẮT BUỘC sử dụng "
+                f"CHÍNH XÁC thời gian thực tế ở trên ({time_ctx['vn_time']}). TUYỆT ĐỐI KHÔNG dùng thời gian cũ trong dữ liệu training (như năm 2023)."
             )
 
             if plan == "PREMIUM":
@@ -1002,7 +1070,7 @@ class AiTutorService:
                 "Bạn có quyền truy cập ĐẦY ĐỦ VÀO DATABASE HỆ THỐNG gồm:\n"
                 "1. Bảng giá thời gian thực của các mã tài sản trên hệ thống liên quan đến câu hỏi.\n"
                 "2. Toàn bộ dữ liệu tài khoản của học viên trong Database.\n\n"
-                f"{intent_guidance}\n\n"
+                f"{intent_guidance}\n\n" + f"{ICT_SMC_CANONICAL_GUIDELINES}\n\n"
                 f"{tiered_prompt_section}\n\n"
                 "YÊU CẦU BẮT BUỘC:\n"
                 "1. Tuân thủ nghiêm ngặt phương pháp trên.\n"
@@ -1040,23 +1108,13 @@ class AiTutorService:
                     if history_lines:
                         chat_history_str = "\n\n💬 [LỊCH SỬ HỘI THOẠI GẦN ĐÂY ĐỂ TRẢ LỜI LIÊN TIẾP]:\n" + "\n".join(history_lines)
 
-            current_chart_str = ""
-            if req.symbol or req.currentPrice is not None:
-                market_lines = []
-                if req.symbol:
-                    market_lines.append(f"- Mã tài sản đang mở biểu đồ: {req.symbol}")
-                if req.currentPrice is not None:
-                    formatted_p = f"{req.currentPrice:,.4f}".rstrip('0').rstrip('.') if req.currentPrice < 1 else f"{req.currentPrice:,.2f}"
-                    market_lines.append(f"- Giá thị trường thực tế: ${formatted_p}")
-                if req.timeframe:
-                    market_lines.append(f"- Khung thời gian: {req.timeframe}")
-                if req.marketContext:
-                    mc = req.marketContext
-                    if mc.get("change24h") is not None:
-                        market_lines.append(f"- Biến động 24h: {mc.get('change24h')}%")
-                    if mc.get("exchange"):
-                        market_lines.append(f"- Sàn giao dịch: {mc.get('exchange')}")
-                current_chart_str = "\n\n📊 [BIỂU ĐỒ ĐANG XEM]:\n" + "\n".join(market_lines)
+            current_chart_str = format_detailed_chart_context(
+                symbol=req.symbol,
+                current_price=req.currentPrice,
+                timeframe=req.timeframe,
+                market_context=req.marketContext,
+                is_en=is_en
+            )
 
             all_stocks_str = ""
             relevant_stocks = extract_relevant_stocks(
@@ -1149,6 +1207,7 @@ class AiTutorService:
                 "remainingToday": remaining,
                 "concept": concept_val,
                 "framework": framework_val,
+                "provider": llm_client.preferred_provider or "openai",
                 "sources": citations
             }
             yield f"data: {json.dumps(meta_data, ensure_ascii=False)}\n\n"
@@ -1168,55 +1227,89 @@ class AiTutorService:
             except Exception as stream_err:
                 print(f"Error during stream generation: {stream_err}")
 
-            # If stream produced no tokens, fallback to regular generate_text
+            # If stream produced no tokens, fallback to regular generate_text or static knowledge base
             if not streamed_tokens:
                 fallback_text = llm_client.generate_text(sys_prompt, user_p, max_tokens=max_out)
                 if fallback_text:
                     streamed_tokens.append(fallback_text)
                     yield f"data: {json.dumps({'type': 'token', 'token': fallback_text}, ensure_ascii=False)}\n\n"
                 else:
-                    subscription_service.rollback_quota_slot(user_id)
-                    yield f"data: {json.dumps({'type': 'error', 'message': 'Không thể kết nối tới mô hình AI. Vui lòng thử lại.'}, ensure_ascii=False)}\n\n"
-                    return
+                    # Seamlessly fall back to verified Knowledge Base without cutting off user
+                    print("LLM stream and generate_text produced empty output, falling back to Knowledge Base")
+                    offline_res = self.answer_question(req)
+                    ans = offline_res.get("answer") or offline_res.get("message")
+                    if not ans and results:
+                        primary_doc = results[0].document
+                        ans = f"### {primary_doc.concept} ({primary_doc.framework})\n\n{primary_doc.content}"
+                    elif not ans:
+                        ans = (
+                            "AI Tutor đang kết nối dữ liệu. Bạn có thể hỏi về các khái niệm như FVG, Order Block, Liquidity Sweep, hoặc nhờ phân tích vị thế hiện tại."
+                            if not is_en else
+                            "AI Tutor is syncing data. Feel free to ask about FVG, Order Block, Liquidity Sweeps, or risk sizing."
+                        )
+                    words = ans.split(" ")
+                    for i, w in enumerate(words):
+                        chunk = w + (" " if i < len(words) - 1 else "")
+                        streamed_tokens.append(chunk)
+                        yield f"data: {json.dumps({'type': 'token', 'token': chunk}, ensure_ascii=False)}\n\n"
 
             full_answer = "".join(streamed_tokens)
+            provider_val = llm_client.active_provider or llm_client.preferred_provider or "openai"
             done_payload = {
                 "type": "done",
                 "answer": full_answer,
                 "concept": concept_val,
                 "framework": framework_val,
+                "provider": provider_val,
                 "sources": citations,
                 "socraticQuestions": []
             }
             yield f"data: {json.dumps(done_payload, ensure_ascii=False)}\n\n"
             return
 
-        # 4. Fallback when LLM is offline: Call static answer_question and stream it as a single chunk
+        # 4. Fallback when LLM is offline: Call static answer_question and stream it smoothly
         offline_res = self.answer_question(req)
-        ans = offline_res.get("answer", "")
+        ans = offline_res.get('answer') or offline_res.get('message') or ''
+        if not ans and results:
+            primary_doc = results[0].document
+            ans = f'### {primary_doc.concept} ({primary_doc.framework})\n\n' + primary_doc.content
+        elif not ans:
+            ans = (
+                'AI Tutor sẵn sàng giải đáp kiến thức ICT/SMC, Price Action và quản trị rủi ro cho bạn. Hãy gõ câu hỏi để bắt đầu nhé!'
+                if not is_en else
+                'AI Tutor is ready to guide you on ICT/SMC, Price Action, and risk management. Type a question to begin!'
+            )
+
+        provider_val = offline_res.get('provider') or ('openai' if llm_client.is_configured() else 'knowledge_base')
         meta_data = {
-            "type": "meta",
-            "intent": offline_res.get("intent", question_intent),
-            "plan": offline_res.get("plan", plan),
-            "dailyAiUsed": offline_res.get("dailyAiUsed", used),
-            "dailyAiLimit": limit,
-            "remainingToday": offline_res.get("remainingToday", max(0, limit - used)),
-            "concept": offline_res.get("concept", "AI Trading Tutor"),
-            "framework": offline_res.get("framework", "OFFLINE"),
-            "sources": offline_res.get("sources", citations)
+            'type': 'meta',
+            'intent': offline_res.get('intent', question_intent),
+            'plan': offline_res.get('plan', plan),
+            'dailyAiUsed': offline_res.get('dailyAiUsed', used),
+            'dailyAiLimit': limit,
+            'remainingToday': offline_res.get('remainingToday', max(0, limit - used)),
+            'concept': offline_res.get('concept', 'AI Trading Tutor'),
+            'framework': offline_res.get('framework', 'VIP_LLM' if provider_val == 'openai' else 'OFFLINE'),
+            'provider': provider_val,
+            'sources': offline_res.get('sources', citations)
         }
-        yield f"data: {json.dumps(meta_data, ensure_ascii=False)}\n\n"
-        if ans:
-            yield f"data: {json.dumps({'type': 'token', 'token': ans}, ensure_ascii=False)}\n\n"
+        yield f'data: {json.dumps(meta_data, ensure_ascii=False)}\n\n'
+
+        words = ans.split(' ')
+        for i, w in enumerate(words):
+            chunk = w + (' ' if i < len(words) - 1 else '')
+            yield f'data: {json.dumps({"type": "token", "token": chunk}, ensure_ascii=False)}\n\n'
+
         done_payload = {
-            "type": "done",
-            "answer": ans,
-            "concept": offline_res.get("concept"),
-            "framework": offline_res.get("framework"),
-            "sources": offline_res.get("sources", []),
-            "socraticQuestions": offline_res.get("socraticQuestions", [])
+            'type': 'done',
+            'answer': ans,
+            'provider': provider_val,
+            'concept': offline_res.get('concept'),
+            'framework': offline_res.get('framework'),
+            'sources': offline_res.get('sources', []),
+            'socraticQuestions': offline_res.get('socraticQuestions', [])
         }
-        yield f"data: {json.dumps(done_payload, ensure_ascii=False)}\n\n"
+        yield f'data: {json.dumps(done_payload, ensure_ascii=False)}\n\n'
 
     def inspect_chart_vision(
         self,
@@ -1224,7 +1317,10 @@ class AiTutorService:
         symbol: Optional[str] = None,
         timeframe: Optional[str] = None,
         user_notes: str = "",
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        lang: str = "vi",
+        klines: Optional[List[Dict[str, Any]]] = None,
+        market_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Multimodal Chart Vision Inspector & Grader.
@@ -1232,49 +1328,65 @@ class AiTutorService:
         grade theory accuracy (ICT/SMC/Price Action), evaluate real-world trade quality,
         and provide corrections.
         """
-        # 1. Quota check if user_id is provided
-        remaining_today = PREMIUM_DAILY_LIMIT
+        # 1. Atomic Quota check & reservation for Chart Vision Inspection
+        remaining_today = 999999
         is_premium = False
+        is_en = str(lang).lower().startswith("en")
         if user_id:
-            try:
-                sub_status = subscription_service.get_user_subscription(user_id)
-                is_premium = sub_status.get("is_premium", False)
-                daily_limit = PREMIUM_DAILY_LIMIT if is_premium else FREE_DAILY_LIMIT
-                used = sub_status.get("daily_ai_used", 0)
-                if used >= daily_limit:
-                    return {
-                        "success": False,
-                        "quotaExceeded": True,
-                        "message": (
-                            f"Bạn đã sử dụng hết hạn mức AI hôm nay ({used}/{daily_limit} lượt). "
-                            "Hãy nâng cấp lên gói PRO để mở khóa 500 lượt soi chart mỗi ngày!"
-                        )
-                    }
-                subscription_service.increment_ai_usage(user_id)
-                remaining_today = max(0, daily_limit - (used + 1))
-            except Exception as ex:
-                print(f"Error checking quota for chart inspection: {ex}")
+            reserved, sub_record = subscription_service.reserve_inspect_slot(user_id)
+            plan = (sub_record or {}).get("plan", "FREE")
+            is_premium = plan in ["PLUS", "PRO", "PREMIUM"]
+            if not reserved:
+                if plan in ["PLUS", "PREMIUM"]:
+                    msg = (
+                        "⚠️ You have used up your 150 chart evaluation quota for this month! Upgrade to PRO for unlimited evaluations."
+                        if is_en else
+                        "⚠️ Bạn đã sử dụng hết 150/150 lượt Chấm Bài của gói PLUS trong tháng này! Nâng cấp gói PRO VIP để chấm bài không giới hạn."
+                    )
+                else:
+                    msg = (
+                        "⚠️ You have used your daily chart evaluation quota (2/2). Upgrade to PLUS (150/mo) or PRO (Unlimited)!"
+                        if is_en else
+                        "⚠️ Bạn đã dùng hết 2/2 lượt Chấm Bài miễn phí hôm nay. Nâng cấp gói PLUS (129k - 150 bài) hoặc PRO (299k - Không giới hạn)!"
+                    )
+                return {
+                    "success": False,
+                    "quotaExceeded": True,
+                    "message": msg
+                }
+            if plan == "PRO":
+                remaining_today = 999999
+            elif plan in ["PLUS", "PREMIUM"]:
+                remaining_today = max(0, sub_record.get("monthly_inspect_limit", 150) - sub_record.get("monthly_inspect_used", 0))
+            else:
+                remaining_today = max(0, sub_record.get("daily_inspect_limit", 2) - sub_record.get("daily_inspect_used", 0))
 
         # 2. System prompt
         system_prompt = (
+            f"{ICT_SMC_CANONICAL_GUIDELINES}\n\n" +
+            
             "Bạn là Chuyên gia Cao cấp Đào tạo Phân tích Kỹ thuật và Huấn luyện viên Chiến lược Thực chiến "
             "(Senior Quantitative & Technical Analyst Tutor, chuyên sâu về Price Action, ICT - Inner Circle Trader, SMC - Smart Money Concepts, Wyckoff).\n"
             "Nhiệm vụ của bạn là soi kỹ ảnh chụp màn hình biểu đồ nến mà học viên cung cấp, đặc biệt chú ý đến:\n"
             "- Các vùng hình hộp chữ nhật (Box / Zone), đường kẻ (Trendline, Support/Resistance), mũi tên hoặc ghi chú mà học viên ĐÃ VẼ trên biểu đồ.\n"
             "- Cấu trúc giá hiện tại (Đỉnh/Đáy, Swing High/Low, Cấu trúc xu hướng tăng/giảm).\n"
-            "- Các khái niệm ICT/SMC: Order Block (OB), Fair Value Gap (FVG), Imbalance, Liquidity Sweep (BSL / SSL), Change of Character (CHoCH), Break of Structure (BOS), Premium vs Discount.\n\n"
+            "- Các khái niệm ICT/SMC: Order Block (OB), Fair Value Gap (FVG), Imbalance, Liquidity Sweep (BSL nằm trên Đỉnh, SSL nằm dưới Đáy), CHoCH, BOS, Premium vs Discount.\n- QUY TẮC BẮT BUỘC VỀ FAIR VALUE GAP (FVG): Biên độ FVG BẮT BUỘC ĐO THEO RÂU NẾN (WICKS) CỦA NẾN 1 VÀ NẾN 3. TUYỆT ĐỐI KHÔNG ĐƯỢC LẤY THEO THÂN NẾN! Nếu học viên vẽ khớp với khoảng trống giữa râu nến 1 và râu nến 3 thì học viên vẽ HOÀN TOÀN ĐÚNG CHUẨN.\n- BẮT BUỘC TUÂN THỦ NGUYÊN TẮC: BSL (Buy-Side Liquidity) luôn ở trên ĐỈNH (chứa Buy Stop của phe Short và Breakout). SSL (Sell-Side Liquidity) luôn ở dưới ĐÁY (chứa Sell Stop của phe Long và Breakdown).\n\n"
             "Hãy trả lời theo cấu trúc Markdown rõ ràng, chuẩn sư phạm, truyền cảm hứng và sắc sảo như sau:\n\n"
-            "### 1. Đánh giá sơ bộ về hình thức lý thuyết\n"
-            "- Kết luận rõ ràng: Bạn vẽ **ĐÚNG** hay **SAI / CHƯA CHUẨN**?\n"
-            "- Nhận diện đúng học viên đã khoanh vùng nến/vùng giá nào (ví dụ: cây nến tăng cuối cùng trước khi một nhịp sập mạnh - Bearish Displacement, hay vùng FVG).\n\n"
+            "### 1. Đánh giá sơ bộ & Chẩn đoán chi tiết từng hình vẽ\n"
+            "- **Kết luận tổng quan:** Nêu rõ học viên vẽ **ĐÚNG**, **ĐÚNG MỘT PHẦN** hay **CHƯA ĐÚNG**?\n"
+            "- **Chẩn đoán từng vùng vẽ cụ thể (NẾU SAI, BẮT BUỘC CHỈ RÕ CÁI NÀO SAI VÀ TẠI SAO SAI):**\n"
+            "  * **Vùng nào SAI hoặc CHƯA CHUẨN:** Chỉ rõ vùng vẽ/hình hộp/đường kẻ nào trên ảnh đang sai.\n"
+            "  * **Lý do sai cụ thể & Điểm mấu chốt:** Nêu rõ nguyên nhân cốt lõi (ví dụ: (1) Khoanh nhầm cây nến giữa sóng thay vì nến cực trị trước Displacement; (2) Thiếu Fair Value Gap (FVG) hợp lệ; (3) Tọa độ vẽ lơ lửng, không bao trùm râu nến cao nhất/thấp nhất; hoặc (4) Đây chỉ là bẫy thanh khoản Inducement dụ dỗ chứ không phải vùng tích lũy của Smart Money).\n"
+            "  * **Hậu quả nếu giao dịch:** Sẽ bị dính Stop Loss oan hoặc rủi ro R:R cực xấu ra sao.\n\n"
             "### 2. Lăng kính thực chiến chuyên sâu (Độ tin cậy & Xác suất)\n"
-            "- **Phân loại vùng:** Đây là vùng Tiếp diễn (Continuation OB/FVG) hay vùng Cực trị / Gốc (Extreme / Original)?\n"
-            "- **Chất lượng sóng đẩy:** Nhịp Displacement có đủ mạnh không? Có tạo ra FVG (Imbalance) đi kèm không?\n"
-            "- **Thanh khoản & Bẫy giá:** Có hiện tượng Quét thanh khoản (Liquidity Sweep) đỉnh/đáy trước đó không? Có nguy cơ là bẫy Smart Money Trap (SMT) hay thanh khoản dụ dỗ (Inducement) không?\n\n"
-            "### 3. Vùng chuẩn xác nhất theo Smart Money\n"
-            "- Chỉ rõ mức giá hoặc vùng nến mà theo ICT/SMC là nơi an toàn và có tỷ lệ Risk:Reward tối ưu nhất (ví dụ: đỉnh/đáy cực trị nào, mức giá cụ thể nào trên chart).\n\n"
-            "### 4. 💡 Bài học thực chiến cốt lõi\n"
-            "- Tóm tắt 1-2 lời khuyên thực chiến ngắn gọn giúp học viên không bị thị trường lừa.\n\n"
+            "- **Phân loại vùng:** Vùng Tiếp diễn (Continuation) hay Cực trị (Extreme)?\n"
+            "- **Chất lượng sóng đẩy:** Nhịp Displacement có đủ mạnh không? Có tạo ra FVG đi kèm không?\n"
+            "- **Thanh khoản & Bẫy giá:** Đã có Liquidity Sweep đỉnh BSL hoặc đáy SSL chưa? Có nguy cơ là bẫy Smart Money Trap (SMT) hay Inducement không?\n\n"
+            "### 3. Vùng chuẩn xác nhất theo Smart Money (Sửa lại cho đúng)\n"
+            "- Chỉ rõ tên vùng chuẩn, khoảng giá nến chuẩn (từ giá thấp đến giá cao) và lý giải ngắn gọn vì sao vùng này mới là tối ưu.\n\n"
+            "### 4. 💡 Kết luận & Bài học thực chiến cốt lõi (Học viên rút ra kinh nghiệm)\n"
+            "- **Bài học rút ra:** 1-2 nguyên tắc vàng giúp học viên tự kiểm tra để lần sau KHÔNG vẽ sai nữa (Ví dụ: 'Luôn tìm FVG trước, sau đó mới dóng ngược lại cây nến trước FVG để xác định Order Block').\n"
+            "- **Kế hoạch hành động:** Chờ điều kiện gì xuất hiện mới kích hoạt lệnh.\n\n"
             "### 5. Điểm số đánh giá\n"
             "- Cho điểm số theo thang điểm 100 (Ví dụ: **Điểm đánh giá: 85/100**)."
         )
@@ -1286,6 +1398,18 @@ class AiTutorService:
             user_prompt += f"\nGhi chú/Nhận định của học viên: {user_notes}"
         else:
             user_prompt += "\nHãy kiểm tra xem các vùng tôi đã vẽ trên biểu đồ (Order Block, FVG, Hỗ trợ/Kháng cự...) đã chính xác chưa và nhận xét chi tiết giúp tôi."
+
+        # Inject factual ground truth price & swing high/low data to Gemini Vision prompt
+        factual_chart_str = format_detailed_chart_context(
+            symbol=symbol,
+            current_price=(market_context or {}).get("currentPrice"),
+            timeframe=timeframe,
+            market_context=market_context,
+            klines=klines,
+            is_en=is_en
+        )
+        if factual_chart_str:
+            user_prompt += "\n" + factual_chart_str
 
         # 3. Call Vision
         analysis = llm_client.generate_vision_text(
@@ -1314,6 +1438,68 @@ class AiTutorService:
         if "CHƯA ĐÚNG" in analysis[:300].upper() or "SAI" in analysis[:300].upper():
             verdict = "INCORRECT"
 
+                # Bind exact candle timestamps and coordinates to suggested_zone for OB, FVG, and Liquidity!
+        if suggested_zone:
+            z_high = float(suggested_zone.get("priceHigh", 0))
+            z_low = float(suggested_zone.get("priceLow", 0))
+            z_type = str(suggested_zone.get("type", "")).upper()
+            first_label = str(first_draw.get("label", "") + " " + first_draw.get("name", "") + " " + first_draw.get("tag", "")).upper()
+
+            matched = False
+
+            # Case A: If user or AI zone is an Order Block (OB)
+            if "ORDER BLOCK" in z_type or "OB" in z_type or "ORDER BLOCK" in first_label or "OB" in first_label:
+                matched_ob = None
+                if detected_obs:
+                    for ob in detected_obs:
+                        ob_h = float(ob.get("priceHigh", 0))
+                        ob_l = float(ob.get("priceLow", 0))
+                        # Match if price ranges overlap within 5% tolerance
+                        if abs(ob_h - z_high) / max(1.0, z_high) < 0.06 and abs(ob_l - z_low) / max(1.0, z_low) < 0.06:
+                            matched_ob = ob
+                            break
+                    if not matched_ob and detected_obs:
+                        # Match closest OB to user drawing center
+                        u_mid = (z_high + z_low) / 2
+                        matched_ob = min(detected_obs, key=lambda o: abs((o['priceHigh'] + o['priceLow'])/2 - u_mid))
+
+                if matched_ob:
+                    suggested_zone["type"] = matched_ob["type"]
+                    suggested_zone["priceHigh"] = matched_ob["priceHigh"]
+                    suggested_zone["priceLow"] = matched_ob["priceLow"]
+                    suggested_zone["startTimestamp"] = matched_ob["startTimestamp"]
+                    u_end = first_draw.get("timeEnd")
+                    suggested_zone["endTimestamp"] = u_end or (klines[-1].get("timestamp") if klines else None)
+                    matched = True
+
+            # Case B: If user or AI zone is a Fair Value Gap (FVG)
+            if not matched and ("FVG" in z_type or "FAIR VALUE" in z_type or "FVG" in first_label or "GAP" in first_label):
+                matched_fvg = None
+                if detected_fvgs:
+                    for fvg in detected_fvgs:
+                        f_top = float(fvg.get("top", 0))
+                        f_bot = float(fvg.get("bottom", 0))
+                        if abs(f_top - z_high) / max(1.0, z_high) < 0.06 and abs(f_bot - z_low) / max(1.0, z_low) < 0.06:
+                            matched_fvg = fvg
+                            break
+                    if not matched_fvg and detected_fvgs:
+                        u_mid = (z_high + z_low) / 2
+                        matched_fvg = min(detected_fvgs, key=lambda f: abs((f['top'] + f['bottom'])/2 - u_mid))
+
+                if matched_fvg:
+                    suggested_zone["type"] = matched_fvg["type"]
+                    suggested_zone["priceHigh"] = matched_fvg["top"]
+                    suggested_zone["priceLow"] = matched_fvg["bottom"]
+                    suggested_zone["startTimestamp"] = matched_fvg["startTimestamp"]
+                    u_end = first_draw.get("timeEnd")
+                    suggested_zone["endTimestamp"] = u_end or (klines[-1].get("timestamp") if klines else None)
+                    matched = True
+
+            # Case C: Fallback to student's exact drawing anchor timestamps
+            if not suggested_zone.get("startTimestamp") and first_draw.get("timeStart"):
+                suggested_zone["startTimestamp"] = first_draw.get("timeStart")
+                suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else None)
+
         return {
             "success": True,
             "symbol": symbol,
@@ -1321,6 +1507,7 @@ class AiTutorService:
             "score": score,
             "verdict": verdict,
             "analysis": analysis,
+            "provider": llm_client.active_provider or "gemini",
             "remainingToday": remaining_today,
             "isPremium": is_premium
         }
@@ -1341,45 +1528,100 @@ class AiTutorService:
         without requiring screenshots.
         """
         is_en = lang == "en"
-        remaining_today = PREMIUM_DAILY_LIMIT
+        remaining_today = 999999
         is_premium = False
         if user_id:
-            try:
-                sub_status = subscription_service.get_user_subscription(user_id)
-                is_premium = sub_status.get("is_premium", False)
-                daily_limit = PREMIUM_DAILY_LIMIT if is_premium else FREE_DAILY_LIMIT
-                used = sub_status.get("daily_ai_used", 0)
-                if used >= daily_limit:
-                    return {
-                        "success": False,
-                        "quotaExceeded": True,
-                        "message": (
-                            f"You have reached your daily AI quota ({used}/{daily_limit}). Upgrade to PRO to unlock 500 chart evaluations per day!"
-                            if is_en else
-                            f"Bạn đã sử dụng hết hạn mức AI hôm nay ({used}/{daily_limit} lượt). Hãy nâng cấp lên gói PRO để mở khóa 500 lượt soi chart mỗi ngày!"
-                        )
-                    }
-                subscription_service.increment_ai_usage(user_id)
-                remaining_today = max(0, daily_limit - (used + 1))
-            except Exception as ex:
-                print(f"Error checking quota for inspect_chart_data: {ex}")
+            reserved, sub_record = subscription_service.reserve_inspect_slot(user_id)
+            plan = (sub_record or {}).get("plan", "FREE")
+            is_premium = plan in ["PLUS", "PRO", "PREMIUM"]
+            if not reserved:
+                if plan in ["PLUS", "PREMIUM"]:
+                    msg = (
+                        "⚠️ You have used up your 150 chart evaluation quota for this month! Upgrade to PRO for unlimited evaluations."
+                        if is_en else
+                        "⚠️ Bạn đã sử dụng hết 150/150 lượt Chấm Bài của gói PLUS trong tháng này! Nâng cấp gói PRO VIP để chấm bài không giới hạn."
+                    )
+                else:
+                    msg = (
+                        "⚠️ You have used your daily chart evaluation quota (2/2). Upgrade to PLUS (150/mo) or PRO (Unlimited)!"
+                        if is_en else
+                        "⚠️ Bạn đã dùng hết 2/2 lượt Chấm Bài miễn phí hôm nay. Nâng cấp gói PLUS (129k - 150 bài) hoặc PRO (299k - Không giới hạn)!"
+                    )
+                return {
+                    "success": False,
+                    "quotaExceeded": True,
+                    "message": msg
+                }
+            if plan == "PRO":
+                remaining_today = 999999
+            elif plan in ["PLUS", "PREMIUM"]:
+                remaining_today = max(0, sub_record.get("monthly_inspect_limit", 150) - sub_record.get("monthly_inspect_used", 0))
+            else:
+                remaining_today = max(0, sub_record.get("daily_inspect_limit", 2) - sub_record.get("daily_inspect_used", 0))
 
-        # Summarize drawings
+        # Summarize drawings with student labels & SMC concepts
         drawings_summary = []
         for idx, d in enumerate(drawings, 1):
             name = d.get("name", "Vùng vẽ")
+            label = d.get("label") or d.get("userLabel") or name
+            tag = d.get("tag") or ""
+            concept = d.get("detectedConcept") or tag
             p_high = d.get("priceHigh")
             p_low = d.get("priceLow")
+            p_mid = d.get("priceMid")
+            range_amt = d.get("rangeAmount")
             pts = d.get("points", [])
-            drawings_summary.append(
-                f"- Figure {idx} ({name}): Price range from {p_low} to {p_high}, with {len(pts)} anchor points."
-                if is_en else
-                f"- Hình {idx} ({name}): Vùng giá từ {p_low} đến {p_high}, gồm {len(pts)} điểm neo."
-            )
+
+            tag_part = f" [SMC Tag: {tag}]" if tag else ""
+            concept_part = f" - Khái niệm: {concept}" if concept and concept != label else ""
+            mid_part = f" (Giá tâm: {p_mid})" if p_mid is not None else ""
+            range_part = f" (Biên độ: {range_amt})" if range_amt is not None else ""
+
+            if is_en:
+                drawings_summary.append(
+                    f"- Figure #{idx}: Student Label/Annotation: '{label}'{tag_part}, Tool Type: {name}, "
+                    f"Price Range: {p_low} -> {p_high}{mid_part}{range_part}, with {len(pts)} anchor points."
+                )
+            else:
+                drawings_summary.append(
+                    f"- Hình #{idx}: Ký hiệu / Tên học viên đặt: '{label}'{tag_part}{concept_part}, Loại công cụ: {name}, "
+                    f"Vùng giá: {p_low} -> {p_high}{mid_part}{range_part}, gồm {len(pts)} điểm neo."
+                )
         drawings_str = "\n".join(drawings_summary)
 
-        # Summarize recent candles (last 25 candles)
-        recent_klines = klines[-25:] if len(klines) > 25 else klines
+        # Extract swings & extrema across ALL klines provided (up to 120 candles)
+        swings = extract_chart_swings_and_extrema(klines)
+        wave_max = swings["global_high"] or 0
+        wave_min = swings["global_low"] or 0
+
+        recent_sh = swings["swing_highs"][-4:] if swings["swing_highs"] else []
+        recent_sl = swings["swing_lows"][-4:] if swings["swing_lows"] else []
+        sh_str = ", ".join([f"${sh['price']:,.2f} ({sh['candles_ago']} nến trước)" for sh in reversed(recent_sh)]) if recent_sh else "N/A"
+        sl_str = ", ".join([f"${sl['price']:,.2f} ({sl['candles_ago']} nến trước)" for sl in reversed(recent_sl)]) if recent_sl else "N/A"
+
+        # Detect factual FVGs strictly based on candle wicks (Râu nến)
+        detected_fvgs = detect_fair_value_gaps(klines)
+        detected_obs = detect_order_blocks(klines)
+        recent_obs = detected_obs[-4:] if detected_obs else []
+        obs_summary = []
+        for ob in recent_obs:
+            obs_summary.append(
+                f"- {ob['type']}: Vùng giá chuẩn [${ob['priceLow']:,.2f} -> ${ob['priceHigh']:,.2f}] "
+                f"(Mốc 50% Mean Threshold = ${ob['mean_threshold']:,.2f}, Nến xuất hiện lúc t:{ob['startTimestamp']}, cách đây {ob['candles_ago']} nến)"
+            )
+        obs_str = "\n".join(obs_summary) if obs_summary else "Không có Order Block lớn chưa test gần đây" 
+        recent_fvgs = detected_fvgs[-4:] if detected_fvgs else []
+        fvgs_summary = []
+        for fvg in recent_fvgs:
+            fvgs_summary.append(
+                f"- {fvg['type']}: Vùng giá chuẩn [${fvg['bottom']:,.2f} -> ${fvg['top']:,.2f}] "
+                f"(Đo theo RÂU NẾN Wicks: {fvg.get('c1_info', '')}; {fvg.get('c3_info', '')}; "
+                f"Mốc 50% C.E = ${fvg['midpoint_ce']:,.2f}, xuất hiện cách đây {fvg['candles_ago']} nến)"
+            )
+        fvgs_str = "\n".join(fvgs_summary) if fvgs_summary else "Không có FVG lớn chưa lấp trong các nến gần nhất"
+
+        # Summarize recent candles (last 40 candles for LLM prompt context)
+        recent_klines = klines[-40:] if len(klines) > 40 else klines
         klines_summary = []
         for k in recent_klines:
             o = k.get("open")
@@ -1389,12 +1631,6 @@ class AiTutorService:
             t = k.get("timestamp")
             klines_summary.append(f"O:{o} H:{h} L:{l} C:{c} (t:{t})")
         klines_str = "; ".join(klines_summary)
-
-        # Calculate wave extrema & price context
-        highs = [k.get("high") for k in recent_klines if isinstance(k.get("high"), (int, float))]
-        lows = [k.get("low") for k in recent_klines if isinstance(k.get("low"), (int, float))]
-        wave_max = max(highs) if highs else 0
-        wave_min = min(lows) if lows else 0
 
         # Identify student drawing zone relative to wave (upper swing high or lower swing low)
         first_draw = drawings[0] if drawings else {}
@@ -1406,6 +1642,7 @@ class AiTutorService:
 
         if is_en:
             system_prompt = (
+                f"{ICT_SMC_CANONICAL_GUIDELINES}\n\n" +
                 "You are a Senior Quantitative & Technical Analyst Tutor specializing in Price Action, ICT, and Smart Money Concepts (SMC).\n"
                 "Your objective is to inspect direct COORDINATE DRAWING DATA drawn by the trader on the chart against REAL OHLCV CANDLESTICK DATA.\n\n"
                 "IMPORTANT INSTRUCTIONS:\n"
@@ -1439,29 +1676,41 @@ class AiTutorService:
                 f"Asset: {symbol or 'N/A'}, Timeframe: {timeframe or 'N/A'}.\n"
                 f"STUDENT CHART DRAWINGS DATA:\n{drawings_str}\n\n"
                 f"REAL CANDLESTICK DATA (OHLCV):\n{klines_str}\n"
-                f"Swing High: {wave_max}, Swing Low: {wave_min}.\n"
+                f"Chart Highest High: {wave_max}, Chart Lowest Low: {wave_min}.\n"
+                f"Recent Swing Highs: {sh_str}\n"
+                f"Recent Swing Lows: {sl_str}\n\n"
+                f"FACTUAL CANDLE WICK-BASED FAIR VALUE GAPS (FVG GROUND TRUTH):\n{fvgs_str}\n\n"
+                "MANDATORY FVG GRADING INSTRUCTION:\n"
+                "FVG boundaries are strictly measured from Wick of Candle 1 to Wick of Candle 3. "
+                "If the student drawing anchors to the wicks of candle 1 and candle 3, it is 100% CORRECT according to ICT. "
+                "DO NOT penalize or claim it should be candle bodies.\n"
             )
             if user_notes:
                 user_prompt += f"\nTrader's notes: {user_notes}\n"
             user_prompt += "\nPlease evaluate and grade this drawing now in English."
         else:
             system_prompt = (
+                f"{ICT_SMC_CANONICAL_GUIDELINES}\n\n" +
                 "Bạn là Chuyên gia Cao cấp Đào tạo Phân tích Kỹ thuật và Huấn luyện viên Chiến lược Thực chiến "
                 "(Price Action, ICT - Inner Circle Trader, SMC - Smart Money Concepts).\n"
                 "Nhiệm vụ của bạn là kiểm tra trực tiếp DỮ LIỆU TỌA ĐỘ VÙNG VẼ HỌC VIÊN ĐÃ VẼ TRÊN BIỂU ĐỒ đối chiếu với DỮ LIỆU NẾN THẬT (OHLCV).\n\n"
                 "YÊU CẦU QUAN TRỌNG ĐỂ KHÔNG BỊ CẮT CHỮ (TRUNCATION):\n"
                 "1. Viết súc tích, sắc bén, chuẩn sư phạm (khoảng 300 - 450 từ). Tuyệt đối KHÔNG viết dông dài để đảm bảo hoàn thành trọn vẹn cả 5 mục và khối JSON cuối cùng.\n"
                 "2. Trình bày bài chấm theo đúng 5 mục cấu trúc Markdown sau:\n\n"
-                "### 1. Đánh giá sơ bộ về hình thức lý thuyết\n"
-                "- **Kết luận:** Nêu rõ học viên vẽ **ĐÚNG**, **ĐÚNG MỘT PHẦN** hay **CHƯA ĐÚNG**?\n"
-                "- **Nhận diện vùng vẽ:** Xác định học viên đang vẽ vùng gì (Order Block, FVG, hay Vùng Cung/Cầu). Tọa độ vùng vẽ của học viên so với râu nến và thân nến thực tế lệch hay chuẩn ở đâu?\n\n"
+                "### 1. Đánh giá sơ bộ & Chẩn đoán chi tiết từng hình vẽ\n"
+                "- **Kết luận tổng quan:** Nêu rõ bài vẽ **ĐÚNG**, **ĐÚNG MỘT PHẦN** hay **CHƯA ĐÚNG**?\n"
+                "- **Chẩn đoán từng hình vẽ cụ thể (NẾU SAI, BẮT BUỘC CHỈ RÕ CÁI NÀO SAI VÀ LÝ DO SAI):**\n"
+                "  * **Hình nào SAI hoặc CHƯA CHUẨN:** Chỉ đích danh (ví dụ: *Hình #1 - [Tên nhãn / Vùng giá]* hoặc *Hình #2*).\n"
+                "  * **Lý do sai cụ thể & Điểm mấu chốt:** Nêu rõ nguyên nhân cốt lõi khiến hình này sai (ví dụ: (1) Khoanh nhầm cây nến giữa sóng thay vì nến cực trị trước nhịp Displacement; (2) Thiếu khoảng trống giá Fair Value Gap (FVG) hợp lệ; (3) Tọa độ vẽ lơ lửng, không bao trùm râu nến cao nhất/thấp nhất; hoặc (4) Đây chỉ là bẫy thanh khoản Inducement dụ dỗ chứ không phải vùng tích lũy của Smart Money).\n"
+                "  * **Hậu quả nếu giao dịch:** Nếu đặt lệnh theo vùng vẽ sai này, trader sẽ đối mặt nguy cơ gì (ví dụ: dính Stop Loss oan, rủi ro R:R cực xấu)?\n\n"
                 "### 2. Lăng kính thực chiến chuyên sâu (Độ tin cậy & Xác suất)\n"
                 "- **Phân loại vùng:** Vùng Tiếp diễn (Continuation) hay Cực trị (Extreme)?\n"
                 "- **Chất lượng sóng đẩy & Bẫy giá:** Nhịp Displacement có đủ mạnh không? Có tạo FVG không? Cảnh báo nguy cơ Quét thanh khoản (Liquidity Sweep) và Bẫy Smart Money (SMT / Inducement).\n\n"
-                "### 3. Vùng chuẩn xác nhất theo Smart Money\n"
+                "### 3. Vùng chuẩn xác nhất theo Smart Money (Sửa lại cho đúng)\n"
                 "- Chỉ rõ tên vùng chuẩn, khoảng giá nến chuẩn (từ giá thấp đến giá cao) và lý giải ngắn gọn vì sao vùng này mới là tối ưu.\n\n"
-                "### 4. 💡 Bài học thực chiến cốt lõi\n"
-                "- 1-2 lời khuyên đắt giá giúp học viên vào lệnh chuẩn, tránh bị quét Stop Loss oan uổng.\n\n"
+                "### 4. 💡 Kết luận & Bài học thực chiến cốt lõi (Học viên rút ra kinh nghiệm)\n"
+                "- **Bài học rút ra:** 1-2 nguyên tắc vàng giúp học viên tự kiểm tra để lần sau KHÔNG vẽ sai nữa (Ví dụ: 'Luôn tìm FVG trước, sau đó mới dóng ngược lại cây nến trước FVG để xác định Order Block').\n"
+                "- **Kế hoạch hành động:** Chờ điều kiện gì xuất hiện mới kích hoạt lệnh.\n\n"
                 "### 5. Điểm số đánh giá\n"
                 "- **Điểm đánh giá: [X]/100** (cho điểm khách quan từ 0 đến 100).\n\n"
                 "Ở CUỐI CÙNG, BẮT BUỘC CUNG CẤP KHỐI DỮ LIỆU JSON ĐỂ HỆ THỐNG VẼ LẠI VÙNG CHUẨN LÊN BIỂU ĐỒ:\n"
@@ -1480,12 +1729,22 @@ class AiTutorService:
                 f"Mã tài sản: {symbol or 'N/A'}, Khung thời gian: {timeframe or 'N/A'}.\n"
                 f"DỮ LIỆU HÌNH VẼ CỦA HỌC VIÊN TRÊN BIỂU ĐỒ:\n{drawings_str}\n\n"
                 f"CHUỖI NẾN THỰC TẾ TRÊN BIỂU ĐỒ (OHLCV):\n{klines_str}\n\n"
-                f"Đỉnh cao nhất của sóng: {wave_max}, Đáy thấp nhất: {wave_min}.\n"
+                f"Đỉnh cao nhất trên biểu đồ: {wave_max}, Đáy thấp nhất: {wave_min}.\n"
+                f"Các Đỉnh đảo chiều gần nhất (Recent Swing Highs): {sh_str}\n"
+                f"Các Đáy đảo chiều gần nhất (Recent Swing Lows): {sl_str}\n\n"
+                f"CÁC VÙNG ORDER BLOCK (OB) THỰC TẾ TRÊN BIỂU ĐỒ (GROUND-TRUTH CHUẨN XÁC THEO NẾN DISPLACEMENT):\n{obs_str}\n\nCÁC KHOẢNG TRỐNG GIÁ FVG THỰC TẾ TRÊN BIỂU ĐỒ (ĐO CHUẨN XÁC 100% THEO RÂU NẾN WICKS):\n{fvgs_str}\n\n"
+                "⚠️ NGUYÊN TẮC BẮT BUỘC KHI CHẤM VÙNG FAIR VALUE GAP (FVG):\n"
+                "1. Biên độ của FVG BẮT BUỘC ĐO THEO RÂU NẾN (WICKS) CỦA NẾN 1 VÀ NẾN 3. TUYỆT ĐỐI KHÔNG LẤY THEO THÂN NẾN!\n"
+                "   - Bullish FVG: Biên dưới là Đỉnh râu Nến 1 (High Wick), Biên trên là Đáy râu Nến 3 (Low Wick).\n"
+                "   - Bearish FVG: Biên trên là Đáy râu Nến 1 (Low Wick), Biên dưới là Đỉnh râu Nến 3 (High Wick).\n"
+                "2. NẾU HỌC VIÊN ĐANG VẼ VÙNG FVG KHỚP VỚI CÁC MỐC RÂU NẾN NÀY, HỌC VIÊN ĐÃ VẼ HOÀN TOÀN ĐÚNG CHUẨN 100% THEO ICT!\n"
+                "   - KẾT LUẬN: ĐÚNG (Score: 85-100).\n"
+                "   - CẤM TUYỆT ĐỐI BẢO HỌC VIÊN VẼ SAI VÌ 'KHÔNG LẤY THEO THÂN NẾN' HOẶC ĐỔI SANG BẮT HỌC VIÊN VẼ ORDER BLOCK KHI HỌ ĐANG VẼ FVG!\n"
             )
             if user_notes:
                 user_prompt += f"\nGhi chú học viên: {user_notes}\n"
 
-        analysis = llm_client.generate_text(system_prompt, user_prompt, max_tokens=4000)
+        analysis = llm_client.generate_inspection_text(system_prompt, user_prompt, max_tokens=4000)
         if not analysis:
             analysis = (
                 "Unable to analyze data at this time. Please try again later."
@@ -1496,9 +1755,15 @@ class AiTutorService:
         # 1. Parse JSON zone block if generated by LLM
         suggested_zone = None
         zone_match = re.search(r'```(?:json:zone|json)?\s*(\{[\s\S]*?\})\s*```', analysis)
+        if not zone_match:
+            zone_match = re.search(r'(\{[\s\S]*?"priceHigh"[\s\S]*?"priceLow"[\s\S]*?\})', analysis)
+
         if zone_match:
             try:
-                raw_zone = json.loads(zone_match.group(1))
+                raw_str = zone_match.group(1).strip()
+                # Clean potential trailing commas
+                raw_str = re.sub(r',(\s*[\}\]])', r'\1', raw_str)
+                raw_zone = json.loads(raw_str)
                 if isinstance(raw_zone, dict) and "priceHigh" in raw_zone and "priceLow" in raw_zone:
                     z_high = float(raw_zone.get("priceHigh", 0))
                     z_low = float(raw_zone.get("priceLow", 0))
@@ -1509,50 +1774,74 @@ class AiTutorService:
                             "label": raw_zone.get("label", f"AI: {raw_zone.get('name', 'Order Block')}"),
                             "priceHigh": round(z_high, 4),
                             "priceLow": round(z_low, 4),
-                            "explanation": raw_zone.get("explanation", "")
+                            "explanation": raw_zone.get("explanation", ""),
+                            "startTimestamp": raw_zone.get("startTimestamp"),
+                            "endTimestamp": raw_zone.get("endTimestamp")
                         }
                 # Clean JSON block from analysis text so UI displays pure clean markdown
                 analysis = analysis[:zone_match.start()].strip()
             except Exception as e:
                 print(f"Error parsing AI suggested zone JSON: {e}")
 
-        # 2. Intelligent candle-based algorithmic fallback if JSON was missing or malformed
-        if not suggested_zone and wave_max > 0:
-            if is_upper_zone:
-                # Find swing high candle
-                high_candle = next((k for k in reversed(recent_klines) if k.get("high") == wave_max), recent_klines[-1] if recent_klines else {})
-                c_open = float(high_candle.get("open") or wave_max)
-                c_close = float(high_candle.get("close") or wave_max)
-                c_low = float(high_candle.get("low") or wave_max * 0.995)
-                # Order block bottom: body low or high candle low
-                ob_low = min(c_open, c_close)
-                if ob_low >= wave_max or ob_low <= 0:
-                    ob_low = wave_max * 0.993
-                suggested_zone = {
-                    "type": "Order Block (OB)",
-                    "name": "Bearish Extreme Order Block" if is_en else "Order Block (OB) Giảm Giá - Cực Trị",
-                    "label": "AI: Bearish Order Block" if is_en else "AI: Order Block (OB) Kháng Cự",
-                    "priceHigh": round(wave_max, 4),
-                    "priceLow": round(ob_low, 4),
-                    "explanation": "Extreme institutional mitigation zone at wave high" if is_en else "Vùng nến đảo chiều cực trị tại đỉnh sóng có thanh khoản phe bán"
-                }
-            else:
-                # Find swing low candle
-                low_candle = next((k for k in reversed(recent_klines) if k.get("low") == wave_min), recent_klines[-1] if recent_klines else {})
-                c_open = float(low_candle.get("open") or wave_min)
-                c_close = float(low_candle.get("close") or wave_min)
-                ob_high = max(c_open, c_close)
-                if ob_high <= wave_min or ob_high <= 0:
-                    ob_high = wave_min * 1.007
-                suggested_zone = {
-                    "type": "Order Block (OB)",
-                    "name": "Bullish Extreme Order Block" if is_en else "Order Block (OB) Tăng Giá - Cực Trị",
-                    "label": "AI: Bullish Order Block" if is_en else "AI: Order Block (OB) Hỗ Trợ",
-                    "priceHigh": round(ob_high, 4),
-                    "priceLow": round(wave_min, 4),
-                    "explanation": "Extreme institutional mitigation zone at wave low" if is_en else "Vùng nến tích lũy cực trị tại đáy sóng có thanh khoản phe mua"
-                }
+        # 2. Intelligent candle-based algorithmic fallback localized to the student's exact drawing area
+        if not suggested_zone:
+            u_time_start = first_draw.get("timeStart")
+            u_time_end = first_draw.get("timeEnd")
 
+            # Check what concept user was drawing
+            first_label = str(first_draw.get("label", "")).upper()
+            first_tag = str(first_draw.get("tag", "")).upper()
+            is_ob_draw = any(k in first_label or k in first_tag for k in ["OB", "ORDER BLOCK", "BLOCK"])
+            is_fvg_draw = any(k in first_label or k in first_tag for k in ["FVG", "FAIR VALUE", "IMBALANCE", "GAP"])
+
+            # Option A: User drew Order Block (or no tag specified) -> match nearest factual Order Block
+            if (is_ob_draw or not is_fvg_draw) and detected_obs:
+                def ob_dist(ob):
+                    p_diff = abs(((ob['priceHigh'] + ob['priceLow']) / 2) - user_mid)
+                    t_diff = abs(ob.get('startTimestamp', 0) - (u_time_start or 0)) if u_time_start else 0
+                    return p_diff + (t_diff * 0.0001)
+
+                best_ob = min(detected_obs, key=ob_dist)
+                suggested_zone = {
+                    "type": best_ob["type"],
+                    "name": best_ob["type"],
+                    "label": f"AI: {best_ob['type']}",
+                    "priceHigh": best_ob["priceHigh"],
+                    "priceLow": best_ob["priceLow"],
+                    "startTimestamp": best_ob.get("startTimestamp") or u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": best_ob.get("rule", "Vùng Order Block chuẩn xác theo Smart Money tại khu vực bạn phân tích")
+                }
+            # Option B: User drew FVG -> match nearest factual FVG
+            elif is_fvg_draw and detected_fvgs:
+                def fvg_dist(f):
+                    p_diff = abs(((f['top'] + f['bottom']) / 2) - user_mid)
+                    t_diff = abs(f.get('startTimestamp', 0) - (u_time_start or 0)) if u_time_start else 0
+                    return p_diff + (t_diff * 0.0001)
+
+                best_fvg = min(detected_fvgs, key=fvg_dist)
+                suggested_zone = {
+                    "type": best_fvg["type"],
+                    "name": best_fvg["type"],
+                    "label": f"AI: {best_fvg['type']}",
+                    "priceHigh": best_fvg["top"],
+                    "priceLow": best_fvg["bottom"],
+                    "startTimestamp": best_fvg.get("startTimestamp") or u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": best_fvg.get("rule", "Vùng Fair Value Gap chuẩn xác theo Râu Nến tại khu vực bạn phân tích")
+                }
+            # Option C: Use student's localized drawing coordinates
+            elif user_p_high and user_p_low:
+                suggested_zone = {
+                    "type": first_draw.get("name") or "Order Block (OB)",
+                    "name": first_draw.get("label") or "Vùng Chuẩn Tối Ưu",
+                    "label": f"AI: {first_draw.get('label') or 'Vùng Chuẩn'}",
+                    "priceHigh": round(user_p_high, 4),
+                    "priceLow": round(user_p_low, 4),
+                    "startTimestamp": u_time_start,
+                    "endTimestamp": u_time_end or (klines[-1].get("timestamp") if klines else None),
+                    "explanation": "Vùng cấu trúc nến tối ưu tại khu vực học viên đang vẽ"
+                }
         score = 80
         score_match = re.search(r'(?:Điểm\s*(?:đánh giá|số)?|Score)[:\s*]+(\d{1,3})\s*(?:/\s*100)?', analysis, re.IGNORECASE)
         if score_match:
@@ -1568,6 +1857,149 @@ class AiTutorService:
         if "CHƯA ĐÚNG" in analysis[:300].upper() or "SAI" in analysis[:300].upper():
             verdict = "INCORRECT"
 
+                # Bind exact candle timestamps and coordinates to suggested_zone for OB, FVG, and Liquidity!
+        if suggested_zone:
+            z_high = float(suggested_zone.get("priceHigh", 0))
+            z_low = float(suggested_zone.get("priceLow", 0))
+            z_type = str(suggested_zone.get("type", "")).upper()
+            first_label = str(first_draw.get("label", "") + " " + first_draw.get("name", "") + " " + first_draw.get("tag", "")).upper()
+
+            matched = False
+
+            # Case A: If user or AI zone is an Order Block (OB)
+            if "ORDER BLOCK" in z_type or "OB" in z_type or "ORDER BLOCK" in first_label or "OB" in first_label:
+                matched_ob = None
+                if detected_obs:
+                    for ob in detected_obs:
+                        ob_h = float(ob.get("priceHigh", 0))
+                        ob_l = float(ob.get("priceLow", 0))
+                        # Match if price ranges overlap within 5% tolerance
+                        if abs(ob_h - z_high) / max(1.0, z_high) < 0.06 and abs(ob_l - z_low) / max(1.0, z_low) < 0.06:
+                            matched_ob = ob
+                            break
+                    if not matched_ob and detected_obs:
+                        # Match closest OB to user drawing center
+                        u_mid = (z_high + z_low) / 2
+                        matched_ob = min(detected_obs, key=lambda o: abs((o['priceHigh'] + o['priceLow'])/2 - u_mid))
+
+                if matched_ob:
+                    suggested_zone["type"] = matched_ob["type"]
+                    suggested_zone["priceHigh"] = matched_ob["priceHigh"]
+                    suggested_zone["priceLow"] = matched_ob["priceLow"]
+                    suggested_zone["startTimestamp"] = matched_ob["startTimestamp"]
+                    u_end = first_draw.get("timeEnd")
+                    suggested_zone["endTimestamp"] = u_end or (klines[-1].get("timestamp") if klines else None)
+                    matched = True
+
+            # Case B: If user or AI zone is a Fair Value Gap (FVG)
+            if not matched and ("FVG" in z_type or "FAIR VALUE" in z_type or "FVG" in first_label or "GAP" in first_label):
+                matched_fvg = None
+                if detected_fvgs:
+                    for fvg in detected_fvgs:
+                        f_top = float(fvg.get("top", 0))
+                        f_bot = float(fvg.get("bottom", 0))
+                        if abs(f_top - z_high) / max(1.0, z_high) < 0.06 and abs(f_bot - z_low) / max(1.0, z_low) < 0.06:
+                            matched_fvg = fvg
+                            break
+                    if not matched_fvg and detected_fvgs:
+                        u_mid = (z_high + z_low) / 2
+                        matched_fvg = min(detected_fvgs, key=lambda f: abs((f['top'] + f['bottom'])/2 - u_mid))
+
+                if matched_fvg:
+                    suggested_zone["type"] = matched_fvg["type"]
+                    suggested_zone["priceHigh"] = matched_fvg["top"]
+                    suggested_zone["priceLow"] = matched_fvg["bottom"]
+                    suggested_zone["startTimestamp"] = matched_fvg["startTimestamp"]
+                    u_end = first_draw.get("timeEnd")
+                    suggested_zone["endTimestamp"] = u_end or (klines[-1].get("timestamp") if klines else None)
+                    matched = True
+
+            # Case C: Fallback to student's exact drawing anchor timestamps
+            if not suggested_zone.get("startTimestamp") and first_draw.get("timeStart"):
+                suggested_zone["startTimestamp"] = first_draw.get("timeStart")
+                suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else None)
+
+                # Comprehensive Timestamp & Concept Binding for ALL Smart Money Patterns
+        if suggested_zone:
+            z_high = float(suggested_zone.get("priceHigh", 0))
+            z_low = float(suggested_zone.get("priceLow", 0))
+            z_type = str(suggested_zone.get("type", "")).upper()
+            z_name = str(suggested_zone.get("name", "")).upper()
+            first_label = str(first_draw.get("label", "")).upper()
+            first_tag = str(first_draw.get("tag", "")).upper()
+            first_concept = str(first_draw.get("detectedConcept", "")).upper()
+            u_time_start = first_draw.get("timeStart")
+            u_time_end = first_draw.get("timeEnd")
+
+            # Priority 1: Match with detected FVGs if user or AI indicates FVG
+            is_fvg = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["FVG", "FAIR VALUE", "IMBALANCE", "GAP"])
+            if is_fvg and detected_fvgs:
+                # Find all candidates matching price range (within 6% tolerance)
+                price_candidates = [
+                    f for f in detected_fvgs
+                    if abs(float(f.get("top", 0)) - z_high) / max(1.0, z_high) < 0.06
+                    and abs(float(f.get("bottom", 0)) - z_low) / max(1.0, z_low) < 0.06
+                ]
+                matched_fvg = None
+                if price_candidates:
+                    if u_time_start:
+                        # CRITICAL: Pick the candidate closest in time to where the student actually drew!
+                        matched_fvg = min(price_candidates, key=lambda f: abs((f.get("startTimestamp") or f.get("c1_timestamp") or 0) - u_time_start))
+                    else:
+                        # Otherwise pick the most recent candidate (reversed)
+                        matched_fvg = price_candidates[-1]
+                else:
+                    # If prices didn't match directly, find FVG closest in time to user drawing
+                    if u_time_start:
+                        matched_fvg = min(detected_fvgs, key=lambda f: abs((f.get("startTimestamp") or 0) - u_time_start))
+                    else:
+                        matched_fvg = detected_fvgs[-1]
+
+                if matched_fvg:
+                    suggested_zone["type"] = matched_fvg["type"]
+                    suggested_zone["name"] = matched_fvg["type"]
+                    suggested_zone["label"] = f"AI: {matched_fvg['type']}"
+                    suggested_zone["priceHigh"] = matched_fvg["top"]
+                    suggested_zone["priceLow"] = matched_fvg["bottom"]
+                    # If user anchored at Candle 2 (displacement), use Candle 1 or userTimeStart so it aligns seamlessly
+                    c1_ts = matched_fvg.get("startTimestamp") or matched_fvg.get("c1_timestamp")
+                    suggested_zone["startTimestamp"] = c1_ts if c1_ts else u_time_start
+                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else matched_fvg.get("c3_timestamp"))
+
+            # Priority 2: Match with detected OBs if user or AI indicates Order Block
+            is_ob = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["ORDER BLOCK", "OB", "BLOCK"])
+            if is_ob and detected_obs and not suggested_zone.get("startTimestamp"):
+                price_candidates = [
+                    o for o in detected_obs
+                    if abs(float(o.get("priceHigh", 0)) - z_high) / max(1.0, z_high) < 0.06
+                    and abs(float(o.get("priceLow", 0)) - z_low) / max(1.0, z_low) < 0.06
+                ]
+                matched_ob = None
+                if price_candidates:
+                    if u_time_start:
+                        matched_ob = min(price_candidates, key=lambda o: abs((o.get("startTimestamp") or 0) - u_time_start))
+                    else:
+                        matched_ob = price_candidates[-1]
+                else:
+                    if u_time_start:
+                        matched_ob = min(detected_obs, key=lambda o: abs((o.get("startTimestamp") or 0) - u_time_start))
+                    else:
+                        matched_ob = detected_obs[-1]
+
+                if matched_ob:
+                    suggested_zone["type"] = matched_ob["type"]
+                    suggested_zone["name"] = matched_ob["type"]
+                    suggested_zone["label"] = f"AI: {matched_ob['type']}"
+                    suggested_zone["priceHigh"] = matched_ob["priceHigh"]
+                    suggested_zone["priceLow"] = matched_ob["priceLow"]
+                    suggested_zone["startTimestamp"] = matched_ob.get("startTimestamp") or u_time_start
+                    suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
+
+            # Priority 3: Fallback timestamp binding using user drawing coordinates
+            if not suggested_zone.get("startTimestamp") and u_time_start:
+                suggested_zone["startTimestamp"] = u_time_start
+                suggested_zone["endTimestamp"] = u_time_end or (klines[-1].get("timestamp") if klines else None)
+
         return {
             "success": True,
             "symbol": symbol,
@@ -1577,6 +2009,7 @@ class AiTutorService:
             "analysis": analysis,
             "suggestedZone": suggested_zone,
             "drawingsCount": len(drawings),
+            "provider": llm_client.active_provider or "gemini",
             "remainingToday": remaining_today,
             "isPremium": is_premium
         }

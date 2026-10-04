@@ -10,6 +10,8 @@ from app.core.config import (
     PAYOS_CHECKSUM_KEY,
     PAYOS_RETURN_URL,
     PAYOS_CANCEL_URL,
+    PLAN_PLUS_PRICE,
+    PLAN_PRO_PRICE,
     PREMIUM_MONTHLY_PRICE
 )
 from app.core.database import get_payments_collection
@@ -63,12 +65,15 @@ class PayOSService:
     def create_payment_link(
         self, 
         user_id: str, 
-        plan: str = "PREMIUM_MONTHLY",
+        plan: str = "PLUS",
         return_url: Optional[str] = None,
         cancel_url: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Creates a PayOS payment link for the authenticated user.
+        Supports:
+        - Gói PLUS: 129.000₫ / 30 ngày (300 Chat, 150 Chấm bài)
+        - Gói PRO: 299.000₫ / 30 ngày (Không giới hạn toàn bộ)
         Stores the pending payment in the database.
         """
         if not (self.client_id and self.api_key and self.checksum_key):
@@ -84,8 +89,20 @@ class PayOSService:
 
         order_code = self.generate_unique_order_code()
         short_uid = str(user_id)[-8:]
-        description = f"PRO {short_uid}"[:25] # PayOS max 25 chars
-        amount = PREMIUM_MONTHLY_PRICE
+
+        # Multi-tier plan recognition
+        is_pro = "PRO" in str(plan).upper()
+        norm_plan = "PRO" if is_pro else "PLUS"
+
+        if is_pro:
+            amount = PLAN_PRO_PRICE  # 299.000₫
+            item_name = "AI Tutor PRO"
+            description = f"PRO {short_uid}"[:25]
+        else:
+            amount = PLAN_PLUS_PRICE # 129.000₫
+            item_name = "AI Tutor PLUS"
+            description = f"PLUS {short_uid}"[:25]
+
         expire_minutes = 10
         expire_timestamp = int(time.time()) + (expire_minutes * 60)
         expired_at_dt = datetime.fromtimestamp(expire_timestamp, tz=timezone.utc)
@@ -96,7 +113,7 @@ class PayOSService:
             # Using PayOS v1.1.0 payment_requests or legacy createPaymentLink
             try:
                 from payos.type import PaymentData, ItemData
-                item = ItemData(name="Gói AI Tutor PRO 30 Ngày", quantity=1, price=amount)
+                item = ItemData(name=item_name, quantity=1, price=amount)
                 payment_data = PaymentData(
                     orderCode=order_code,
                     amount=amount,
@@ -112,7 +129,7 @@ class PayOSService:
             except Exception as legacy_err:
                 logger.warning(f"Legacy createPaymentLink failed, attempting payment_requests.create: {legacy_err}")
                 from payos.types import CreatePaymentLinkRequest, ItemData
-                item = ItemData(name="Gói AI Tutor PRO 30 Ngày", quantity=1, price=amount)
+                item = ItemData(name=item_name, quantity=1, price=amount)
                 req_obj = CreatePaymentLinkRequest(
                     order_code=order_code,
                     amount=amount,
@@ -132,7 +149,7 @@ class PayOSService:
             payment_record = {
                 "user_id": str(user_id),
                 "order_code": order_code,
-                "plan": plan,
+                "plan": norm_plan,
                 "amount": amount,
                 "status": "PENDING",
                 "payment_provider": "PAYOS",
@@ -144,7 +161,7 @@ class PayOSService:
             }
             col.insert_one(payment_record)
 
-            logger.info(f"Created PayOS payment link for user {user_id}, order {order_code}, expires at {expired_at_dt}")
+            logger.info(f"Created PayOS payment link for user {user_id}, plan {norm_plan} ({amount} VND), order {order_code}")
             return {
                 "success": True,
                 "orderCode": order_code,
@@ -217,10 +234,11 @@ class PayOSService:
                     {"$set": {"status": "PAID", "paid_at": now_utc}}
                 )
 
-                # Upgrade subscription
+                # Upgrade subscription to specific plan (PLUS or PRO)
                 user_id = payment["user_id"]
-                subscription_service.upgrade_to_premium(user_id, int(order_code))
-                logger.info(f"Successfully processed webhook for order {order_code}. Upgraded user {user_id} to PREMIUM.")
+                target_plan = payment.get("plan", "PLUS")
+                subscription_service.upgrade_to_plan(user_id, int(order_code), plan=target_plan)
+                logger.info(f"Successfully processed webhook for order {order_code}. Upgraded user {user_id} to {target_plan}.")
                 return {"success": True}
             else:
                 logger.warning(f"PayOS webhook reported non-success code: {code}")
@@ -285,15 +303,17 @@ class PayOSService:
                     {"$set": {"status": "PAID", "paid_at": now_utc}}
                 )
                 user_id = payment["user_id"]
-                sub = subscription_service.upgrade_to_premium(user_id, int(order_code))
-                logger.info(f"Verified order {order_code} as PAID. Upgraded user {user_id} to PREMIUM.")
+                target_plan = payment.get("plan", "PLUS")
+                sub = subscription_service.upgrade_to_plan(user_id, int(order_code), plan=target_plan)
+                logger.info(f"Verified order {order_code} as PAID. Upgraded user {user_id} to {target_plan}.")
                 return {
                     "success": True,
                     "status": "PAID",
                     "is_premium": True,
+                    "plan": target_plan,
                     "orderCode": order_code,
                     "subscription": sub,
-                    "message": "Giao dịch đã thanh toán thành công. Kích hoạt tài khoản PRO thành công!"
+                    "message": f"Giao dịch đã thanh toán thành công. Kích hoạt tài khoản {target_plan} thành công!"
                 }
             elif status in ["CANCELLED", "EXPIRED"]:
                 col.update_one(

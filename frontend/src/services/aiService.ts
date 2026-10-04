@@ -19,6 +19,7 @@ export interface AskResponse {
   sources: KnowledgeSource[];
   socraticQuestions: string[];
   guardrailTriggered?: string | null;
+  provider?: string;
 }
 
 export interface TradeAnalysisSummary {
@@ -307,7 +308,11 @@ export const aiService = {
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.message || 'Lỗi kết nối AI Tutor');
-    return json.data;
+    const data = json.data || {};
+    if (!data.provider && (data.framework === 'VIP_LLM' || json.provider)) {
+      data.provider = json.provider || 'openai';
+    }
+    return data;
   },
 
   async askQuestionStream(
@@ -379,10 +384,14 @@ export const aiService = {
       }
     }
 
+    const finalAnswer = accumulatedText || doneData?.answer || metaInfo?.message || metaInfo?.answer;
+    const finalProvider = doneData?.provider || metaInfo?.provider || (doneData?.framework === 'VIP_LLM' || metaInfo?.framework === 'VIP_LLM' ? 'openai' : 'knowledge_base');
+
     return {
-      answer: accumulatedText || doneData?.answer || 'Không nhận được câu trả lời từ AI.',
+      answer: finalAnswer || 'Không nhận được câu trả lời từ AI.',
       concept: doneData?.concept || metaInfo?.concept || 'AI Trading Tutor',
       framework: doneData?.framework || metaInfo?.framework || 'VIP_LLM',
+      provider: finalProvider,
       sources: doneData?.sources || metaInfo?.sources || [],
       socraticQuestions: doneData?.socraticQuestions || [],
       guardrailTriggered: metaInfo?.guardrailTriggered || null

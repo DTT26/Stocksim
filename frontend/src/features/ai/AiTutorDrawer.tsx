@@ -17,6 +17,8 @@ import {
   getChartDrawingsData, 
   drawAiCorrectionOverlay, 
   clearAiCorrectionOverlay,
+  removeChartDrawing,
+  clearAllChartDrawings,
   type UserChartDrawing 
 } from '../market/components/ChartArea';
 
@@ -87,10 +89,127 @@ const renderInlineStyles = (text: string) => {
 };
 
 const renderFormattedText = (text: string) => {
-  const lines = text.split('\n');
+  // Pre-process into structured blocks: code, table, or line
+  const rawLines = text.split('\n');
+  type Block = 
+    | { type: 'code'; lang: string; content: string }
+    | { type: 'table'; headers: string[]; rows: string[][] }
+    | { type: 'line'; line: string };
+
+  const blocks: Block[] = [];
+  let inCode = false;
+  let codeLang = '';
+  let codeBuffer: string[] = [];
+  let tableBuffer: string[] = [];
+
+  const flushTable = () => {
+    if (tableBuffer.length >= 2) {
+      const parseRow = (r: string) => 
+        r.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+      const headers = parseRow(tableBuffer[0]);
+      // Skip separator row (|---|---|)
+      const dataRows = tableBuffer.slice(1).filter(r => !/^[|\s\-:]+$/.test(r)).map(parseRow);
+      blocks.push({ type: 'table', headers, rows: dataRows });
+    } else {
+      tableBuffer.forEach(line => blocks.push({ type: 'line', line }));
+    }
+    tableBuffer = [];
+  };
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const l = rawLines[i];
+    const trimmed = l.trim();
+
+    // Check code fence
+    if (trimmed.startsWith('```')) {
+      if (inCode) {
+        // closing fence
+        blocks.push({ type: 'code', lang: codeLang, content: codeBuffer.join('\n') });
+        inCode = false;
+        codeBuffer = [];
+        codeLang = '';
+      } else {
+        if (tableBuffer.length > 0) flushTable();
+        inCode = true;
+        codeLang = trimmed.replace(/^```/, '').trim();
+        codeBuffer = [];
+      }
+      continue;
+    }
+
+    if (inCode) {
+      codeBuffer.push(l);
+      continue;
+    }
+
+    // Check table row (| ... |)
+    if (trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2) {
+      tableBuffer.push(trimmed);
+      continue;
+    } else {
+      if (tableBuffer.length > 0) flushTable();
+    }
+
+    blocks.push({ type: 'line', line: l });
+  }
+
+  if (inCode && codeBuffer.length > 0) {
+    blocks.push({ type: 'code', lang: codeLang, content: codeBuffer.join('\n') });
+  }
+  if (tableBuffer.length > 0) {
+    flushTable();
+  }
+
   return (
     <div className="space-y-1.5 text-[13px] leading-relaxed text-slate-800 dark:text-slate-100">
-      {lines.map((line, idx) => {
+      {blocks.map((block, idx) => {
+        if (block.type === 'code') {
+          // If internal zone JSON block, skip or render compact
+          if (block.lang.includes('zone') || block.lang === 'json:zone') {
+            return null;
+          }
+          return (
+            <div key={idx} className="my-2 rounded-xl overflow-hidden border border-slate-700/60 bg-[#0f141c] shadow-sm">
+              {block.lang && (
+                <div className="px-3 py-1 bg-slate-800/60 border-b border-slate-700/50 text-[10px] text-slate-400 font-mono uppercase tracking-wider">
+                  {block.lang}
+                </div>
+              )}
+              <pre className="p-3 text-[11px] font-mono leading-relaxed text-emerald-400 dark:text-emerald-300 overflow-x-auto whitespace-pre">
+                {block.content}
+              </pre>
+            </div>
+          );
+        }
+
+        if (block.type === 'table') {
+          return (
+            <div key={idx} className="my-2.5 overflow-x-auto rounded-xl border border-slate-200 dark:border-[#2b3347] bg-white dark:bg-[#181d2a] shadow-xs">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-50 dark:bg-[#1f2637] border-b border-slate-200 dark:border-[#2b3347] text-slate-800 dark:text-slate-200 font-semibold text-[11.5px]">
+                  <tr>
+                    {block.headers.map((h, hi) => (
+                      <th key={hi} className="py-2 px-3">{renderInlineStyles(h)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-[#252c3f] text-[11px]">
+                  {block.rows.map((row, ri) => (
+                    <tr key={ri} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
+                      {row.map((cell, ci) => (
+                        <td key={ci} className="py-2 px-3 text-slate-700 dark:text-slate-300">
+                          {renderInlineStyles(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        const line = block.line;
         const trimmed = line.trim();
         if (!trimmed) {
           return <div key={idx} className="h-1" />;
@@ -101,13 +220,30 @@ const renderFormattedText = (text: string) => {
           return <hr key={idx} className="border-slate-200 dark:border-[#252c3f] my-2" />;
         }
 
-        // Section Title
-        if (trimmed.startsWith('### ') || trimmed.startsWith('## ')) {
+        // Section Titles (#, ##, ###, ####)
+        if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
           const title = trimmed.replace(/^#+\s*/, '');
           return (
-            <div key={idx} className="pt-2 pb-0.5 text-[13.5px] font-bold text-amber-600 dark:text-amber-300 flex items-center gap-1.5 border-b border-slate-200 dark:border-[#252c3f]/70">
-              <span className="w-1 h-3.5 rounded-full bg-gradient-to-b from-amber-500 to-amber-600 inline-block shrink-0" />
+            <div key={idx} className="pt-2.5 pb-0.5 text-[13.5px] font-bold text-amber-600 dark:text-amber-300 flex items-center gap-1.5 border-b border-slate-200 dark:border-[#252c3f]/70">
+              <span className="w-1.5 h-3.5 rounded-full bg-gradient-to-b from-amber-500 to-amber-600 inline-block shrink-0" />
               <span>{renderInlineStyles(title)}</span>
+            </div>
+          );
+        }
+        if (trimmed.startsWith('#### ')) {
+          const title = trimmed.replace(/^#+\s*/, '');
+          return (
+            <div key={idx} className="pt-2 text-[12.5px] font-bold text-slate-800 dark:text-slate-200">
+              {renderInlineStyles(title)}
+            </div>
+          );
+        }
+
+        // Hard Breach Warning Box (Red alert)
+        if (trimmed.includes('🔴') || trimmed.includes('HARD BREACH') || trimmed.includes('CẢNH BÁO VI PHẠM LUẬT QUỸ')) {
+          return (
+            <div key={idx} className="my-2 p-2.5 rounded-xl bg-rose-500/10 border-l-4 border-rose-500 text-rose-800 dark:text-rose-200 text-xs font-semibold leading-relaxed">
+              {renderInlineStyles(trimmed)}
             </div>
           );
         }
@@ -309,13 +445,29 @@ export const AiTutorDrawer = ({
           const qText = isEn
             ? `Analyze market structure, key price zones, and Fibonacci levels of ${currentSymbol} on ${timeframe} timeframe. Suggest trade scenarios with proper risk management.`
             : `Phân tích cấu trúc thị trường, các vùng giá quan trọng và các mức Fibonacci của mã ${currentSymbol} trên khung thời gian ${timeframe}. Đưa ra các gợi ý kịch bản giao dịch theo quản trị rủi ro.`;
+          // Attach real chart structure to shared snapshot
+          let snapChartContext = { ...marketContext };
+          try {
+            const chartData = getChartDrawingsData();
+            if (chartData.klines && chartData.klines.length > 0) {
+              const highs = chartData.klines.map((k: any) => k.high).filter((v: any) => typeof v === 'number');
+              const lows = chartData.klines.map((k: any) => k.low).filter((v: any) => typeof v === 'number');
+              snapChartContext = {
+                ...snapChartContext,
+                chartHigh: highs.length > 0 ? Math.max(...highs) : undefined,
+                chartLow: lows.length > 0 ? Math.min(...lows) : undefined,
+                klines: chartData.klines
+              };
+            }
+          } catch (_) {}
+
           const res = await aiService.askQuestion(
             qText,
             undefined,
             currentSymbol,
             currentPrice,
             timeframe,
-            marketContext,
+            snapChartContext,
             undefined,
             undefined,
             lang
@@ -407,12 +559,81 @@ export const AiTutorDrawer = ({
   const [inspectResult, setInspectResult] = useState<any | null>(null);
   const [hasDrawnCorrection, setHasDrawnCorrection] = useState(false);
 
+  // Scanning state and user feedback banner
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
+
   // Scan drawings directly from chart instance
-  const handleScanDrawings = () => {
+  const handleScanDrawings = (clearResult = true) => {
+    setIsScanning(true);
     const data = getChartDrawingsData();
     setDetectedDrawings(data.drawings);
     setDetectedKlines(data.klines);
+    if (clearResult) {
+      setInspectResult(null);
+      setInspectError(null);
+      setHasDrawnCorrection(false);
+      clearAiCorrectionOverlay();
+    }
+    const count = data.drawings.length;
+    const msg = isEn
+      ? (count > 0 ? `Synced ${count} drawing(s) from chart.` : 'No drawings found on chart.')
+      : (count > 0 ? `Đã đồng bộ ${count} hình vẽ từ biểu đồ.` : 'Không có hình vẽ nào trên biểu đồ.');
+    setScanMessage(msg);
+    setTimeout(() => setIsScanning(false), 500);
+    setTimeout(() => setScanMessage(null), 3500);
     return data;
+  };
+
+  // Real-time synchronization when drawings change on the chart
+  useEffect(() => {
+    const handleDrawingsChange = () => {
+      const data = getChartDrawingsData();
+      setDetectedDrawings(data.drawings);
+      setDetectedKlines(data.klines);
+    };
+    window.addEventListener('stocksim-drawings-changed', handleDrawingsChange);
+    return () => window.removeEventListener('stocksim-drawings-changed', handleDrawingsChange);
+  }, []);
+
+  const handleTagDrawing = (index: number, tagType: string) => {
+    setDetectedDrawings(prev => {
+      const updated = [...prev];
+      if (updated[index]) {
+        const item = updated[index];
+        const tagMap: Record<string, { label: string; concept: string }> = {
+          OB: { label: isEn ? 'Order Block (OB)' : 'Khối Lệnh (Order Block - OB)', concept: 'Order Block (OB)' },
+          FVG: { label: isEn ? 'Fair Value Gap (FVG)' : 'Khoảng Trống Giá (Fair Value Gap - FVG)', concept: 'Fair Value Gap (FVG)' },
+          BOS: { label: isEn ? 'Break of Structure (BOS)' : 'Phá Vỡ Cấu Trúc (BOS)', concept: 'Break of Structure (BOS)' },
+          CHOCH: { label: isEn ? 'Change of Character (CHoCH)' : 'Đổi Tính Chất (CHoCH)', concept: 'Change of Character (CHoCH)' },
+          LIQUIDITY: { label: isEn ? 'Liquidity Pool' : 'Thanh Khoản (Liquidity Pool)', concept: 'Liquidity Pool' },
+        };
+        const info = tagMap[tagType] || { label: tagType, concept: tagType };
+        updated[index] = {
+          ...item,
+          tag: tagType,
+          userLabel: tagType,
+          label: info.label,
+          detectedConcept: info.concept
+        };
+      }
+      return updated;
+    });
+  };
+
+  const handleEditDrawingLabel = (index: number, newLabel: string) => {
+    setDetectedDrawings(prev => {
+      const updated = [...prev];
+      if (updated[index]) {
+        const item = updated[index];
+        updated[index] = {
+          ...item,
+          userLabel: newLabel,
+          label: newLabel || item.name
+        };
+      }
+      return updated;
+    });
   };
 
   // Auto scan when switching to inspect tab
@@ -427,8 +648,14 @@ export const AiTutorDrawer = ({
       login();
       return;
     }
-    const currentData = handleScanDrawings();
-    if (!currentData.drawings || currentData.drawings.length === 0) {
+    let currentDrawings = detectedDrawings;
+    let currentKlines = detectedKlines;
+    if (!currentDrawings || currentDrawings.length === 0) {
+      const currentData = handleScanDrawings();
+      currentDrawings = currentData.drawings;
+      currentKlines = currentData.klines;
+    }
+    if (!currentDrawings || currentDrawings.length === 0) {
       setInspectError(
         isEn
           ? 'No drawings found on chart. Please use the left toolbar (Rectangle, Trend Line) to mark Order Block / FVG first!'
@@ -441,8 +668,8 @@ export const AiTutorDrawer = ({
     setHasDrawnCorrection(false);
     try {
       const res = await aiService.inspectChartDrawings({
-        drawings: currentData.drawings,
-        klines: currentData.klines,
+        drawings: currentDrawings,
+        klines: currentKlines,
         symbol: activeSymbol,
         timeframe: timeframe || '15m',
         userNotes: inspectNotes,
@@ -463,7 +690,13 @@ export const AiTutorDrawer = ({
 
   const handleApplyAiCorrection = () => {
     if (!inspectResult?.suggestedZone) return;
-    const overlayId = drawAiCorrectionOverlay(inspectResult.suggestedZone);
+    const firstDrawing = detectedDrawings[0];
+    const zoneWithTiming = {
+      ...inspectResult.suggestedZone,
+      userTimeStart: firstDrawing?.timeStart,
+      userTimeEnd: firstDrawing?.timeEnd
+    };
+    const overlayId = drawAiCorrectionOverlay(zoneWithTiming);
     if (overlayId) {
       setHasDrawnCorrection(true);
     }
@@ -510,6 +743,51 @@ export const AiTutorDrawer = ({
         exchange: s.exchange
       }));
 
+      // Compute live chart swings & extrema (Đỉnh & Đáy chuẩn xác từ biểu đồ)
+      let dynamicChartContext = { ...marketContext };
+      try {
+        const liveChartData = getChartDrawingsData();
+        const liveKlines = liveChartData.klines || [];
+        if (liveKlines.length > 0) {
+          const highs = liveKlines.map((k: any) => k.high).filter((v: any) => typeof v === 'number');
+          const lows = liveKlines.map((k: any) => k.low).filter((v: any) => typeof v === 'number');
+          const chartHigh = highs.length > 0 ? Math.max(...highs) : undefined;
+          const chartLow = lows.length > 0 ? Math.min(...lows) : undefined;
+
+          const swingHighs: Array<{ price: number; timestamp?: number; candlesAgo: number }> = [];
+          const swingLows: Array<{ price: number; timestamp?: number; candlesAgo: number }> = [];
+          const n = liveKlines.length;
+          for (let i = 1; i < n - 1; i++) {
+            const h = liveKlines[i].high;
+            const l = liveKlines[i].low;
+            if (h >= liveKlines[i - 1].high && h >= liveKlines[i + 1].high) {
+              swingHighs.push({ price: h, timestamp: liveKlines[i].timestamp, candlesAgo: n - 1 - i });
+            }
+            if (l <= liveKlines[i - 1].low && l <= liveKlines[i + 1].low) {
+              swingLows.push({ price: l, timestamp: liveKlines[i].timestamp, candlesAgo: n - 1 - i });
+            }
+          }
+
+          dynamicChartContext = {
+            ...dynamicChartContext,
+            chartHigh,
+            chartLow,
+            klines: liveKlines,
+            recentSwingHighs: swingHighs.slice(-4),
+            recentSwingLows: swingLows.slice(-4),
+            userDrawingsSummary: (liveChartData.drawings || []).map((d: any) => ({
+              name: d.name,
+              label: d.label,
+              tag: d.tag,
+              priceHigh: d.priceHigh,
+              priceLow: d.priceLow
+            }))
+          };
+        }
+      } catch (chartErr) {
+        console.warn('Could not extract live chart swings:', chartErr);
+      }
+
       // 1. Try Server-Sent Events (SSE Streaming) first for real-time word-by-word delivery
       let streamSucceeded = false;
       try {
@@ -520,7 +798,7 @@ export const AiTutorDrawer = ({
             symbol: currentSymbol,
             currentPrice,
             timeframe,
-            marketContext,
+            marketContext: dynamicChartContext,
             chatHistory,
             allStocks,
             lang
@@ -543,32 +821,35 @@ export const AiTutorDrawer = ({
           }
         );
 
-        // Finalize message with complete metadata & citations
-        setMessages(prev => {
-          const exists = prev.some(m => m.id === streamingId);
-          if (exists) {
-            return prev.map(m => m.id === streamingId ? { ...m, text: res.answer, data: res } : m);
-          }
-          return [...prev, { id: streamingId, sender: 'tutor', text: res.answer, data: res }];
-        });
-        streamSucceeded = true;
-        fetchSubscription();
+        // Finalize message with complete metadata & citations if valid answer was received
+        if (res.answer && !res.answer.includes('Không nhận được câu trả lời từ AI.')) {
+          setMessages(prev => {
+            const exists = prev.some(m => m.id === streamingId);
+            if (exists) {
+              return prev.map(m => m.id === streamingId ? { ...m, text: res.answer, data: res } : m);
+            }
+            return [...prev, { id: streamingId, sender: 'tutor', text: res.answer, data: res }];
+          });
+          streamSucceeded = true;
+          fetchSubscription();
+        } else {
+          console.warn('Streaming produced empty answer, falling back to standard askQuestion');
+          setMessages(prev => prev.filter(m => m.id !== streamingId));
+        }
       } catch (streamErr) {
         console.warn('Streaming error, checking fallback:', streamErr);
-        if (hasStartedStreaming) {
-          throw streamErr;
-        }
+        setMessages(prev => prev.filter(m => m.id !== streamingId));
       }
 
-      // 2. Fallback to standard request if streaming failed before sending any tokens
-      if (!streamSucceeded && !hasStartedStreaming) {
+      // 2. Fallback to standard request if streaming failed or produced empty answer
+      if (!streamSucceeded) {
         const res = await aiService.askQuestion(
           q, 
           undefined, 
           currentSymbol, 
           currentPrice, 
           timeframe, 
-          marketContext,
+          dynamicChartContext,
           chatHistory,
           allStocks,
           lang
@@ -707,7 +988,7 @@ export const AiTutorDrawer = ({
         <div className="flex items-center gap-1.5 shrink-0">
           {user && (
             <>
-              {subscription?.isPremium ? (
+              {subscription?.plan === 'PRO' ? (
                 <button
                   type="button"
                   onClick={() => setIsUpgradeModalOpen(true)}
@@ -715,16 +996,39 @@ export const AiTutorDrawer = ({
                   title={
                     subscription.premiumExpiresAt
                       ? (isEn
-                          ? `PRO VIP Account • ${subscription.remainingToday}/500 requests remaining today • Expires: ${new Date(subscription.premiumExpiresAt).toLocaleDateString('en-US')} (Click to view / extend)`
-                          : `Tài khoản PRO VIP • Còn ${subscription.remainingToday}/500 lượt hôm nay • Hạn dùng đến: ${new Date(subscription.premiumExpiresAt).toLocaleString('vi-VN')} (Bấm xem chi tiết / gia hạn)`)
-                      : (isEn ? 'PRO VIP Account (Click for details)' : 'Tài khoản PRO VIP (Bấm xem chi tiết)')
+                          ? `PRO VIP Account • Unlimited Chat & Chart Evaluations • Expires: ${new Date(subscription.premiumExpiresAt).toLocaleDateString('en-US')}`
+                          : `Tài khoản PRO VIP • Không giới hạn Chat & Chấm bài • Hạn đến: ${new Date(subscription.premiumExpiresAt).toLocaleDateString('vi-VN')}`)
+                      : 'PRO VIP Account (Unlimited)'
                   }
                 >
                   <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                  <span>PRO</span>
-                  <span className="font-mono text-[11px] opacity-85">({subscription.remainingToday}/500)</span>
+                  <span>PRO VIP</span>
+                  <span className="font-mono text-[11px] opacity-90 text-amber-500 font-extrabold">(∞)</span>
                   {subscription.premiumExpiresAt && (
                     <span className="hidden sm:inline-flex items-center text-[10px] text-amber-700 dark:text-amber-300 font-normal ml-0.5 border-l border-amber-500/30 pl-1.5 gap-1">
+                      <span>{isEn ? 'EXP:' : 'HSD:'}</span>
+                      <strong className="font-mono font-medium">{new Date(subscription.premiumExpiresAt).toLocaleDateString(isEn ? 'en-US' : 'vi-VN')}</strong>
+                    </span>
+                  )}
+                </button>
+              ) : subscription?.plan === 'PLUS' || subscription?.isPremium ? (
+                <button
+                  type="button"
+                  onClick={() => setIsUpgradeModalOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-blue-500/15 via-purple-500/10 to-blue-500/15 border border-blue-500/35 hover:border-blue-500/60 text-blue-600 dark:text-blue-400 font-bold text-xs whitespace-nowrap shadow-xs transition-all cursor-pointer hover:scale-[1.02]"
+                  title={
+                    isEn
+                      ? `PLUS Plan • ${subscription.remainingChat ?? subscription.remainingToday}/300 chats • ${subscription.remainingInspect ?? 150}/150 evaluations remaining`
+                      : `Gói PLUS • Còn ${subscription.remainingChat ?? subscription.remainingToday}/300 chat • ${subscription.remainingInspect ?? 150}/150 chấm bài (Bấm nâng cấp PRO)`
+                  }
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span>PLUS</span>
+                  <span className="font-mono text-[11px] opacity-85">
+                    ({subscription.remainingChat ?? subscription.remainingToday}/300)
+                  </span>
+                  {subscription.premiumExpiresAt && (
+                    <span className="hidden sm:inline-flex items-center text-[10px] text-blue-700 dark:text-blue-300 font-normal ml-0.5 border-l border-blue-500/30 pl-1.5 gap-1">
                       <span>{isEn ? 'EXP:' : 'HSD:'}</span>
                       <strong className="font-mono font-medium">{new Date(subscription.premiumExpiresAt).toLocaleDateString(isEn ? 'en-US' : 'vi-VN')}</strong>
                     </span>
@@ -734,19 +1038,22 @@ export const AiTutorDrawer = ({
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span 
                     className="hidden sm:inline-flex items-center px-2 py-1 rounded-lg bg-slate-100 dark:bg-[#1a1f2c] text-slate-600 dark:text-slate-300 text-xs font-mono border border-slate-200 dark:border-[#2b3347] whitespace-nowrap"
-                    title={isEn ? 'Remaining free AI requests today' : 'Lượt hỏi AI miễn phí còn lại hôm nay'}
+                    title={isEn ? 'Free quota remaining today' : 'Lượt dùng miễn phí hôm nay'}
                   >
                     <span className="text-slate-400 text-[11px] mr-1">Free:</span>
-                    <strong className="text-amber-600 dark:text-amber-400">{subscription ? subscription.remainingToday : 10}</strong>
-                    <span className="text-slate-400">/{subscription?.dailyAiLimit || 10}</span>
+                    <strong className="text-amber-600 dark:text-amber-400">{subscription?.remainingChat ?? (subscription ? subscription.remainingToday : 10)}</strong>
+                    <span className="text-slate-400">/10 chat</span>
+                    <span className="mx-1 text-slate-300 dark:text-slate-600">•</span>
+                    <strong className="text-blue-600 dark:text-blue-400">{subscription?.remainingInspect ?? 1}</strong>
+                    <span className="text-slate-400">/1 bài</span>
                   </span>
                   <button
                     onClick={() => setIsUpgradeModalOpen(true)}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-xs transition-all cursor-pointer whitespace-nowrap hover:scale-[1.02]"
-                    title={isEn ? 'Upgrade to PRO 500 requests/day' : 'Nâng cấp lên gói PRO 500 lượt/ngày qua PayOS'}
+                    title={isEn ? 'Upgrade to PLUS (129k) or PRO (299k)' : 'Nâng cấp Gói PLUS (129k) hoặc PRO (299k) qua PayOS'}
                   >
                     <Crown className="w-3.5 h-3.5 shrink-0" />
-                    <span>{isEn ? 'Upgrade PRO' : 'Nâng cấp PRO'}</span>
+                    <span>{isEn ? 'Upgrade' : 'Nâng cấp gói'}</span>
                   </button>
                 </div>
               )}
@@ -905,25 +1212,37 @@ export const AiTutorDrawer = ({
                               <Sparkles className="w-3 h-3 text-amber-500 dark:text-amber-400" />
                               AI Tutor
                             </span>
-                            <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
-                              Gemini
-                            </span>
+                            {msg.data?.provider === 'gemini' ? (
+                              <span className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-[9px] font-mono text-blue-600 dark:text-blue-400 flex items-center gap-1 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 animate-pulse" />
+                                {msg.imageUrl ? 'Gemini Vision' : 'Gemini VIP'}
+                              </span>
+                            ) : (msg.data?.provider === 'openai' || msg.data?.framework === 'VIP_LLM' || (!msg.data?.provider && (!msg.text || !msg.text.includes('Không nhận được')))) ? (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
+                                OpenAI GPT-4o
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-mono text-amber-600 dark:text-amber-400 flex items-center gap-1 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
+                                Knowledge Base
+                              </span>
+                            )}
                           </div>
                           <button
                             onClick={() => handleCopy(msg.id, msg.text)}
                             className="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-[#202738] hover:bg-slate-200 dark:hover:bg-[#2a334a] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-[#374158] text-[10px] transition-colors shadow-2xs"
-                            title="Sao chép nội dung"
+                            title={isEn ? "Copy content" : "Sao chép nội dung"}
                           >
                             {copiedId === msg.id ? (
                               <>
                                 <Check className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
-                                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Đã chép</span>
+                                <span className="text-emerald-600 dark:text-emerald-400 font-medium">{isEn ? 'Copied' : 'Đã chép'}</span>
                               </>
                             ) : (
                               <>
                                 <Copy className="w-3 h-3" />
-                                <span>Sao chép</span>
+                                <span>{isEn ? 'Copy' : 'Sao chép'}</span>
                               </>
                             )}
                           </button>
@@ -934,7 +1253,7 @@ export const AiTutorDrawer = ({
                           <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2 text-amber-800 dark:text-amber-300 text-xs">
                             <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
                             <div>
-                              <strong className="text-amber-900 dark:text-amber-200">Lưu ý:</strong> AI đóng vai trò Trợ lý Giáo dục & Phân tích Độc lập, không đưa ra tín hiệu Buy/Sell hay phím lệnh.
+                              <strong className="text-amber-900 dark:text-amber-200">{isEn ? 'Notice:' : 'Lưu ý:'}</strong> {isEn ? 'AI acts as an Educational & Independent Analysis Assistant and does not provide direct buy/sell signals.' : 'AI đóng vai trò Trợ lý Giáo dục & Phân tích Độc lập, không đưa ra tín hiệu Buy/Sell hay phím lệnh.'}
                             </div>
                           </div>
                         )}
@@ -952,17 +1271,19 @@ export const AiTutorDrawer = ({
                           <div className="mt-3 p-3.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-amber-500/15 border border-amber-500/40 text-center space-y-2">
                             <div className="text-xs font-bold text-amber-700 dark:text-amber-300 flex items-center justify-center gap-1.5">
                               <Crown className="w-4 h-4 text-amber-500 shrink-0" />
-                              <span>Mở khóa 500 lượt hỏi AI / ngày với gói PRO</span>
+                              <span>{isEn ? 'Unlock 500 AI queries / day with PRO package' : 'Mở khóa 500 lượt hỏi AI / ngày với gói PRO'}</span>
                             </div>
                             <p className="text-[11px] text-slate-600 dark:text-slate-300">
-                              Kích hoạt Senior Prop Firm AI Tutor • Đo lường rủi ro quỹ • Quét mã QR PayOS kích hoạt ngay
+                              {isEn 
+                                ? 'Activate Senior Prop Firm AI Tutor • Portfolio Risk Measurement • Instant PayOS QR activation' 
+                                : 'Kích hoạt Senior Prop Firm AI Tutor • Đo lường rủi ro quỹ • Quét mã QR PayOS kích hoạt ngay'}
                             </p>
                             <button
                               onClick={() => setIsUpgradeModalOpen(true)}
                               className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5 mx-auto cursor-pointer hover:scale-[1.02]"
                             >
                               <Crown className="w-3.5 h-3.5" />
-                              <span>Nâng cấp PRO ngay (99.000₫ / 30 ngày)</span>
+                              <span>{isEn ? 'Upgrade PRO Now (99,000₫ / 30 days)' : 'Nâng cấp PRO ngay (99.000₫ / 30 ngày)'}</span>
                               <ArrowRight className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -973,7 +1294,7 @@ export const AiTutorDrawer = ({
                           <div className="pt-2 border-t border-slate-200 dark:border-[#252c3f]/60 space-y-1.5">
                             <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1">
                               <ShieldCheck className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
-                              Tài liệu đối chiếu:
+                              {isEn ? 'Verified Reference Sources:' : 'Tài liệu đối chiếu:'}
                             </div>
                             <div className="flex flex-wrap gap-1.5">
                               {msg.data.sources.map((src, i) => (
@@ -985,6 +1306,28 @@ export const AiTutorDrawer = ({
                                   <span className="text-slate-400 dark:text-slate-500">•</span>
                                   <span className="text-slate-600 dark:text-slate-300">{src.author}</span>
                                 </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Socratic Reflection Questions (Interactive Action Chips) */}
+                        {msg.data?.socraticQuestions && msg.data.socraticQuestions.length > 0 && (
+                          <div className="pt-2 border-t border-slate-200 dark:border-[#252c3f]/60 space-y-1.5">
+                            <div className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-amber-500" />
+                              {isEn ? 'Socratic Thinking Questions (Click to ask):' : '💡 Câu hỏi đào sâu tư duy (Bấm để hỏi tiếp):'}
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              {msg.data.socraticQuestions.map((sq: string, i: number) => (
+                                <button
+                                  key={i}
+                                  onClick={() => handleAsk(sq)}
+                                  className="text-left px-2.5 py-1.5 rounded-lg bg-amber-500/5 hover:bg-amber-500/15 border border-amber-500/20 hover:border-amber-500/40 text-[11.5px] text-amber-700 dark:text-amber-300 transition-all flex items-center justify-between group shadow-2xs cursor-pointer"
+                                >
+                                  <span>💬 {sq}</span>
+                                  <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-amber-500 shrink-0 ml-1.5" />
+                                </button>
                               ))}
                             </div>
                           </div>
@@ -1021,7 +1364,7 @@ export const AiTutorDrawer = ({
                       <div className={`h-1.5 rounded-full transition-all duration-300 ${loadingSeconds >= 4 ? 'w-6 bg-amber-500 shadow-xs shadow-amber-500/50' : 'w-2 bg-slate-200 dark:bg-slate-700'}`} />
                       <div className={`h-1.5 rounded-full transition-all duration-300 ${loadingSeconds >= 8 ? 'w-6 bg-amber-500 shadow-xs shadow-amber-500/50' : 'w-2 bg-slate-200 dark:bg-slate-700'}`} />
                       <span className="text-[10px] text-slate-400 ml-1">
-                        {loadingSeconds <= 3 ? 'Giai đoạn 1/3' : loadingSeconds <= 7 ? 'Giai đoạn 2/3' : 'Giai đoạn 3/3'}
+                        {isEn ? `Stage ${loadingSeconds <= 3 ? '1/3' : loadingSeconds <= 7 ? '2/3' : '3/3'}` : (loadingSeconds <= 3 ? 'Giai đoạn 1/3' : loadingSeconds <= 7 ? 'Giai đoạn 2/3' : 'Giai đoạn 3/3')}
                       </span>
                     </div>
                   </div>
@@ -1057,13 +1400,52 @@ export const AiTutorDrawer = ({
                 </div>
 
                 <button
-                  onClick={handleScanDrawings}
+                  onClick={() => handleScanDrawings(true)}
                   className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-[#1f2430] hover:bg-slate-200 dark:hover:bg-[#2b3347] text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
                   title={isEn ? 'Rescan latest drawings on chart' : 'Quét lại hình vẽ mới nhất trên biểu đồ'}
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin text-amber-500' : ''}`} />
                   <span>{isEn ? 'Rescan' : 'Quét lại hình'}</span>
                 </button>
+              </div>
+
+              {/* Scan Feedback Banner */}
+              {scanMessage && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs animate-in fade-in slide-in-from-top-1 duration-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>{scanMessage}</span>
+                </div>
+              )}
+
+              {/* Evaluation Quota Strip */}
+              <div className="flex items-center justify-between pt-2 border-t border-amber-500/20 text-[11px]">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 dark:text-slate-400">
+                    {isEn ? 'Evaluation Quota:' : 'Hạn mức Chấm Bài:'}
+                  </span>
+                  {subscription?.plan === 'PRO' ? (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold font-mono">
+                      {isEn ? 'PRO VIP: Unlimited' : 'PRO VIP: Không giới hạn'}
+                    </span>
+                  ) : subscription?.plan === 'PLUS' || subscription?.plan === 'PREMIUM' ? (
+                    <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold font-mono">
+                      {isEn ? `PLUS: ${subscription?.remainingInspect ?? 150}/150 month` : `PLUS: ${subscription?.remainingInspect ?? 150}/150 tháng`}
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-[#202533] text-slate-700 dark:text-slate-300 font-semibold font-mono">
+                      {isEn ? `Free: ${subscription?.remainingInspect ?? 1}/1 day` : `Free: ${subscription?.remainingInspect ?? 1}/1 lượt/ngày`}
+                    </span>
+                  )}
+                </div>
+                {!subscription?.isPremium && (
+                  <button
+                    onClick={() => setIsUpgradeModalOpen(true)}
+                    className="font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Crown className="w-3 h-3" />
+                    <span>{isEn ? 'Upgrade to 20/day' : 'Nâng cấp 20 lượt/ngày'}</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1073,7 +1455,7 @@ export const AiTutorDrawer = ({
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <span>{inspectError}</span>
-                  {inspectError.includes('hạn mức') && (
+                  {(inspectError.includes('hạn mức') || inspectError.includes('lượt') || inspectError.toLowerCase().includes('quota') || inspectError.toLowerCase().includes('upgrade')) && (
                     <button
                       onClick={() => setIsUpgradeModalOpen(true)}
                       className="block mt-1 font-bold underline cursor-pointer text-amber-600 dark:text-amber-400"
@@ -1136,10 +1518,10 @@ export const AiTutorDrawer = ({
                 </div>
 
                 <button
-                  onClick={handleScanDrawings}
+                  onClick={() => handleScanDrawings(true)}
                   className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-950 font-bold text-xs shadow-xs transition-all cursor-pointer inline-flex items-center gap-2"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
                   <span>{isEn ? 'Rescan drawings on chart' : 'Quét lại hình vẽ trên biểu đồ'}</span>
                 </button>
               </div>
@@ -1157,42 +1539,111 @@ export const AiTutorDrawer = ({
                         : `Đã phát hiện ${detectedDrawings.length} vùng vẽ trên ${activeSymbol} (${timeframe}):`}
                     </span>
                   </div>
-                  <button
-                    onClick={handleScanDrawings}
-                    className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    {isEn ? 'Update' : 'Cập nhật'}
-                  </button>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      onClick={() => handleScanDrawings(true)}
+                      className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isScanning ? 'animate-spin' : ''}`} />
+                      {isEn ? 'Update' : 'Quét lại'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        clearAllChartDrawings();
+                        handleScanDrawings(true);
+                      }}
+                      className="text-[11px] text-red-500 hover:text-red-600 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                      title={isEn ? 'Clear all drawings on chart' : 'Xóa tất cả hình vẽ trên biểu đồ'}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>{isEn ? 'Clear all' : 'Xóa tất cả'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* List detected drawing data items */}
-                <div className="space-y-2">
-                  {detectedDrawings.map((d, idx) => (
-                    <div
-                      key={d.id || idx}
-                      className="p-2.5 rounded-lg bg-slate-50 dark:bg-[#131722] border border-slate-200 dark:border-[#232938] flex items-center justify-between gap-2 text-xs"
-                    >
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <div className="w-5 h-5 rounded bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold text-[10px] shrink-0">
-                          #{idx + 1}
+                <div className="space-y-2.5">
+                  {detectedDrawings.map((d, idx) => {
+                    const tagColors: Record<string, string> = {
+                      OB: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
+                      FVG: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
+                      BOS: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30',
+                      CHOCH: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
+                      LIQUIDITY: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+                      CUSTOM: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30'
+                    };
+                    const badgeClass = tagColors[d.tag || ''] || 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20';
+
+                    return (
+                      <div
+                        key={d.id || idx}
+                        className="p-3 rounded-xl bg-slate-50 dark:bg-[#131722] border border-slate-200 dark:border-[#232938] hover:border-amber-500/40 transition-all flex flex-col gap-2 text-xs"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <div className="w-5 h-5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-[10px] shrink-0 border border-amber-500/20">
+                              #{idx + 1}
+                            </div>
+                            <div className="truncate flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-900 dark:text-white">
+                                {d.label || (d.name === 'rect' ? (isEn ? 'Price Zone (Rectangle)' : 'Hộp Vùng Giá (Rectangle)') : d.name)}
+                              </span>
+                              {d.tag && (
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider border ${badgeClass}`}>
+                                  {d.tag}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                                                    <div className="flex items-center gap-2 shrink-0">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold">
+                              {d.priceLow !== undefined && d.priceHigh !== undefined
+                                ? `$${d.priceLow.toLocaleString('en-US')} → $${d.priceHigh.toLocaleString('en-US')}`
+                                : 'Coordinates active'}
+                            </span>
+                            <button
+                              onClick={() => {
+                                if (d.id) {
+                                  removeChartDrawing(d.id);
+                                  handleScanDrawings(false);
+                                }
+                              }}
+                              className="p-1 rounded hover:bg-red-500/15 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                              title={isEn ? 'Delete this drawing from chart' : 'Xóa hình vẽ này khỏi biểu đồ'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          {d.rangeAmount !== undefined && (
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                              {isEn ? 'Range:' : 'Biên độ:'} {d.rangeAmount >= 1 ? d.rangeAmount.toLocaleString('en-US', { maximumFractionDigits: 2 }) : d.rangeAmount.toFixed(4)}
+                            </span>
+                          )}
                         </div>
-                        <div className="truncate">
-                          <span className="font-semibold text-slate-900 dark:text-white capitalize">
-                            {d.name === 'rect' ? (isEn ? 'Price Zone Box (Rectangle)' : 'Hộp vùng giá (Rectangle)') : d.name}
+
+                        {/* Quick SMC Tag Pill Selection */}
+                        <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-200/60 dark:border-[#1e2330] overflow-x-auto pb-0.5">
+                          <span className="text-[10px] font-medium text-slate-400 shrink-0">
+                            {isEn ? 'SMC Tag:' : 'Ký hiệu:'}
                           </span>
-                          <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-mono">
-                            {d.priceLow !== undefined && d.priceHigh !== undefined
-                              ? `$${d.priceLow.toLocaleString('en-US')} → $${d.priceHigh.toLocaleString('en-US')}`
-                              : `${d.points?.length || 0} ${isEn ? 'anchor points' : 'điểm neo'}`}
-                          </span>
+                          {(['OB', 'FVG', 'BOS', 'LIQUIDITY'] as const).map(tTag => (
+                            <button
+                              key={tTag}
+                              type="button"
+                              onClick={() => handleTagDrawing(idx, tTag)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer border ${
+                                d.tag === tTag
+                                  ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-xs'
+                                  : 'bg-white dark:bg-[#1a1f2e] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-[#2b3347] hover:border-amber-400 hover:text-amber-500'
+                              }`}
+                            >
+                              {tTag === 'OB' ? 'Order Block' : tTag === 'FVG' ? 'Fair Value Gap' : tTag === 'BOS' ? 'BOS Cấu Trúc' : 'Thanh Khoản'}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0 font-medium">
-                        {isEn ? 'Ready to evaluate' : 'Sẵn sàng chấm'}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* User Notes Input */}
@@ -1272,6 +1723,22 @@ export const AiTutorDrawer = ({
                           : (isEn ? 'INCORRECT' : 'CHƯA ĐÚNG')}
                       </span>
                     </span>
+                    {inspectResult.provider === 'gemini' ? (
+                      <span className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-[9px] font-mono text-blue-600 dark:text-blue-400 flex items-center gap-1 shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 animate-pulse" />
+                        Gemini Vision
+                      </span>
+                    ) : inspectResult.provider === 'openai' ? (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1 shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
+                        OpenAI GPT-4o
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-[9px] font-mono text-purple-600 dark:text-purple-400 flex items-center gap-1 shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500 dark:bg-purple-400" />
+                        Rule Engine
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30">
