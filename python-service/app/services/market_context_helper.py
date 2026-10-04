@@ -188,3 +188,155 @@ def classify_user_intent(query: str, has_positions: bool = False) -> Tuple[str, 
     """
     active_method: TradingMethod = route_query_to_method(query, has_positions=has_positions)
     return active_method.code, active_method.to_prompt_text()
+
+
+# ==========================================
+# 5. TRÍCH XUẤT ĐỈNH & ĐÁY BIỂU ĐỒ CHUẨN XÁC (SWING HIGHS / SWING LOWS)
+# ==========================================
+def extract_chart_swings_and_extrema(klines: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Trích xuất chính xác Đỉnh cao nhất (Global High), Đáy thấp nhất (Global Low),
+    và các Đỉnh đảo chiều (Swing Highs / Fractals) & Đáy đảo chiều (Swing Lows / Fractals)
+    từ chuỗi nến thực tế trên biểu đồ.
+    """
+    if not klines or len(klines) < 3:
+        return {
+            "global_high": None,
+            "global_low": None,
+            "latest_close": None,
+            "swing_highs": [],
+            "swing_lows": []
+        }
+
+    highs = [k.get("high") for k in klines if isinstance(k.get("high"), (int, float))]
+    lows = [k.get("low") for k in klines if isinstance(k.get("low"), (int, float))]
+    global_high = max(highs) if highs else None
+    global_low = min(lows) if lows else None
+    latest_close = klines[-1].get("close") if klines else None
+
+    swing_highs = []
+    swing_lows = []
+    n = len(klines)
+
+    # 3-bar and 5-bar pivot detection
+    for i in range(1, n - 1):
+        k = klines[i]
+        h = k.get("high")
+        l = k.get("low")
+        if not isinstance(h, (int, float)) or not isinstance(l, (int, float)):
+            continue
+
+        prev_h = klines[i-1].get("high", -1e9)
+        next_h = klines[i+1].get("high", -1e9)
+        prev_l = klines[i-1].get("low", 1e9)
+        next_l = klines[i+1].get("low", 1e9)
+
+        # Swing High
+        if h >= prev_h and h >= next_h:
+            is_strong = False
+            if i >= 2 and i + 2 < n:
+                is_strong = (h >= klines[i-2].get("high", -1e9) and h >= klines[i+2].get("high", -1e9))
+            swing_highs.append({
+                "price": h,
+                "candles_ago": n - 1 - i,
+                "is_strong": is_strong,
+                "timestamp": k.get("timestamp")
+            })
+
+        # Swing Low
+        if l <= prev_l and l <= next_l:
+            is_strong = False
+            if i >= 2 and i + 2 < n:
+                is_strong = (l <= klines[i-2].get("low", 1e9) and l <= klines[i+2].get("low", 1e9))
+            swing_lows.append({
+                "price": l,
+                "candles_ago": n - 1 - i,
+                "is_strong": is_strong,
+                "timestamp": k.get("timestamp")
+            })
+
+    return {
+        "global_high": global_high,
+        "global_low": global_low,
+        "latest_close": latest_close,
+        "swing_highs": swing_highs,
+        "swing_lows": swing_lows
+    }
+
+def format_detailed_chart_context(
+    symbol: Optional[str] = None,
+    current_price: Optional[float] = None,
+    timeframe: Optional[str] = None,
+    market_context: Optional[Dict[str, Any]] = None,
+    klines: Optional[List[Dict[str, Any]]] = None,
+    is_en: bool = False
+) -> str:
+    """
+    Tạo khối ngữ cảnh biểu đồ thực tế bao gồm đỉnh/đáy chính xác để nạp vào prompt cho LLM.
+    """
+    lines = []
+    if symbol:
+        lines.append(f"- Mã tài sản đang mở biểu đồ: {symbol}")
+    if current_price is not None:
+        p_fmt = f"${current_price:,.4f}".rstrip('0').rstrip('.') if current_price < 1 else f"${current_price:,.2f}"
+        lines.append(f"- Giá thị trường thực tế: {p_fmt}")
+    if timeframe:
+        lines.append(f"- Khung thời gian: {timeframe}")
+
+    mc = market_context or {}
+    if mc.get("change24h") is not None:
+        lines.append(f"- Biến động 24h: {mc.get('change24h')}%")
+    if mc.get("exchange"):
+        lines.append(f"- Sàn giao dịch: {mc.get('exchange')}")
+    if mc.get("high24h") is not None:
+        lines.append(f"- Đỉnh cao nhất 24h (24h High): ${mc.get('high24h'):,.2f}")
+    if mc.get("low24h") is not None:
+        lines.append(f"- Đáy thấp nhất 24h (24h Low): ${mc.get('low24h'):,.2f}")
+
+    # Process klines if available
+    chart_klines = klines or mc.get("klines") or []
+    swings = extract_chart_swings_and_extrema(chart_klines) if chart_klines else None
+
+    g_high = (swings and swings["global_high"]) or mc.get("chartHigh")
+    g_low = (swings and swings["global_low"]) or mc.get("chartLow")
+
+    if g_high is not None:
+        lines.append(f"- Đỉnh cao nhất trên biểu đồ (Highest High): ${g_high:,.2f}")
+    if g_low is not None:
+        lines.append(f"- Đáy thấp nhất trên biểu đồ (Lowest Low): ${g_low:,.2f}")
+
+    recent_sh = (swings and swings["swing_highs"]) or mc.get("recentSwingHighs") or []
+    if recent_sh:
+        sh_items = recent_sh[-4:]
+        sh_strs = [f"${sh.get('price'):,.2f} ({sh.get('candles_ago', sh.get('candlesAgo', 0))} nến trước)" for sh in reversed(sh_items)]
+        lines.append(f"- Các Đỉnh đảo chiều gần nhất (Swing Highs): {', '.join(sh_strs)}")
+
+    recent_sl = (swings and swings["swing_lows"]) or mc.get("recentSwingLows") or []
+    if recent_sl:
+        sl_items = recent_sl[-4:]
+        sl_strs = [f"${sl.get('price'):,.2f} ({sl.get('candles_ago', sl.get('candlesAgo', 0))} nến trước)" for sl in reversed(sl_items)]
+        lines.append(f"- Các Đáy đảo chiều gần nhất (Swing Lows): {', '.join(sl_strs)}")
+
+    user_drawings = mc.get("userDrawingsSummary") or []
+    if user_drawings:
+        draw_strs = [f"{d.get('label', d.get('name'))} [Vùng giá: ${d.get('priceLow')}-${d.get('priceHigh')}]" for d in user_drawings]
+        lines.append(f"- Các vùng hình vẽ học viên đã đánh dấu trên biểu đồ: {'; '.join(draw_strs)}")
+
+    if not lines:
+        return ""
+
+    if is_en:
+        rule = (
+            "\n\n⚠️ MANDATORY ACCURACY RULE FOR PEAKS & TROUGHS:\n"
+            "When analyzing market structure, swing highs/lows, support, and resistance, you MUST use the EXACT "
+            "factual High/Low numbers provided above. DO NOT invent or estimate random prices for peaks and troughs."
+        )
+        return "\n\n📊 [FACTUAL CHART & SWING HIGH/LOW DATA]:\n" + "\n".join(lines) + rule
+    else:
+        rule = (
+            "\n\n⚠️ QUY TẮC BẮT BUỘC VỀ ĐỈNH & ĐÁY BIỂU ĐỒ:\n"
+            "Khi phân tích cấu trúc thị trường, đỉnh/đáy, hỗ trợ/kháng cự, bạn BẮT BUỘC sử dụng CHÍNH XÁC "
+            "các mức giá Đỉnh và Đáy thực tế được cung cấp cụ thể ở trên. "
+            "TUYỆT ĐỐI KHÔNG tự bịa hoặc đoán mò giá đỉnh đáy khác xa với dữ liệu thật."
+        )
+        return "\n\n📊 [DỮ LIỆU ĐỈNH/ĐÁY VÀ CẤU TRÚC BIỂU ĐỒ THỰC TẾ]:\n" + "\n".join(lines) + rule

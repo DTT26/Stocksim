@@ -215,7 +215,7 @@ export const getChartDrawingsData = (): { drawings: UserChartDrawing[]; klines: 
       : [];
 
     const klines = typeof globalChartInstance.getDataList === 'function'
-      ? (globalChartInstance.getDataList() || []).slice(-60)
+      ? (globalChartInstance.getDataList() || []).slice(-120)
       : [];
 
     const allUserOverlays = (Array.isArray(rawOverlays) ? rawOverlays : []).filter(isUserDrawingOverlay);

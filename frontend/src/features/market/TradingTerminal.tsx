@@ -1888,7 +1888,10 @@ export const TradingTerminal = () => {
         marketContext={{
           change24h: selectedStock.percent !== undefined ? Number(selectedStock.percent.toFixed(2)) : undefined,
           exchange: selectedStock.exchange,
-          market: selectedStock.market
+          market: selectedStock.market,
+          high24h: currentTicker?.high24h,
+          low24h: currentTicker?.low24h,
+          volume: currentTicker?.volume24h
         }}
         onStartBacktestReplay={handleStartBacktestReplayFromAi}
       />

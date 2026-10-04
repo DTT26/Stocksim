@@ -77,13 +77,17 @@ async def inspect_chart(request: Request):
     user_notes = data.get("userNotes", "")
     user_id = request.headers.get("x-user-id") or data.get("userId")
     lang = data.get("lang", "vi")
+    klines = data.get("klines", [])
+    market_context = data.get("marketContext", {})
     return ai_tutor_service.inspect_chart_vision(
         image_base64=image,
         symbol=symbol,
         timeframe=timeframe,
         user_notes=user_notes,
         user_id=user_id,
-        lang=lang
+        lang=lang,
+        klines=klines,
+        market_context=market_context
     )
 
 @router.post("/inspect-chart-data")

@@ -391,24 +391,14 @@ class AiTutorService:
                     if history_lines:
                         chat_history_str = "\n\n💬 [LỊCH SỬ HỘI THOẠI GẦN ĐÂY ĐỂ TRẢ LỜI LIÊN TIẾP]:\n" + "\n".join(history_lines)
 
-            # 1. Mã hiện tại đang xem trên biểu đồ
-            current_chart_str = ""
-            if req.symbol or req.currentPrice is not None:
-                market_lines = []
-                if req.symbol:
-                    market_lines.append(f"- Mã tài sản đang mở biểu đồ: {req.symbol}")
-                if req.currentPrice is not None:
-                    formatted_p = f"{req.currentPrice:,.4f}".rstrip('0').rstrip('.') if req.currentPrice < 1 else f"{req.currentPrice:,.2f}"
-                    market_lines.append(f"- Giá thị trường thực tế: ${formatted_p}")
-                if req.timeframe:
-                    market_lines.append(f"- Khung thời gian biểu đồ người dùng đang xem: {req.timeframe}")
-                if req.marketContext:
-                    mc = req.marketContext
-                    if mc.get("change24h") is not None:
-                        market_lines.append(f"- Biến động 24h: {mc.get('change24h')}%")
-                    if mc.get("exchange"):
-                        market_lines.append(f"- Sàn giao dịch: {mc.get('exchange')}")
-                current_chart_str = "\n\n📊 [BIỂU ĐỒ ĐANG XEM]:\n" + "\n".join(market_lines)
+            # 1. Mã hiện tại và cấu trúc Đỉnh/Đáy thực tế trên biểu đồ
+            current_chart_str = format_detailed_chart_context(
+                symbol=req.symbol,
+                current_price=req.currentPrice,
+                timeframe=req.timeframe,
+                market_context=req.marketContext,
+                is_en=is_en
+            )
 
             # 2. Bảng giá lọc thông minh (chỉ nạp 3-5 mã liên quan, chống tràn token & giảm độ trễ)
             all_stocks_str = ""
@@ -1059,23 +1049,13 @@ class AiTutorService:
                     if history_lines:
                         chat_history_str = "\n\n💬 [LỊCH SỬ HỘI THOẠI GẦN ĐÂY ĐỂ TRẢ LỜI LIÊN TIẾP]:\n" + "\n".join(history_lines)
 
-            current_chart_str = ""
-            if req.symbol or req.currentPrice is not None:
-                market_lines = []
-                if req.symbol:
-                    market_lines.append(f"- Mã tài sản đang mở biểu đồ: {req.symbol}")
-                if req.currentPrice is not None:
-                    formatted_p = f"{req.currentPrice:,.4f}".rstrip('0').rstrip('.') if req.currentPrice < 1 else f"{req.currentPrice:,.2f}"
-                    market_lines.append(f"- Giá thị trường thực tế: ${formatted_p}")
-                if req.timeframe:
-                    market_lines.append(f"- Khung thời gian: {req.timeframe}")
-                if req.marketContext:
-                    mc = req.marketContext
-                    if mc.get("change24h") is not None:
-                        market_lines.append(f"- Biến động 24h: {mc.get('change24h')}%")
-                    if mc.get("exchange"):
-                        market_lines.append(f"- Sàn giao dịch: {mc.get('exchange')}")
-                current_chart_str = "\n\n📊 [BIỂU ĐỒ ĐANG XEM]:\n" + "\n".join(market_lines)
+            current_chart_str = format_detailed_chart_context(
+                symbol=req.symbol,
+                current_price=req.currentPrice,
+                timeframe=req.timeframe,
+                market_context=req.marketContext,
+                is_en=is_en
+            )
 
             all_stocks_str = ""
             relevant_stocks = extract_relevant_stocks(
@@ -1279,7 +1259,9 @@ class AiTutorService:
         timeframe: Optional[str] = None,
         user_notes: str = "",
         user_id: Optional[str] = None,
-        lang: str = "vi"
+        lang: str = "vi",
+        klines: Optional[List[Dict[str, Any]]] = None,
+        market_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Multimodal Chart Vision Inspector & Grader.
@@ -1351,6 +1333,18 @@ class AiTutorService:
             user_prompt += f"\nGhi chú/Nhận định của học viên: {user_notes}"
         else:
             user_prompt += "\nHãy kiểm tra xem các vùng tôi đã vẽ trên biểu đồ (Order Block, FVG, Hỗ trợ/Kháng cự...) đã chính xác chưa và nhận xét chi tiết giúp tôi."
+
+        # Inject factual ground truth price & swing high/low data to Gemini Vision prompt
+        factual_chart_str = format_detailed_chart_context(
+            symbol=symbol,
+            current_price=(market_context or {}).get("currentPrice"),
+            timeframe=timeframe,
+            market_context=market_context,
+            klines=klines,
+            is_en=is_en
+        )
+        if factual_chart_str:
+            user_prompt += "\n" + factual_chart_str
 
         # 3. Call Vision
         analysis = llm_client.generate_vision_text(
@@ -1468,8 +1462,18 @@ class AiTutorService:
                 )
         drawings_str = "\n".join(drawings_summary)
 
-        # Summarize recent candles (last 25 candles)
-        recent_klines = klines[-25:] if len(klines) > 25 else klines
+        # Extract swings & extrema across ALL klines provided (up to 120 candles)
+        swings = extract_chart_swings_and_extrema(klines)
+        wave_max = swings["global_high"] or 0
+        wave_min = swings["global_low"] or 0
+
+        recent_sh = swings["swing_highs"][-4:] if swings["swing_highs"] else []
+        recent_sl = swings["swing_lows"][-4:] if swings["swing_lows"] else []
+        sh_str = ", ".join([f"${sh['price']:,.2f} ({sh['candles_ago']} nến trước)" for sh in reversed(recent_sh)]) if recent_sh else "N/A"
+        sl_str = ", ".join([f"${sl['price']:,.2f} ({sl['candles_ago']} nến trước)" for sl in reversed(recent_sl)]) if recent_sl else "N/A"
+
+        # Summarize recent candles (last 40 candles for LLM prompt context)
+        recent_klines = klines[-40:] if len(klines) > 40 else klines
         klines_summary = []
         for k in recent_klines:
             o = k.get("open")
@@ -1479,12 +1483,6 @@ class AiTutorService:
             t = k.get("timestamp")
             klines_summary.append(f"O:{o} H:{h} L:{l} C:{c} (t:{t})")
         klines_str = "; ".join(klines_summary)
-
-        # Calculate wave extrema & price context
-        highs = [k.get("high") for k in recent_klines if isinstance(k.get("high"), (int, float))]
-        lows = [k.get("low") for k in recent_klines if isinstance(k.get("low"), (int, float))]
-        wave_max = max(highs) if highs else 0
-        wave_min = min(lows) if lows else 0
 
         # Identify student drawing zone relative to wave (upper swing high or lower swing low)
         first_draw = drawings[0] if drawings else {}
@@ -1529,7 +1527,9 @@ class AiTutorService:
                 f"Asset: {symbol or 'N/A'}, Timeframe: {timeframe or 'N/A'}.\n"
                 f"STUDENT CHART DRAWINGS DATA:\n{drawings_str}\n\n"
                 f"REAL CANDLESTICK DATA (OHLCV):\n{klines_str}\n"
-                f"Swing High: {wave_max}, Swing Low: {wave_min}.\n"
+                f"Chart Highest High: {wave_max}, Chart Lowest Low: {wave_min}.\n"
+                f"Recent Swing Highs: {sh_str}\n"
+                f"Recent Swing Lows: {sl_str}\n"
             )
             if user_notes:
                 user_prompt += f"\nTrader's notes: {user_notes}\n"
@@ -1570,7 +1570,9 @@ class AiTutorService:
                 f"Mã tài sản: {symbol or 'N/A'}, Khung thời gian: {timeframe or 'N/A'}.\n"
                 f"DỮ LIỆU HÌNH VẼ CỦA HỌC VIÊN TRÊN BIỂU ĐỒ:\n{drawings_str}\n\n"
                 f"CHUỖI NẾN THỰC TẾ TRÊN BIỂU ĐỒ (OHLCV):\n{klines_str}\n\n"
-                f"Đỉnh cao nhất của sóng: {wave_max}, Đáy thấp nhất: {wave_min}.\n"
+                f"Đỉnh cao nhất trên biểu đồ: {wave_max}, Đáy thấp nhất: {wave_min}.\n"
+                f"Các Đỉnh đảo chiều gần nhất (Recent Swing Highs): {sh_str}\n"
+                f"Các Đáy đảo chiều gần nhất (Recent Swing Lows): {sl_str}\n"
             )
             if user_notes:
                 user_prompt += f"\nGhi chú học viên: {user_notes}\n"

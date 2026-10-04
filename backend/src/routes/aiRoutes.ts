@@ -907,7 +907,7 @@ router.delete('/chat-history', protect, async (req: AuthRequest, res: Response) 
 router.post('/inspect-chart', optionalProtect, async (req: any, res: Response) => {
   try {
     const userId = req.user?._id?.toString() || req.body?.userId || 'guest_user';
-    const { image, symbol, timeframe, userNotes } = req.body;
+    const { image, symbol, timeframe, userNotes, klines, marketContext, lang } = req.body;
 
     if (!image) {
       return res.status(400).json({ success: false, message: 'Thiếu dữ liệu ảnh biểu đồ (image base64)' });
@@ -918,6 +918,9 @@ router.post('/inspect-chart', optionalProtect, async (req: any, res: Response) =
       symbol: symbol || '',
       timeframe: timeframe || '',
       userNotes: userNotes || '',
+      klines: klines || [],
+      marketContext: marketContext || {},
+      lang: lang || 'vi',
       userId
     });
 

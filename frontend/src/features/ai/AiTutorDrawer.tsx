@@ -309,13 +309,29 @@ export const AiTutorDrawer = ({
           const qText = isEn
             ? `Analyze market structure, key price zones, and Fibonacci levels of ${currentSymbol} on ${timeframe} timeframe. Suggest trade scenarios with proper risk management.`
             : `Phân tích cấu trúc thị trường, các vùng giá quan trọng và các mức Fibonacci của mã ${currentSymbol} trên khung thời gian ${timeframe}. Đưa ra các gợi ý kịch bản giao dịch theo quản trị rủi ro.`;
+          // Attach real chart structure to shared snapshot
+          let snapChartContext = { ...marketContext };
+          try {
+            const chartData = getChartDrawingsData();
+            if (chartData.klines && chartData.klines.length > 0) {
+              const highs = chartData.klines.map((k: any) => k.high).filter((v: any) => typeof v === 'number');
+              const lows = chartData.klines.map((k: any) => k.low).filter((v: any) => typeof v === 'number');
+              snapChartContext = {
+                ...snapChartContext,
+                chartHigh: highs.length > 0 ? Math.max(...highs) : undefined,
+                chartLow: lows.length > 0 ? Math.min(...lows) : undefined,
+                klines: chartData.klines
+              };
+            }
+          } catch (_) {}
+
           const res = await aiService.askQuestion(
             qText,
             undefined,
             currentSymbol,
             currentPrice,
             timeframe,
-            marketContext,
+            snapChartContext,
             undefined,
             undefined,
             lang
@@ -556,6 +572,51 @@ export const AiTutorDrawer = ({
         exchange: s.exchange
       }));
 
+      // Compute live chart swings & extrema (Đỉnh & Đáy chuẩn xác từ biểu đồ)
+      let dynamicChartContext = { ...marketContext };
+      try {
+        const liveChartData = getChartDrawingsData();
+        const liveKlines = liveChartData.klines || [];
+        if (liveKlines.length > 0) {
+          const highs = liveKlines.map((k: any) => k.high).filter((v: any) => typeof v === 'number');
+          const lows = liveKlines.map((k: any) => k.low).filter((v: any) => typeof v === 'number');
+          const chartHigh = highs.length > 0 ? Math.max(...highs) : undefined;
+          const chartLow = lows.length > 0 ? Math.min(...lows) : undefined;
+
+          const swingHighs: Array<{ price: number; timestamp?: number; candlesAgo: number }> = [];
+          const swingLows: Array<{ price: number; timestamp?: number; candlesAgo: number }> = [];
+          const n = liveKlines.length;
+          for (let i = 1; i < n - 1; i++) {
+            const h = liveKlines[i].high;
+            const l = liveKlines[i].low;
+            if (h >= liveKlines[i - 1].high && h >= liveKlines[i + 1].high) {
+              swingHighs.push({ price: h, timestamp: liveKlines[i].timestamp, candlesAgo: n - 1 - i });
+            }
+            if (l <= liveKlines[i - 1].low && l <= liveKlines[i + 1].low) {
+              swingLows.push({ price: l, timestamp: liveKlines[i].timestamp, candlesAgo: n - 1 - i });
+            }
+          }
+
+          dynamicChartContext = {
+            ...dynamicChartContext,
+            chartHigh,
+            chartLow,
+            klines: liveKlines,
+            recentSwingHighs: swingHighs.slice(-4),
+            recentSwingLows: swingLows.slice(-4),
+            userDrawingsSummary: (liveChartData.drawings || []).map((d: any) => ({
+              name: d.name,
+              label: d.label,
+              tag: d.tag,
+              priceHigh: d.priceHigh,
+              priceLow: d.priceLow
+            }))
+          };
+        }
+      } catch (chartErr) {
+        console.warn('Could not extract live chart swings:', chartErr);
+      }
+
       // 1. Try Server-Sent Events (SSE Streaming) first for real-time word-by-word delivery
       let streamSucceeded = false;
       try {
@@ -566,7 +627,7 @@ export const AiTutorDrawer = ({
             symbol: currentSymbol,
             currentPrice,
             timeframe,
-            marketContext,
+            marketContext: dynamicChartContext,
             chatHistory,
             allStocks,
             lang
@@ -617,7 +678,7 @@ export const AiTutorDrawer = ({
           currentSymbol, 
           currentPrice, 
           timeframe, 
-          marketContext,
+          dynamicChartContext,
           chatHistory,
           allStocks,
           lang
