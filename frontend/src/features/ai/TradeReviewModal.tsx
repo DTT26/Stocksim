@@ -658,7 +658,7 @@ const TradeReviewModalInner = ({
                   <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-start gap-2 text-xs text-amber-200">
                     <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="text-amber-300">{isEn ? 'Actionable Correction:' : 'Hành động khắc phục:'}</strong> {review.aiCoach.actionItem}
+                      <strong className="text-amber-300">{isEn ? 'Actionable Correction:' : 'Hành động khắc phục:'}</strong> {review.aiCoach?.actionItem || (isEn ? 'Stick strictly to your execution plan.' : 'Kiên định tuân thủ kế hoạch giao dịch.')}
                     </div>
                   </div>
                 )}
@@ -666,7 +666,7 @@ const TradeReviewModalInner = ({
                   <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/25 flex items-start gap-2 text-xs text-indigo-200">
                     <Scale className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="text-indigo-300">{isEn ? 'Reflection Question:' : 'Câu hỏi gợi mở tư duy (Reflection Question):'}</strong> {review.aiCoach.reflectionQuestion}
+                      <strong className="text-indigo-300">{isEn ? 'Reflection Question:' : 'Câu hỏi gợi mở tư duy (Reflection Question):'}</strong> {review.aiCoach?.reflectionQuestion || (isEn ? 'Did this setup fully align with your trading criteria?' : 'Lệnh này đã đáp ứng đầy đủ điều kiện vào lệnh của bạn chưa?')}
                     </div>
                   </div>
                 )}
@@ -946,7 +946,7 @@ const TradeReviewModalInner = ({
                         <strong>Nhiệm vụ:</strong> Xác định xu hướng chính (Bias: Bullish hay Bearish), khung giá đang giao dịch (Dealing Range), phân vùng Premium/Discount (50% Equilibrium) và các trạm cản HTF POI.
                       </p>
                       <div className="pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
-                        <span>Trạng thái: <span className="text-slate-200 font-medium">{review.marketContext.higherTimeframeTrend || 'Bullish'} Bias</span></span>
+                        <span>Trạng thái: <span className="text-slate-200 font-medium">{review.marketContext?.higherTimeframeTrend || 'Bullish'} Bias</span></span>
                         <span>Phân vùng: <span className="text-emerald-400 font-medium">Discount / Equilibrium</span></span>
                       </div>
                     </div>
@@ -1038,32 +1038,32 @@ const TradeReviewModalInner = ({
                       <div className="grid grid-cols-2 gap-2.5 text-xs">
                         <div className="p-2 rounded-lg bg-[#191e2b] border border-[#232838]">
                           <span className="text-[10px] text-slate-400 block">Higher Timeframe (1H/4H):</span>
-                          <span className="font-semibold text-slate-200">{review.marketContext.higherTimeframeTrend || 'Bearish'}</span>
+                          <span className="font-semibold text-slate-200">{review.marketContext?.higherTimeframeTrend || 'Bearish'}</span>
                         </div>
                         <div className="p-2 rounded-lg bg-[#191e2b] border border-[#232838]">
-                          <span className="text-[10px] text-slate-400 block">Current Timeframe ({review.marketContext.timeframe}):</span>
-                          <span className="font-semibold text-slate-200">{review.marketContext.currentTimeframeTrend || 'Bearish'}</span>
+                          <span className="text-[10px] text-slate-400 block">Current Timeframe ({review.marketContext?.timeframe || '15m'}):</span>
+                          <span className="font-semibold text-slate-200">{review.marketContext?.currentTimeframeTrend || 'Bearish'}</span>
                         </div>
                         <div className="p-2 rounded-lg bg-[#191e2b] border border-[#232838]">
                           <span className="text-[10px] text-slate-400 block">Market Structure:</span>
-                          <span className="font-semibold text-slate-200">{review.marketContext.marketStructure || 'Lower High → Lower Low'}</span>
+                          <span className="font-semibold text-slate-200">{review.marketContext?.marketStructure || 'Lower High → Lower Low'}</span>
                         </div>
                         <div className="p-2 rounded-lg bg-[#191e2b] border border-[#232838]">
                           <span className="text-[10px] text-slate-400 block">Trading Session:</span>
-                          <span className="font-semibold text-cyan-300">{review.marketContext.tradingSession || 'London Session'}</span>
+                          <span className="font-semibold text-cyan-300">{review.marketContext?.tradingSession || 'London Session'}</span>
                         </div>
                         <div className="p-2 rounded-lg bg-[#191e2b] border border-[#232838]">
                           <span className="text-[10px] text-slate-400 block">{isEn ? 'Liquidity Context:' : 'Thanh khoản (Liquidity):'}</span>
-                          <span className="font-semibold text-slate-200">{review.marketContext.liquidity || 'Sell-side swept'}</span>
+                          <span className="font-semibold text-slate-200">{review.marketContext?.liquidity || 'Sell-side swept'}</span>
                         </div>
                         <div className="p-2 rounded-lg bg-[#191e2b] border border-[#232838]">
                           <span className="text-[10px] text-slate-400 block">{isEn ? 'Volatility & Volume:' : 'Biến động (Volatility) & Khối lượng:'}</span>
-                          <span className="font-semibold text-slate-200">{review.marketContext.volatility || 'Medium'} • {review.marketContext.volumeContext || 'Above average'}</span>
+                          <span className="font-semibold text-slate-200">{review.marketContext?.volatility || 'Medium'} • {review.marketContext?.volumeContext || 'Above average'}</span>
                         </div>
                       </div>
 
                       <div className="text-[11px] text-slate-400 pt-1.5 border-t border-[#232838] flex items-center justify-between">
-                        <span>{isEn ? 'Key Levels:' : 'Cản then chốt:'} <strong className="text-slate-300">{review.marketContext.supportResistance}</strong></span>
+                        <span>{isEn ? 'Key Levels:' : 'Cản then chốt:'} <strong className="text-slate-300">{review.marketContext?.supportResistance || 'S/R Key Level'}</strong></span>
                       </div>
                     </div>
 
@@ -1079,7 +1079,7 @@ const TradeReviewModalInner = ({
                       </div>
 
                       <div className="space-y-1.5 text-xs max-h-56 overflow-y-auto custom-scrollbar pr-1">
-                        {review.setupValidation?.checklist.map((item, idx) => (
+                        {review.setupValidation?.checklist?.map((item, idx) => (
                           <div key={idx} className="p-2 rounded-lg bg-[#191e2b] border border-[#232838] flex items-start justify-between gap-2">
                             <div className="space-y-0.5">
                               <div className="font-semibold text-slate-200">{item.condition}</div>
@@ -1535,85 +1535,95 @@ const TradeReviewModalInner = ({
                   })()}
 
                   {/* Plan vs Execution Table */}
-                  {review.planVsExecution && (
-                    <div className="p-4 rounded-xl bg-[#141822] border border-[#232838] space-y-3">
-                      <div className="flex items-center justify-between pb-1 border-b border-[#232838]">
-                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <Layers className="w-4 h-4 text-cyan-400" /> {isEn ? 'Plan vs Execution Audit' : 'Kế Hoạch vs Thực Thi (Plan vs Execution)'}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          review.planVsExecution.status === 'RULE_FOLLOWED' 
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                            : review.planVsExecution.status === 'PARTIALLY_FOLLOWED'
-                            ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                            : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                        }`}>
-                          {review.planVsExecution.description}
-                        </span>
-                      </div>
+                  {review.planVsExecution && (() => {
+                    const pveAny = review.planVsExecution as any;
+                    const planObj = pveAny?.plan || pveAny?.auditSummary || { entry: `$${safeFormat(entryPrice)}`, stopLoss: 'Not Set', takeProfit: 'Not Set', risk: 'Undefined' };
+                    const actualObj = pveAny?.actual || pveAny?.auditSummary || { entry: `$${safeFormat(effectiveExitPrice)}`, stopLoss: 'Not Set', takeProfit: 'Not Set', risk: 'Undefined' };
+                    const pveStatus = pveAny?.status || 'RULE_FOLLOWED';
+                    const pveDesc = pveAny?.description || pveAny?.disciplineRating || (isEn ? 'Disciplined Execution' : 'Tuân thủ quy trình');
 
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-xs">
-                          <thead>
-                            <tr className="border-b border-[#232838] text-slate-400 text-[11px]">
-                              <th className="py-2 px-3">{isEn ? 'Parameter' : 'Tham số'}</th>
-                              <th className="py-2 px-3 text-cyan-300">{isEn ? 'Planned (Plan)' : 'Kế Hoạch (Plan)'}</th>
-                              <th className="py-2 px-3 text-amber-300">{isEn ? 'Actual' : 'Thực Tế (Actual)'}</th>
-                              <th className="py-2 px-3 text-right">{isEn ? 'Audit Verdict' : 'Đánh Giá Tuân Thủ'}</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-[#232838]/60 font-mono">
-                            <tr>
-                              <td className="py-2 px-3 text-slate-400 font-sans">Entry Price</td>
-                              <td className="py-2 px-3 text-white">{review.planVsExecution.plan.entry}</td>
-                              <td className="py-2 px-3 text-white">{review.planVsExecution.actual.entry}</td>
-                              <td className="py-2 px-3 text-right font-sans text-emerald-400 font-semibold">{isEn ? '✓ Matched' : '✓ Khớp chuẩn'}</td>
-                            </tr>
-                            <tr>
-                              <td className="py-2 px-3 text-slate-400 font-sans">Stop Loss</td>
-                              <td className="py-2 px-3 text-slate-300">{review.planVsExecution.plan.stopLoss}</td>
-                              <td className="py-2 px-3 text-slate-300">{review.planVsExecution.actual.stopLoss}</td>
-                              <td className="py-2 px-3 text-right font-sans">
-                                {review.planVsExecution.actual.stopLoss !== 'Not Set' && review.planVsExecution.actual.stopLoss !== 'Chưa đặt' ? (
-                                  <span className="text-emerald-400 font-semibold">{isEn ? '✓ Set' : '✓ Đã cài đặt'}</span>
-                                ) : (
-                                  <span className="text-rose-400 font-semibold">{isEn ? '✗ Missing SL (Violation)' : '✗ Vi phạm (Thiếu SL)'}</span>
-                                )}
-                              </td>
-                            </tr>
-                            <tr>
-                              <td className="py-2 px-3 text-slate-400 font-sans">Take Profit</td>
-                              <td className="py-2 px-3 text-slate-300">{review.planVsExecution.plan.takeProfit}</td>
-                              <td className="py-2 px-3 text-slate-300">{review.planVsExecution.actual.takeProfit}</td>
-                              <td className="py-2 px-3 text-right font-sans">
-                                {review.planVsExecution.actual.takeProfit !== 'Not Set' && review.planVsExecution.actual.takeProfit !== 'Chưa đặt' ? (
-                                  <span className="text-emerald-400 font-semibold">{isEn ? '✓ Set' : '✓ Đã cài đặt'}</span>
-                                ) : (
-                                  <span className="text-amber-400 font-semibold">{isEn ? '⚠ Floating TP (Discretionary)' : '⚠ Chưa đặt TP cố định'}</span>
-                                )}
-                              </td>
-                            </tr>
-                            <tr>
-                              <td className="py-2 px-3 text-slate-400 font-sans">{isEn ? 'Risk Management' : 'Risk Quản Trị'}</td>
-                              <td className="py-2 px-3 text-slate-300">{review.planVsExecution.plan.risk}</td>
-                              <td className="py-2 px-3 text-slate-300">{review.planVsExecution.actual.risk}</td>
-                              <td className="py-2 px-3 text-right font-sans">
-                                {review.planVsExecution.actual.risk !== 'Undefined' && !review.planVsExecution.actual.risk.includes('Chưa') ? (
-                                  <span className="text-emerald-400 font-semibold">{isEn ? '✓ Controlled' : '✓ Kiểm soát tốt'}</span>
-                                ) : (
-                                  <span className="text-rose-400 font-semibold">{isEn ? '✗ Undefined' : '✗ Không thể xác định'}</span>
-                                )}
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
+                    return (
+                      <div className="p-4 rounded-xl bg-[#141822] border border-[#232838] space-y-3">
+                        <div className="flex items-center justify-between pb-1 border-b border-[#232838]">
+                          <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                            <Layers className="w-4 h-4 text-cyan-400" /> {isEn ? 'Plan vs Execution Audit' : 'Kế Hoạch vs Thực Thi (Plan vs Execution)'}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            pveStatus === 'RULE_FOLLOWED' 
+                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                              : pveStatus === 'PARTIALLY_FOLLOWED'
+                              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                              : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                          }`}>
+                            {pveDesc}
+                          </span>
+                        </div>
 
-                      <div className="text-[10px] text-slate-500 italic pt-1 border-t border-[#232838]">
-                        * {review.planVsExecution.auditNote}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="border-b border-[#232838] text-slate-400 text-[11px]">
+                                <th className="py-2 px-3">{isEn ? 'Parameter' : 'Tham số'}</th>
+                                <th className="py-2 px-3 text-cyan-300">{isEn ? 'Planned (Plan)' : 'Kế Hoạch (Plan)'}</th>
+                                <th className="py-2 px-3 text-amber-300">{isEn ? 'Actual' : 'Thực Tế (Actual)'}</th>
+                                <th className="py-2 px-3 text-right">{isEn ? 'Audit Verdict' : 'Đánh Giá Tuân Thủ'}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#232838]/60 font-mono">
+                              <tr>
+                                <td className="py-2 px-3 text-slate-400 font-sans">Entry Price</td>
+                                <td className="py-2 px-3 text-white">{planObj.entry || `$${safeFormat(entryPrice)}`}</td>
+                                <td className="py-2 px-3 text-white">{actualObj.entry || `$${safeFormat(entryPrice)}`}</td>
+                                <td className="py-2 px-3 text-right font-sans text-emerald-400 font-semibold">{isEn ? '✓ Matched' : '✓ Khớp chuẩn'}</td>
+                              </tr>
+                              <tr>
+                                <td className="py-2 px-3 text-slate-400 font-sans">Stop Loss</td>
+                                <td className="py-2 px-3 text-slate-300">{planObj.stopLoss || 'Not Set'}</td>
+                                <td className="py-2 px-3 text-slate-300">{actualObj.stopLoss || 'Not Set'}</td>
+                                <td className="py-2 px-3 text-right font-sans">
+                                  {actualObj.stopLoss && actualObj.stopLoss !== 'Not Set' && actualObj.stopLoss !== 'Chưa đặt' ? (
+                                    <span className="text-emerald-400 font-semibold">{isEn ? '✓ Set' : '✓ Đã cài đặt'}</span>
+                                  ) : (
+                                    <span className="text-rose-400 font-semibold">{isEn ? '✗ Missing SL (Violation)' : '✗ Vi phạm (Thiếu SL)'}</span>
+                                  )}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="py-2 px-3 text-slate-400 font-sans">Take Profit</td>
+                                <td className="py-2 px-3 text-slate-300">{planObj.takeProfit || 'Not Set'}</td>
+                                <td className="py-2 px-3 text-slate-300">{actualObj.takeProfit || 'Not Set'}</td>
+                                <td className="py-2 px-3 text-right font-sans">
+                                  {actualObj.takeProfit && actualObj.takeProfit !== 'Not Set' && actualObj.takeProfit !== 'Chưa đặt' ? (
+                                    <span className="text-emerald-400 font-semibold">{isEn ? '✓ Set' : '✓ Đã cài đặt'}</span>
+                                  ) : (
+                                    <span className="text-amber-400 font-semibold">{isEn ? '⚠ Floating TP (Discretionary)' : '⚠ Chưa đặt TP cố định'}</span>
+                                  )}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="py-2 px-3 text-slate-400 font-sans">{isEn ? 'Risk Management' : 'Risk Quản Trị'}</td>
+                                <td className="py-2 px-3 text-slate-300">{planObj.risk || 'Undefined'}</td>
+                                <td className="py-2 px-3 text-slate-300">{actualObj.risk || 'Undefined'}</td>
+                                <td className="py-2 px-3 text-right font-sans">
+                                  {actualObj.risk && actualObj.risk !== 'Undefined' && !String(actualObj.risk).includes('Chưa') ? (
+                                    <span className="text-emerald-400 font-semibold">{isEn ? '✓ Controlled' : '✓ Kiểm soát tốt'}</span>
+                                  ) : (
+                                    <span className="text-rose-400 font-semibold">{isEn ? '✗ Undefined' : '✗ Không thể xác định'}</span>
+                                  )}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {review.planVsExecution.auditNote && (
+                          <div className="text-[10px] text-slate-500 italic pt-1 border-t border-[#232838]">
+                            * {review.planVsExecution.auditNote}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
 
@@ -1664,7 +1674,7 @@ const TradeReviewModalInner = ({
                             <span className="font-bold text-rose-300 flex items-center gap-1 text-[11px]">
                               <ShieldAlert className="w-3 h-3" /> {isEn ? 'A. Rule Violations:' : 'A. Rule Violations (Vi phạm nguyên tắc):'}
                             </span>
-                            {review.categorizedImprovements.ruleViolations.map((v, i) => (
+                            {review.categorizedImprovements?.ruleViolations?.map((v, i) => (
                               <div key={i} className="text-rose-200 text-[11px] pl-3 flex items-start gap-1">
                                 <span>•</span>
                                 <span>{v}</span>
@@ -1679,7 +1689,7 @@ const TradeReviewModalInner = ({
                             <span className="font-bold text-amber-300 flex items-center gap-1 text-[11px]">
                               <AlertCircle className="w-3 h-3" /> {isEn ? 'B. Risk Management Issues:' : 'B. Risk Issues (Vấn đề quản trị rủi ro):'}
                             </span>
-                            {review.categorizedImprovements.riskIssues.map((v, i) => (
+                            {review.categorizedImprovements?.riskIssues?.map((v, i) => (
                               <div key={i} className="text-amber-200 text-[11px] pl-3 flex items-start gap-1">
                                 <span>•</span>
                                 <span>{v}</span>
@@ -1694,7 +1704,7 @@ const TradeReviewModalInner = ({
                             <span className="font-bold text-slate-300 flex items-center gap-1 text-[11px]">
                               <Activity className="w-3 h-3 text-cyan-400" /> {isEn ? 'C. Execution Issues:' : 'C. Execution Issues (Vấn đề thực thi):'}
                             </span>
-                            {review.categorizedImprovements.executionIssues.map((v, i) => (
+                            {review.categorizedImprovements?.executionIssues?.map((v, i) => (
                               <div key={i} className="text-slate-300 text-[11px] pl-3 flex items-start gap-1">
                                 <span>•</span>
                                 <span>{v}</span>
@@ -1709,7 +1719,7 @@ const TradeReviewModalInner = ({
                             <span className="font-bold text-slate-300 flex items-center gap-1 text-[11px]">
                               <Compass className="w-3 h-3 text-indigo-400" /> {isEn ? 'D. Strategy Fit Issues:' : 'D. Strategy Issues (Vấn đề chiến lược):'}
                             </span>
-                            {review.categorizedImprovements.strategyIssues.map((v, i) => (
+                            {review.categorizedImprovements?.strategyIssues?.map((v, i) => (
                               <div key={i} className="text-slate-300 text-[11px] pl-3 flex items-start gap-1">
                                 <span>•</span>
                                 <span>{v}</span>
@@ -1729,7 +1739,7 @@ const TradeReviewModalInner = ({
                         {isEn ? 'Student Learning Takeaways' : 'Bài Học Đúc Kết Cho Sinh Viên (Learning Takeaways)'}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        {review.learningTakeaways.map((takeaway, idx) => (
+                        {review.learningTakeaways?.map((takeaway, idx) => (
                           <div key={idx} className="p-2.5 rounded-lg bg-[#191f2d] border border-[#262e42] flex items-start gap-2.5">
                             <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">
                               {idx + 1}
@@ -1761,7 +1771,7 @@ const TradeReviewModalInner = ({
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {review.sources.map((s, idx) => {
+                    {review.sources?.map((s, idx) => {
                       const hasLink = s.sourceUrl && s.sourceUrl !== '#' && s.sourceUrl.startsWith('http');
                       const isYouTube = hasLink && (s.sourceUrl.includes('youtube.com') || s.sourceUrl.includes('youtu.be'));
                       return (

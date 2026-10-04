@@ -561,6 +561,20 @@ class TradeAnalyzer:
         plan_vs_execution = {
             "deviations": execution_issues if execution_issues else ["Không phát hiện sai lệch lớn so với kế hoạch."],
             "disciplineRating": "Cao (Disciplined)" if total_process_score >= 75 else ("Trung bình" if total_process_score >= 60 else "Kém (Vi phạm quy trình)"),
+            "status": "RULE_FOLLOWED" if total_process_score >= 75 else ("PARTIALLY_FOLLOWED" if total_process_score >= 60 else "VIOLATED"),
+            "description": "Tuân thủ kỷ luật (Disciplined)" if total_process_score >= 75 else ("Tuân thủ một phần (Partial)" if total_process_score >= 60 else "Vi phạm quy trình (Violated)"),
+            "plan": {
+                "entry": f"${entry:,.2f}",
+                "stopLoss": f"${sl:,.2f}" if has_sl else "Not Set",
+                "takeProfit": f"${tp:,.2f}" if has_tp else "Not Set",
+                "risk": f"{risk_pct}%" if has_sl else "Undefined"
+            },
+            "actual": {
+                "entry": f"${entry:,.2f}",
+                "stopLoss": f"${sl:,.2f}" if has_sl else "Not Set",
+                "takeProfit": f"${tp:,.2f}" if has_tp else "Not Set",
+                "risk": f"{risk_pct}%" if has_sl else "Undefined"
+            },
             "auditSummary": {
                 "entry": f"${entry:,.2f}",
                 "stopLoss": f"${sl:,.2f}" if has_sl else "Not Set",
