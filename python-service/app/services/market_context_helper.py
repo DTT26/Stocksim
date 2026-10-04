@@ -340,3 +340,69 @@ def format_detailed_chart_context(
             "TUYỆT ĐỐI KHÔNG tự bịa hoặc đoán mò giá đỉnh đáy khác xa với dữ liệu thật."
         )
         return "\n\n📊 [DỮ LIỆU ĐỈNH/ĐÁY VÀ CẤU TRÚC BIỂU ĐỒ THỰC TẾ]:\n" + "\n".join(lines) + rule
+
+
+# ==========================================
+# ==========================================
+# 6. NHẬN DIỆN FAIR VALUE GAP (FVG) CHUẨN XÁC THEO RÂU NẾN (WICKS)
+# ==========================================
+def detect_fair_value_gaps(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện chính xác 100% các khoảng trống giá Fair Value Gap (FVG) theo chuẩn ICT (Michael Huddleston)
+    dựa trên RÂU NẾN (WICKS) của Nến 1 và Nến 3.
+    """
+    fvgs = []
+    if not klines or len(klines) < 3:
+        return fvgs
+
+    n = len(klines)
+    for i in range(1, n - 1):
+        c1 = klines[i - 1]
+        c2 = klines[i]
+        c3 = klines[i + 1]
+
+        h1, l1 = c1.get("high"), c1.get("low")
+        h3, l3 = c3.get("high"), c3.get("low")
+
+        if not all(isinstance(v, (int, float)) for v in [h1, l1, h3, l3]):
+            continue
+
+        # 1. Bullish FVG: Low of candle 3 > High of candle 1
+        # Nến 1 có Đỉnh râu (High) < Đáy râu Nến 3 (Low). Nến 2 tăng mạnh ở giữa tạo Displacement.
+        if l3 > h1:
+            gap_size = round(l3 - h1, 4)
+            ce = round((l3 + h1) / 2, 4)
+            fvgs.append({
+                "type": "Bullish FVG",
+                "top": l3,         # Đáy râu Nến 3
+                "bottom": h1,      # Đỉnh râu Nến 1
+                "midpoint_ce": ce, # 50% Consequent Encroachment
+                "gap_size": gap_size,
+                "candle_index": i,
+                "candles_ago": n - 1 - i,
+                "c1_info": f"Nến 1 (t:{c1.get('timestamp')}) Đỉnh râu High = {h1}",
+                "c2_info": f"Nến 2 (t:{c2.get('timestamp')}) Thân tăng mạnh Displacement",
+                "c3_info": f"Nến 3 (t:{c3.get('timestamp')}) Đáy râu Low = {l3}",
+                "rule": f"Vùng FVG tăng chuẩn xác: Từ Đỉnh râu Nến 1 ({h1}) đến Đáy râu Nến 3 ({l3}). 50% C.E = {ce}."
+            })
+
+        # 2. Bearish FVG: High of candle 3 < Low of candle 1
+        # Nến 1 có Đáy râu (Low) > Đỉnh râu Nến 3 (High). Nến 2 giảm mạnh ở giữa tạo Displacement.
+        if h3 < l1:
+            gap_size = round(l1 - h3, 4)
+            ce = round((l1 + h3) / 2, 4)
+            fvgs.append({
+                "type": "Bearish FVG",
+                "top": l1,         # Đáy râu Nến 1
+                "bottom": h3,      # Đỉnh râu Nến 3
+                "midpoint_ce": ce,
+                "gap_size": gap_size,
+                "candle_index": i,
+                "candles_ago": n - 1 - i,
+                "c1_info": f"Nến 1 (t:{c1.get('timestamp')}) Đáy râu Low = {l1}",
+                "c2_info": f"Nến 2 (t:{c2.get('timestamp')}) Thân giảm mạnh Displacement",
+                "c3_info": f"Nến 3 (t:{c3.get('timestamp')}) Đỉnh râu High = {h3}",
+                "rule": f"Vùng FVG giảm chuẩn xác: Từ Đỉnh râu Nến 3 ({h3}) đến Đáy râu Nến 1 ({l1}). 50% C.E = {ce}."
+            })
+
+    return fvgs

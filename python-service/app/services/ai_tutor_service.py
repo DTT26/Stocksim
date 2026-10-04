@@ -11,7 +11,8 @@ from app.services.market_context_helper import (
     get_all_methods_overview,
     SYMBOL_ALIASES,
     extract_chart_swings_and_extrema,
-    format_detailed_chart_context
+    format_detailed_chart_context,
+    detect_fair_value_gaps
 )
 from app.services.prop_firm_risk_tool import (
     extract_trade_intent,
@@ -62,6 +63,19 @@ Khi giải thích hoặc phân tích bất kỳ khái niệm nào về ICT / SMC
 3. LIQUIDITY SWEEP (Săn / Quét thanh khoản - Raid / Turtle Soup):
    - Giá chỉ đâm râu nến (Wick) qua đỉnh BSL hoặc đáy SSL để gom thanh khoản rồi lập tức rút chân đóng nến quay ngược lại bên trong (SFP - Swing Failure Pattern) -> Tín hiệu chuẩn bị đảo chiều.
    - Phân biệt với LIQUIDITY RUN (Expansion): Thân nến (Candle Body) đóng cửa dứt khoát vượt qua kèm nến Displacement dài -> Bứt phá tiếp diễn để tìm đến vùng thanh khoản tiếp theo.
+
+
+5. FAIR VALUE GAP (FVG - Khoảng trống giá trị công bằng / Imbalance):
+   - ĐỊNH NGHĨA VÀ NGUYÊN TẮC BẮT BUỘC VỀ RÂU NẾN (WICKS):
+     + FVG xuất hiện trong chuỗi 3 nến liên tiếp [Nến 1, Nến 2, Nến 3]. Nến 2 là cây nến tăng/giảm cực mạnh (Displacement).
+     + VÙNG FVG ĐƯỢC XÁC ĐỊNH BỞI KHOẢNG TRỐNG GIỮA RÂU NẾN 1 VÀ RÂU NẾN 3. TUYỆT ĐỐI KHÔNG LẤY THEO THÂN NẾN!
+     + Bullish FVG (FVG Tăng giá): Biên dưới = Đỉnh râu cao nhất của Nến 1 (High Wick). Biên trên = Đáy râu thấp nhất của Nến 3 (Low Wick). Vùng giá giữa 2 đầu râu này chính là Bullish FVG.
+     + Bearish FVG (FVG Giảm giá): Biên trên = Đáy râu thấp nhất của Nến 1 (Low Wick). Biên dưới = Đỉnh râu cao nhất của Nến 3 (High Wick). Vùng giá giữa 2 đầu râu này chính là Bearish FVG.
+     + 50% Consequent Encroachment (C.E): Mốc cân bằng ở chính giữa 2 đầu râu nến: (Râu 1 + Râu 3) / 2.
+   - QUY TẮC CHẤM BÀI BẮT BUỘC:
+     + Khi học viên vẽ vùng FVG nối từ Râu Nến 1 đến Râu Nến 3 (hoặc biên độ trùng khớp với khoảng cách giữa 2 đầu râu nến), học viên vẽ HOÀN TOÀN CHUẨN XÁC 100% THEO ĐÚNG NGUYÊN BẢN ICT CỦA MICHAEL HUDDLESTON.
+     + KẾT LUẬN: ĐÚNG (Score 90-100).
+     + TUYỆT ĐỐI CẤM đánh giá học viên sai vì 'không lấy theo thân nến' hoặc nhầm lẫn giữa nến 1 và nến 2!
 
 4. ERL (External Range Liquidity) vs IRL (Internal Range Liquidity):
    - ERL: Các mốc đỉnh/đáy lớn bên ngoài cấu trúc (Swing Highs/Lows, BSL, SSL).
@@ -1337,12 +1351,14 @@ class AiTutorService:
 
         # 2. System prompt
         system_prompt = (
+            f"{ICT_SMC_CANONICAL_GUIDELINES}\n\n" +
+            
             "Bạn là Chuyên gia Cao cấp Đào tạo Phân tích Kỹ thuật và Huấn luyện viên Chiến lược Thực chiến "
             "(Senior Quantitative & Technical Analyst Tutor, chuyên sâu về Price Action, ICT - Inner Circle Trader, SMC - Smart Money Concepts, Wyckoff).\n"
             "Nhiệm vụ của bạn là soi kỹ ảnh chụp màn hình biểu đồ nến mà học viên cung cấp, đặc biệt chú ý đến:\n"
             "- Các vùng hình hộp chữ nhật (Box / Zone), đường kẻ (Trendline, Support/Resistance), mũi tên hoặc ghi chú mà học viên ĐÃ VẼ trên biểu đồ.\n"
             "- Cấu trúc giá hiện tại (Đỉnh/Đáy, Swing High/Low, Cấu trúc xu hướng tăng/giảm).\n"
-            "- Các khái niệm ICT/SMC: Order Block (OB), Fair Value Gap (FVG), Imbalance, Liquidity Sweep (BSL nằm trên Đỉnh, SSL nằm dưới Đáy), CHoCH, BOS, Premium vs Discount.\n- BẮT BUỘC TUÂN THỦ NGUYÊN TẮC: BSL (Buy-Side Liquidity) luôn ở trên ĐỈNH (chứa Buy Stop của phe Short và Breakout). SSL (Sell-Side Liquidity) luôn ở dưới ĐÁY (chứa Sell Stop của phe Long và Breakdown).\n\n"
+            "- Các khái niệm ICT/SMC: Order Block (OB), Fair Value Gap (FVG), Imbalance, Liquidity Sweep (BSL nằm trên Đỉnh, SSL nằm dưới Đáy), CHoCH, BOS, Premium vs Discount.\n- QUY TẮC BẮT BUỘC VỀ FAIR VALUE GAP (FVG): Biên độ FVG BẮT BUỘC ĐO THEO RÂU NẾN (WICKS) CỦA NẾN 1 VÀ NẾN 3. TUYỆT ĐỐI KHÔNG ĐƯỢC LẤY THEO THÂN NẾN! Nếu học viên vẽ khớp với khoảng trống giữa râu nến 1 và râu nến 3 thì học viên vẽ HOÀN TOÀN ĐÚNG CHUẨN.\n- BẮT BUỘC TUÂN THỦ NGUYÊN TẮC: BSL (Buy-Side Liquidity) luôn ở trên ĐỈNH (chứa Buy Stop của phe Short và Breakout). SSL (Sell-Side Liquidity) luôn ở dưới ĐÁY (chứa Sell Stop của phe Long và Breakdown).\n\n"
             "Hãy trả lời theo cấu trúc Markdown rõ ràng, chuẩn sư phạm, truyền cảm hứng và sắc sảo như sau:\n\n"
             "### 1. Đánh giá sơ bộ & Chẩn đoán chi tiết từng hình vẽ\n"
             "- **Kết luận tổng quan:** Nêu rõ học viên vẽ **ĐÚNG**, **ĐÚNG MỘT PHẦN** hay **CHƯA ĐÚNG**?\n"
@@ -1361,6 +1377,11 @@ class AiTutorService:
             "- **Kế hoạch hành động:** Chờ điều kiện gì xuất hiện mới kích hoạt lệnh.\n\n"
             "### 5. Điểm số đánh giá\n"
             "- Cho điểm số theo thang điểm 100 (Ví dụ: **Điểm đánh giá: 85/100**)."
+        )
+
+        asset_info = f"mã cổ phiếu/tiền tệ: {symbol}" if symbol else "mã hiển thị trực tiếp trên ảnh biểu đồ"
+        tf_info = f", khung thời gian: {timeframe}" if timeframe else ""
+        user_prompt = f"Phân tích biểu đồ {asset_info}{tf_info}."
         if user_notes:
             user_prompt += f"\nGhi chú/Nhận định của học viên: {user_notes}"
         else:
@@ -1504,6 +1525,18 @@ class AiTutorService:
         sh_str = ", ".join([f"${sh['price']:,.2f} ({sh['candles_ago']} nến trước)" for sh in reversed(recent_sh)]) if recent_sh else "N/A"
         sl_str = ", ".join([f"${sl['price']:,.2f} ({sl['candles_ago']} nến trước)" for sl in reversed(recent_sl)]) if recent_sl else "N/A"
 
+        # Detect factual FVGs strictly based on candle wicks (Râu nến)
+        detected_fvgs = detect_fair_value_gaps(klines)
+        recent_fvgs = detected_fvgs[-4:] if detected_fvgs else []
+        fvgs_summary = []
+        for fvg in recent_fvgs:
+            fvgs_summary.append(
+                f"- {fvg['type']}: Vùng giá chuẩn [${fvg['bottom']:,.2f} -> ${fvg['top']:,.2f}] "
+                f"(Đo theo RÂU NẾN Wicks: {fvg.get('c1_info', '')}; {fvg.get('c3_info', '')}; "
+                f"Mốc 50% C.E = ${fvg['midpoint_ce']:,.2f}, xuất hiện cách đây {fvg['candles_ago']} nến)"
+            )
+        fvgs_str = "\n".join(fvgs_summary) if fvgs_summary else "Không có FVG lớn chưa lấp trong các nến gần nhất"
+
         # Summarize recent candles (last 40 candles for LLM prompt context)
         recent_klines = klines[-40:] if len(klines) > 40 else klines
         klines_summary = []
@@ -1526,6 +1559,7 @@ class AiTutorService:
 
         if is_en:
             system_prompt = (
+                f"{ICT_SMC_CANONICAL_GUIDELINES}\n\n" +
                 "You are a Senior Quantitative & Technical Analyst Tutor specializing in Price Action, ICT, and Smart Money Concepts (SMC).\n"
                 "Your objective is to inspect direct COORDINATE DRAWING DATA drawn by the trader on the chart against REAL OHLCV CANDLESTICK DATA.\n\n"
                 "IMPORTANT INSTRUCTIONS:\n"
@@ -1561,13 +1595,19 @@ class AiTutorService:
                 f"REAL CANDLESTICK DATA (OHLCV):\n{klines_str}\n"
                 f"Chart Highest High: {wave_max}, Chart Lowest Low: {wave_min}.\n"
                 f"Recent Swing Highs: {sh_str}\n"
-                f"Recent Swing Lows: {sl_str}\n"
+                f"Recent Swing Lows: {sl_str}\n\n"
+                f"FACTUAL CANDLE WICK-BASED FAIR VALUE GAPS (FVG GROUND TRUTH):\n{fvgs_str}\n\n"
+                "MANDATORY FVG GRADING INSTRUCTION:\n"
+                "FVG boundaries are strictly measured from Wick of Candle 1 to Wick of Candle 3. "
+                "If the student drawing anchors to the wicks of candle 1 and candle 3, it is 100% CORRECT according to ICT. "
+                "DO NOT penalize or claim it should be candle bodies.\n"
             )
             if user_notes:
                 user_prompt += f"\nTrader's notes: {user_notes}\n"
             user_prompt += "\nPlease evaluate and grade this drawing now in English."
         else:
             system_prompt = (
+                f"{ICT_SMC_CANONICAL_GUIDELINES}\n\n" +
                 "Bạn là Chuyên gia Cao cấp Đào tạo Phân tích Kỹ thuật và Huấn luyện viên Chiến lược Thực chiến "
                 "(Price Action, ICT - Inner Circle Trader, SMC - Smart Money Concepts).\n"
                 "Nhiệm vụ của bạn là kiểm tra trực tiếp DỮ LIỆU TỌA ĐỘ VÙNG VẼ HỌC VIÊN ĐÃ VẼ TRÊN BIỂU ĐỒ đối chiếu với DỮ LIỆU NẾN THẬT (OHLCV).\n\n"
@@ -1608,7 +1648,15 @@ class AiTutorService:
                 f"CHUỖI NẾN THỰC TẾ TRÊN BIỂU ĐỒ (OHLCV):\n{klines_str}\n\n"
                 f"Đỉnh cao nhất trên biểu đồ: {wave_max}, Đáy thấp nhất: {wave_min}.\n"
                 f"Các Đỉnh đảo chiều gần nhất (Recent Swing Highs): {sh_str}\n"
-                f"Các Đáy đảo chiều gần nhất (Recent Swing Lows): {sl_str}\n"
+                f"Các Đáy đảo chiều gần nhất (Recent Swing Lows): {sl_str}\n\n"
+                f"CÁC KHOẢNG TRỐNG GIÁ FVG THỰC TẾ TRÊN BIỂU ĐỒ (ĐO CHUẨN XÁC 100% THEO RÂU NẾN WICKS):\n{fvgs_str}\n\n"
+                "⚠️ NGUYÊN TẮC BẮT BUỘC KHI CHẤM VÙNG FAIR VALUE GAP (FVG):\n"
+                "1. Biên độ của FVG BẮT BUỘC ĐO THEO RÂU NẾN (WICKS) CỦA NẾN 1 VÀ NẾN 3. TUYỆT ĐỐI KHÔNG LẤY THEO THÂN NẾN!\n"
+                "   - Bullish FVG: Biên dưới là Đỉnh râu Nến 1 (High Wick), Biên trên là Đáy râu Nến 3 (Low Wick).\n"
+                "   - Bearish FVG: Biên trên là Đáy râu Nến 1 (Low Wick), Biên dưới là Đỉnh râu Nến 3 (High Wick).\n"
+                "2. NẾU HỌC VIÊN ĐANG VẼ VÙNG FVG KHỚP VỚI CÁC MỐC RÂU NẾN NÀY, HỌC VIÊN ĐÃ VẼ HOÀN TOÀN ĐÚNG CHUẨN 100% THEO ICT!\n"
+                "   - KẾT LUẬN: ĐÚNG (Score: 85-100).\n"
+                "   - CẤM TUYỆT ĐỐI BẢO HỌC VIÊN VẼ SAI VÌ 'KHÔNG LẤY THEO THÂN NẾN' HOẶC ĐỔI SANG BẮT HỌC VIÊN VẼ ORDER BLOCK KHI HỌ ĐANG VẼ FVG!\n"
             )
             if user_notes:
                 user_prompt += f"\nGhi chú học viên: {user_notes}\n"
