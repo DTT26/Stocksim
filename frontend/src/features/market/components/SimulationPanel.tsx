@@ -2,8 +2,9 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   HelpCircle, Play, PlayCircle, ChevronDown, ChevronLeft, Calendar, ArrowRight, Edit3, 
-  BarChart2, Eye, Trash2, Trophy, Target, Activity, Clock, Check, X 
+  BarChart2, Eye, Trash2, Trophy, Target, Activity, Clock, Check, X, Sparkles 
 } from 'lucide-react';
+import { TradeReviewModal } from '../../ai/TradeReviewModal';
 import { type Stock, STOCKS, getContractMultiplier, getAssetUnit } from '../data';
 import { AuthOverlay } from './AuthOverlay';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -84,6 +85,7 @@ export const SimulationPanel = ({
   // Selected completed session for detail view
   const [selectedCompletedSession, setSelectedCompletedSession] = useState<PaperSession | null>(null);
   const [sessionDetailData, setSessionDetailData] = useState<{ session: any; positions: any[]; orders: any[]; history: any[] } | null>(null);
+  const [reviewTradeData, setReviewTradeData] = useState<any | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
   // Renaming state
@@ -910,6 +912,33 @@ export const SimulationPanel = ({
                                     {tx.entryPrice?.toLocaleString('vi-VN')} &rarr; {tx.exitPrice?.toLocaleString('vi-VN')}
                                   </div>
                                   <div className="flex items-center gap-1.5">
+                                    <button
+                                      onClick={() => {
+                                        const mult = getContractMultiplier(tx.symbol);
+                                        const qty = tx.lot * mult;
+                                        setReviewTradeData({
+                                          symbol: tx.symbol || 'BTCUSDT',
+                                          side: tx.side === 'LONG' ? 'BUY' : 'SELL',
+                                          entryPrice: tx.entryPrice,
+                                          exitPrice: tx.exitPrice,
+                                          quantity: qty,
+                                          accountBalance: selectedCompletedSession?.balance || 100000,
+                                          realPnL: tx.netPnL,
+                                          isOpen: false,
+                                          timeframe: selectedCompletedSession?.timeframe || '15m',
+                                          strategy: 'Phiên Giao Dịch Giả Lập (Backtest Session)',
+                                          setupName: 'Lệnh trong Phiên Giao Dịch',
+                                          reason: tx.closeReason || 'Giao dịch trong phiên backtest / replay giả lập',
+                                          entryTime: tx.openTime ? new Date(tx.openTime).toLocaleString('vi-VN') : undefined,
+                                          exitTime: tx.closeTime ? new Date(tx.closeTime).toLocaleString('vi-VN') : undefined,
+                                          duration: (tx.openTime && tx.closeTime) ? `${Math.max(1, Math.round((new Date(tx.closeTime).getTime() - new Date(tx.openTime).getTime()) / 60000))} phút` : undefined
+                                        });
+                                      }}
+                                      className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[10px] font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                      title="AI Review lệnh này"
+                                    >
+                                      <Sparkles className="w-2.5 h-2.5" /> AI Review
+                                    </button>
                                     <span className="bg-[#e6e8ea] dark:bg-[#1e222d] text-[#1e2329] dark:text-[#d1d4dc] px-1.5 py-0.5 rounded text-[10px]">{tx.closeReason || 'MANUAL'}</span>
                                     {tx.closeTime && <span>{new Date(tx.closeTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>}
                                   </div>
@@ -1222,6 +1251,15 @@ export const SimulationPanel = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Trade Review Modal for Simulation Session Trades */}
+      {reviewTradeData && (
+        <TradeReviewModal
+          isOpen={true}
+          onClose={() => setReviewTradeData(null)}
+          tradeData={reviewTradeData}
+        />
       )}
     </div>
   );
