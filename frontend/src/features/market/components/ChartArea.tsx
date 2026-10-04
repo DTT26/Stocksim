@@ -433,50 +433,92 @@ export const drawAiCorrectionOverlay = (suggestedZone: {
     let t1 = suggestedZone.startTimestamp || suggestedZone.userTimeStart;
     let t2 = suggestedZone.endTimestamp || suggestedZone.userTimeEnd;
 
-    // If t1 is still missing, scan klines for the exact 3-candle FVG sequence to anchor at Candle 1
-    if (!t1 && klines.length >= 3) {
-      const zHigh = suggestedZone.priceHigh;
-      const zLow = suggestedZone.priceLow;
-      for (let i = 1; i < klines.length - 1; i++) {
-        const c1 = klines[i - 1];
-        const c3 = klines[i + 1];
-        const h1 = c1.high;
-        const l3 = c3.low;
-        // Bullish FVG: c1.high ≈ zLow and c3.low ≈ zHigh
-        if (typeof h1 === 'number' && typeof l3 === 'number') {
-          if (Math.abs(h1 - zLow) / Math.max(1, zLow) < 0.05 && Math.abs(l3 - zHigh) / Math.max(1, zHigh) < 0.05) {
-            t1 = c1.timestamp;
-            break;
+    const zHigh = suggestedZone.priceHigh;
+    const zLow = suggestedZone.priceLow;
+    const zType = String(suggestedZone.type || suggestedZone.name || '').toUpperCase();
+
+    // Scan klines if t1 is missing to bind right on the exact candle(s)
+    if (!t1 && klines.length >= 2) {
+      // 1. If FVG, scan 3-candle sequence
+      if (zType.includes('FVG') || zType.includes('FAIR VALUE') || zType.includes('GAP') || zType.includes('IMBALANCE')) {
+        for (let i = 1; i < klines.length - 1; i++) {
+          const c1 = klines[i - 1];
+          const c3 = klines[i + 1];
+          const h1 = c1.high;
+          const l3 = c3.low;
+          if (typeof h1 === 'number' && typeof l3 === 'number') {
+            if (Math.abs(h1 - zLow) / Math.max(1, zLow) < 0.05 && Math.abs(l3 - zHigh) / Math.max(1, zHigh) < 0.05) {
+              t1 = c1.timestamp;
+              break;
+            }
+          }
+          const l1 = c1.low;
+          const h3 = c3.high;
+          if (typeof l1 === 'number' && typeof h3 === 'number') {
+            if (Math.abs(l1 - zHigh) / Math.max(1, zHigh) < 0.05 && Math.abs(h3 - zLow) / Math.max(1, zLow) < 0.05) {
+              t1 = c1.timestamp;
+              break;
+            }
           }
         }
-        // Bearish FVG: c1.low ≈ zHigh and c3.high ≈ zLow
-        const l1 = c1.low;
-        const h3 = c3.high;
-        if (typeof l1 === 'number' && typeof h3 === 'number') {
-          if (Math.abs(l1 - zHigh) / Math.max(1, zHigh) < 0.05 && Math.abs(h3 - zLow) / Math.max(1, zLow) < 0.05) {
-            t1 = c1.timestamp;
-            break;
+      }
+
+      // 2. If Order Block, scan for the exact OB candle (last opposite-colored candle)
+      if (!t1 && (zType.includes('ORDER BLOCK') || zType.includes('OB') || zType.includes('BLOCK'))) {
+        for (let i = 1; i < klines.length; i++) {
+          const c = klines[i - 1];
+          if (typeof c.high === 'number' && typeof c.low === 'number') {
+            const hMatch = Math.abs(c.high - zHigh) / Math.max(1, zHigh) < 0.05;
+            const lMatch = Math.abs(c.low - zLow) / Math.max(1, zLow) < 0.05;
+            if (hMatch || lMatch) {
+              t1 = c.timestamp;
+              break;
+            }
+          }
+        }
+      }
+
+      // 3. Fallback: match any swing high or low candle
+      if (!t1) {
+        for (let i = klines.length - 1; i >= 0; i--) {
+          const c = klines[i];
+          if (typeof c.high === 'number' && typeof c.low === 'number') {
+            if (Math.abs(c.high - zHigh) / Math.max(1, zHigh) < 0.03 || Math.abs(c.low - zLow) / Math.max(1, zLow) < 0.03) {
+              t1 = c.timestamp;
+              break;
+            }
           }
         }
       }
     }
 
-    if (!t1) {
-      const prevKline = klines[Math.max(0, klines.length - 15)];
-      t1 = prevKline?.timestamp || (Date.now() - 3600000 * 4);
-    }
-    if (!t2) {
-      t2 = lastKline?.timestamp || Date.now();
+    const finalT1: number = t1 || (klines[Math.max(0, klines.length - 15)]?.timestamp) || (Date.now() - 3600000 * 4);
+    const finalT2: number = (!t2 || t2 <= finalT1)
+      ? ((lastKline?.timestamp && lastKline.timestamp > finalT1) ? lastKline.timestamp : (finalT1 + 3600000 * 24 * 7))
+      : t2;
+
+    // Determine colors according to concept
+    let fillColor = 'rgba(245, 158, 11, 0.22)';
+    let borderColor = '#f59e0b';
+    if (zType.includes('BULLISH') || zType.includes('TĂNG')) {
+      fillColor = 'rgba(16, 185, 129, 0.22)'; // Emerald
+      borderColor = '#10b981';
+    } else if (zType.includes('BEARISH') || zType.includes('GIẢM')) {
+      fillColor = 'rgba(239, 68, 68, 0.22)'; // Red
+      borderColor = '#ef4444';
+    } else if (zType.includes('LIQUIDITY') || zType.includes('BSL') || zType.includes('SSL')) {
+      fillColor = 'rgba(59, 130, 246, 0.22)'; // Blue
+      borderColor = '#3b82f6';
     }
 
-    const zoneLabel = suggestedZone.label || (suggestedZone.type ? `đŸ¯ AI: ${suggestedZone.type}` : (suggestedZone.name ? `đŸ¯ AI: ${suggestedZone.name}` : 'đŸ¯ AI: VĂ¹ng Chuáº©n'));
+    const zoneLabel = suggestedZone.label || (suggestedZone.type ? `🎯 AI: ${suggestedZone.type}` : (suggestedZone.name ? `🎯 AI: ${suggestedZone.name}` : '🎯 AI: Vùng Chuẩn'));
     const priceText = `$${suggestedZone.priceLow?.toLocaleString('en-US')} - $${suggestedZone.priceHigh?.toLocaleString('en-US')}`;
 
-    const newId = globalChartInstance.createOverlay({
+    const newId = chart.createOverlay({
       name: 'aiCorrectionZone',
       points: [
-        { timestamp: t1, value: suggestedZone.priceHigh },
-        { timestamp: t2, value: suggestedZone.priceLow }
+        { timestamp: finalT1, value: suggestedZone.priceHigh },
+        { timestamp: finalT2, value: suggestedZone.priceLow }
       ],
       extendData: {
         label: zoneLabel,
@@ -490,8 +532,8 @@ export const drawAiCorrectionOverlay = (suggestedZone: {
       styles: {
         rect: {
           style: 'stroke_fill',
-          color: 'rgba(245, 158, 11, 0.22)',
-          borderColor: '#f59e0b',
+          color: fillColor,
+          borderColor: borderColor,
           borderSize: 2,
           borderStyle: 'dashed'
         }

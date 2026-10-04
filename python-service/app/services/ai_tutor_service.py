@@ -12,7 +12,8 @@ from app.services.market_context_helper import (
     SYMBOL_ALIASES,
     extract_chart_swings_and_extrema,
     format_detailed_chart_context,
-    detect_fair_value_gaps
+    detect_fair_value_gaps,
+    detect_order_blocks
 )
 from app.services.prop_firm_risk_tool import (
     extract_trade_intent,
@@ -46,24 +47,36 @@ ICT_SMC_CANONICAL_GUIDELINES = """
 ==================================================
 📚 BỘ QUY CHUẨN ĐỊNH NGHĨA CHÍNH XÁC ICT / SMC (INNER CIRCLE TRADER & SMART MONEY CONCEPTS):
 ==================================================
-Khi giải thích hoặc phân tích bất kỳ khái niệm nào về ICT / SMC, bạn BẮT BUỘC phải tuân thủ 100% định nghĩa chuẩn xác sau:
+Khi giải thích hoặc chấm bài bất kỳ khái niệm nào về ICT / SMC, bạn BẮT BUỘC phải tuân thủ 100% định nghĩa chuẩn xác sau:
 
 1. BSL (Buy-Side Liquidity - Thanh khoản Phía Mua):
    - VỊ TRÍ: Luôn luôn nằm ở PHÍA TRÊN CÁC ĐỈNH (Old Highs, Swing Highs, Equal Highs - EQH, Previous Day High - PDH, Session Highs).
-   - BẢN CHẤT: Nơi tập trung các lệnh BUY STOP gồm: (1) Lệnh Dừng Lỗ (Stop Loss) của phe Bán/Short và (2) Lệnh Mua Đuổi (Buy Stop) của Breakout Traders.
-   - HÀNH VI SMART MONEY: Smart Money cần một lượng MUA cực lớn để khớp lệnh BÁN (Short/Sell) của họ. Do đó họ ĐẨY GIÁ VƯỢT ĐỈNH để quét BSL (kích hoạt các lệnh Buy của nhỏ lẻ), biến nhỏ lẻ thành đối ứng để Smart Money BÁN RA ở giá cao (Premium), sau đó giá đảo chiều GIẢM mạnh.
-   - TUYỆT ĐỐI KHÔNG NÓI: BSL là "lực mua", BSL là "vùng hỗ trợ", hay BSL nằm ở dưới đáy (sai hoàn toàn!).
+   - BẢN CHẤT: Nơi tập trung các lệnh BUY STOP gồm Stop Loss của phe Short và Buy Stop của Breakout Traders.
+   - HÀNH VI SMART MONEY: Smart Money đẩy giá quét vượt đỉnh BSL để khớp lệnh BÁN (Short) của họ ở mức giá cao (Premium).
+   - TUYỆT ĐỐI KHÔNG NÓI: BSL là "lực mua" hay BSL nằm ở dưới đáy (sai hoàn toàn!).
 
 2. SSL (Sell-Side Liquidity - Thanh khoản Phía Bán):
    - VỊ TRÍ: Luôn luôn nằm ở PHÍA DƯỚI CÁC ĐÁY (Old Lows, Swing Lows, Equal Lows - EQL, Previous Day Low - PDL, Session Lows).
-   - BẢN CHẤT: Nơi tập trung các lệnh SELL STOP gồm: (1) Lệnh Dừng Lỗ (Stop Loss) của phe Mua/Long và (2) Lệnh Bán Đuổi (Sell Stop) của Breakdown Traders.
-   - HÀNH VI SMART MONEY: Smart Money cần một lượng BÁN cực lớn để khớp lệnh MUA (Long/Buy) của họ. Do đó họ ĐẨY GIÁ ĐÂM THỦNG ĐÁY để quét SSL (kích hoạt các lệnh Sell cắt lỗ của nhỏ lẻ), biến nhỏ lẻ thành đối ứng để Smart Money MUA VÀO ở giá rẻ (Discount), sau đó giá đảo chiều TĂNG mạnh.
-   - TUYỆT ĐỐI KHÔNG NÓI: SSL là "lực bán", SSL là "vùng kháng cự", hay SSL nằm ở trên đỉnh (sai hoàn toàn!).
+   - BẢN CHẤT: Nơi tập trung các lệnh SELL STOP gồm Stop Loss của phe Long và Sell Stop của Breakdown Traders.
+   - HÀNH VI SMART MONEY: Smart Money đẩy giá đâm thủng đáy SSL để khớp lệnh MUA (Long) của họ ở mức giá rẻ (Discount).
+   - TUYỆT ĐỐI KHÔNG NÓI: SSL là "lực bán" hay SSL nằm ở trên đỉnh (sai hoàn toàn!).
 
 3. LIQUIDITY SWEEP (Săn / Quét thanh khoản - Raid / Turtle Soup):
    - Giá chỉ đâm râu nến (Wick) qua đỉnh BSL hoặc đáy SSL để gom thanh khoản rồi lập tức rút chân đóng nến quay ngược lại bên trong (SFP - Swing Failure Pattern) -> Tín hiệu chuẩn bị đảo chiều.
-   - Phân biệt với LIQUIDITY RUN (Expansion): Thân nến (Candle Body) đóng cửa dứt khoát vượt qua kèm nến Displacement dài -> Bứt phá tiếp diễn để tìm đến vùng thanh khoản tiếp theo.
+   - Phân biệt với LIQUIDITY RUN (Expansion): Thân nến đóng cửa dứt khoát vượt qua kèm nến Displacement dài -> Bứt phá tiếp diễn xu hướng.
 
+4. ORDER BLOCK (OB - Khối lệnh của Smart Money):
+   - ĐỊNH NGHĨA & NGUYÊN TẮC BẮT BUỘC:
+     + Bullish Order Block (OB Tăng giá): Là CÂY NẾN GIẢM CUỐI CÙNG (Last Down-close Candle, close <= open) ngay trước nhịp tăng bứt phá với xung lượng cực mạnh (Displacement) tạo ra Fair Value Gap (FVG) và phá vỡ cấu trúc đỉnh (BOS / MSS).
+       * Tọa độ chuẩn xác: Lấy toàn bộ cây nến bao gồm cả râu nến (từ Đỉnh râu High / Open xuống Đáy râu Low).
+       * Mốc 50% Mean Threshold (M.T): Trung điểm (High + Low) / 2 của cây nến OB. Nếu giá hồi về test M.T rồi rút chân, OB giữ được sức mạnh lớn nhất.
+     + Bearish Order Block (OB Giảm giá): Là CÂY NẾN TĂNG CUỐI CÙNG (Last Up-close Candle, close >= open) ngay trước nhịp sập giảm với xung lượng cực mạnh (Displacement) tạo ra Fair Value Gap (FVG) và phá vỡ cấu trúc đáy (BOS / MSS).
+       * Tọa độ chuẩn xác: Lấy toàn bộ cây nến bao gồm cả râu nến (từ Đáy râu Low / Open lên Đỉnh râu High).
+       * Mốc 50% Mean Threshold (M.T): Trung điểm (High + Low) / 2 của cây nến OB.
+   - QUY TẮC CHẤM BÀI CHO ORDER BLOCK:
+     + Nếu học viên khoanh đúng cây nến giảm cuối cùng (với Bullish OB) hoặc cây nến tăng cuối cùng (với Bearish OB) trước nhịp sóng đẩy Displacement, học viên đã vẽ HOÀN TOÀN ĐÚNG CHUẨN XÁC 100% THEO ICT!
+     + KẾT LUẬN: ĐÚNG (Score: 85 - 100).
+     + CẤM TUYỆT ĐỐI không được bảo học viên vẽ sai khi họ đã xác định đúng cây nến cực trị này!
 
 5. FAIR VALUE GAP (FVG - Khoảng trống giá trị công bằng / Imbalance):
    - ĐỊNH NGHĨA VÀ NGUYÊN TẮC BẮT BUỘC VỀ RÂU NẾN (WICKS):
@@ -72,16 +85,15 @@ Khi giải thích hoặc phân tích bất kỳ khái niệm nào về ICT / SMC
      + Bullish FVG (FVG Tăng giá): Biên dưới = Đỉnh râu cao nhất của Nến 1 (High Wick). Biên trên = Đáy râu thấp nhất của Nến 3 (Low Wick). Vùng giá giữa 2 đầu râu này chính là Bullish FVG.
      + Bearish FVG (FVG Giảm giá): Biên trên = Đáy râu thấp nhất của Nến 1 (Low Wick). Biên dưới = Đỉnh râu cao nhất của Nến 3 (High Wick). Vùng giá giữa 2 đầu râu này chính là Bearish FVG.
      + 50% Consequent Encroachment (C.E): Mốc cân bằng ở chính giữa 2 đầu râu nến: (Râu 1 + Râu 3) / 2.
-   - QUY TẮC CHẤM BÀI BẮT BUỘC:
-     + Khi học viên vẽ vùng FVG nối từ Râu Nến 1 đến Râu Nến 3 (hoặc biên độ trùng khớp với khoảng cách giữa 2 đầu râu nến), học viên vẽ HOÀN TOÀN CHUẨN XÁC 100% THEO ĐÚNG NGUYÊN BẢN ICT CỦA MICHAEL HUDDLESTON.
-     + KẾT LUẬN: ĐÚNG (Score 90-100).
-     + TUYỆT ĐỐI CẤM đánh giá học viên sai vì 'không lấy theo thân nến' hoặc nhầm lẫn giữa nến 1 và nến 2!
+   - QUY TẮC CHẤM BÀI: Nếu học viên vẽ vùng FVG nối từ Râu Nến 1 đến Râu Nến 3, học viên vẽ HOÀN TOÀN CHUẨN XÁC 100% THEO ICT (Score: 90 - 100). Cấm trừ điểm vì không lấy theo thân nến!
 
-4. ERL (External Range Liquidity) vs IRL (Internal Range Liquidity):
-   - ERL: Các mốc đỉnh/đáy lớn bên ngoài cấu trúc (Swing Highs/Lows, BSL, SSL).
-   - IRL: Các vùng mất cân bằng bên trong cấu trúc, bao gồm FVG (Fair Value Gap) và Order Block (OB).
-   - Quy luật IPDA: Giá luôn đi từ ERL -> IRL (quét đỉnh đáy ngoài xong hồi về FVG/OB trong), rồi từ IRL -> ERL (bật từ FVG/OB trong để mở rộng ra quét đỉnh đáy ngoài tiếp theo).
-"""
+6. CẤU TRÚC THỊ TRƯỜNG (BOS vs CHoCH / MSS):
+   - BOS (Break of Structure - Phá vỡ cấu trúc tiếp diễn): Giá tiếp tục xu hướng cũ, thân nến đóng cửa vượt qua đỉnh cũ (Uptrend) hoặc đáy cũ (Downtrend).
+   - CHoCH / MSS (Change of Character / Market Structure Shift - Đảo chiều cấu trúc): Giá phá vỡ đỉnh dẫn tới đáy thấp nhất (chuyển từ Giảm sang Tăng) hoặc đáy dẫn tới đỉnh cao nhất (chuyển từ Tăng sang Giảm), mở ra chu kỳ mới kèm Displacement và FVG.
+
+7. BREAKER BLOCK & SUPPLY / DEMAND:
+   - Breaker Block: Một Order Block bị giá đâm xuyên qua không thể đỡ được giá (Failed OB), sau đó quay đầu test lại và đảo ngược vai trò từ Kháng cự thành Hỗ trợ hoặc ngược lại.
+   - Vùng Cung / Cầu (Supply / Demand): Vùng nến tích lũy cơ sở (Base) trước nhịp bứt phá mạnh (Rally/Drop)."""
 
 class AiTutorService:
     """
@@ -1426,25 +1438,65 @@ class AiTutorService:
         if "CHƯA ĐÚNG" in analysis[:300].upper() or "SAI" in analysis[:300].upper():
             verdict = "INCORRECT"
 
-                # Bind exact 3-candle timestamps to suggested_zone so AI box touches the 3 candles on chart!
+                # Bind exact candle timestamps and coordinates to suggested_zone for OB, FVG, and Liquidity!
         if suggested_zone:
             z_high = float(suggested_zone.get("priceHigh", 0))
             z_low = float(suggested_zone.get("priceLow", 0))
-            matched_fvg = None
-            if detected_fvgs:
-                for fvg in detected_fvgs:
-                    f_top = float(fvg.get("top", 0))
-                    f_bot = float(fvg.get("bottom", 0))
-                    if abs(f_top - z_high) / max(1.0, z_high) < 0.05 and abs(f_bot - z_low) / max(1.0, z_low) < 0.05:
-                        matched_fvg = fvg
-                        break
+            z_type = str(suggested_zone.get("type", "")).upper()
+            first_label = str(first_draw.get("label", "") + " " + first_draw.get("name", "") + " " + first_draw.get("tag", "")).upper()
 
-            if matched_fvg and matched_fvg.get("startTimestamp"):
-                suggested_zone["startTimestamp"] = matched_fvg["startTimestamp"]
-                u_end = first_draw.get("timeEnd")
-                latest_t = klines[-1].get("timestamp") if klines else matched_fvg.get("c3_timestamp")
-                suggested_zone["endTimestamp"] = u_end or latest_t
-            elif not suggested_zone.get("startTimestamp") and first_draw.get("timeStart"):
+            matched = False
+
+            # Case A: If user or AI zone is an Order Block (OB)
+            if "ORDER BLOCK" in z_type or "OB" in z_type or "ORDER BLOCK" in first_label or "OB" in first_label:
+                matched_ob = None
+                if detected_obs:
+                    for ob in detected_obs:
+                        ob_h = float(ob.get("priceHigh", 0))
+                        ob_l = float(ob.get("priceLow", 0))
+                        # Match if price ranges overlap within 5% tolerance
+                        if abs(ob_h - z_high) / max(1.0, z_high) < 0.06 and abs(ob_l - z_low) / max(1.0, z_low) < 0.06:
+                            matched_ob = ob
+                            break
+                    if not matched_ob and detected_obs:
+                        # Match closest OB to user drawing center
+                        u_mid = (z_high + z_low) / 2
+                        matched_ob = min(detected_obs, key=lambda o: abs((o['priceHigh'] + o['priceLow'])/2 - u_mid))
+
+                if matched_ob:
+                    suggested_zone["type"] = matched_ob["type"]
+                    suggested_zone["priceHigh"] = matched_ob["priceHigh"]
+                    suggested_zone["priceLow"] = matched_ob["priceLow"]
+                    suggested_zone["startTimestamp"] = matched_ob["startTimestamp"]
+                    u_end = first_draw.get("timeEnd")
+                    suggested_zone["endTimestamp"] = u_end or (klines[-1].get("timestamp") if klines else None)
+                    matched = True
+
+            # Case B: If user or AI zone is a Fair Value Gap (FVG)
+            if not matched and ("FVG" in z_type or "FAIR VALUE" in z_type or "FVG" in first_label or "GAP" in first_label):
+                matched_fvg = None
+                if detected_fvgs:
+                    for fvg in detected_fvgs:
+                        f_top = float(fvg.get("top", 0))
+                        f_bot = float(fvg.get("bottom", 0))
+                        if abs(f_top - z_high) / max(1.0, z_high) < 0.06 and abs(f_bot - z_low) / max(1.0, z_low) < 0.06:
+                            matched_fvg = fvg
+                            break
+                    if not matched_fvg and detected_fvgs:
+                        u_mid = (z_high + z_low) / 2
+                        matched_fvg = min(detected_fvgs, key=lambda f: abs((f['top'] + f['bottom'])/2 - u_mid))
+
+                if matched_fvg:
+                    suggested_zone["type"] = matched_fvg["type"]
+                    suggested_zone["priceHigh"] = matched_fvg["top"]
+                    suggested_zone["priceLow"] = matched_fvg["bottom"]
+                    suggested_zone["startTimestamp"] = matched_fvg["startTimestamp"]
+                    u_end = first_draw.get("timeEnd")
+                    suggested_zone["endTimestamp"] = u_end or (klines[-1].get("timestamp") if klines else None)
+                    matched = True
+
+            # Case C: Fallback to student's exact drawing anchor timestamps
+            if not suggested_zone.get("startTimestamp") and first_draw.get("timeStart"):
                 suggested_zone["startTimestamp"] = first_draw.get("timeStart")
                 suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else None)
 
@@ -1549,6 +1601,15 @@ class AiTutorService:
 
         # Detect factual FVGs strictly based on candle wicks (Râu nến)
         detected_fvgs = detect_fair_value_gaps(klines)
+        detected_obs = detect_order_blocks(klines)
+        recent_obs = detected_obs[-4:] if detected_obs else []
+        obs_summary = []
+        for ob in recent_obs:
+            obs_summary.append(
+                f"- {ob['type']}: Vùng giá chuẩn [${ob['priceLow']:,.2f} -> ${ob['priceHigh']:,.2f}] "
+                f"(Mốc 50% Mean Threshold = ${ob['mean_threshold']:,.2f}, Nến xuất hiện lúc t:{ob['startTimestamp']}, cách đây {ob['candles_ago']} nến)"
+            )
+        obs_str = "\n".join(obs_summary) if obs_summary else "Không có Order Block lớn chưa test gần đây" 
         recent_fvgs = detected_fvgs[-4:] if detected_fvgs else []
         fvgs_summary = []
         for fvg in recent_fvgs:
@@ -1671,7 +1732,7 @@ class AiTutorService:
                 f"Đỉnh cao nhất trên biểu đồ: {wave_max}, Đáy thấp nhất: {wave_min}.\n"
                 f"Các Đỉnh đảo chiều gần nhất (Recent Swing Highs): {sh_str}\n"
                 f"Các Đáy đảo chiều gần nhất (Recent Swing Lows): {sl_str}\n\n"
-                f"CÁC KHOẢNG TRỐNG GIÁ FVG THỰC TẾ TRÊN BIỂU ĐỒ (ĐO CHUẨN XÁC 100% THEO RÂU NẾN WICKS):\n{fvgs_str}\n\n"
+                f"CÁC VÙNG ORDER BLOCK (OB) THỰC TẾ TRÊN BIỂU ĐỒ (GROUND-TRUTH CHUẨN XÁC THEO NẾN DISPLACEMENT):\n{obs_str}\n\nCÁC KHOẢNG TRỐNG GIÁ FVG THỰC TẾ TRÊN BIỂU ĐỒ (ĐO CHUẨN XÁC 100% THEO RÂU NẾN WICKS):\n{fvgs_str}\n\n"
                 "⚠️ NGUYÊN TẮC BẮT BUỘC KHI CHẤM VÙNG FAIR VALUE GAP (FVG):\n"
                 "1. Biên độ của FVG BẮT BUỘC ĐO THEO RÂU NẾN (WICKS) CỦA NẾN 1 VÀ NẾN 3. TUYỆT ĐỐI KHÔNG LẤY THEO THÂN NẾN!\n"
                 "   - Bullish FVG: Biên dưới là Đỉnh râu Nến 1 (High Wick), Biên trên là Đáy râu Nến 3 (Low Wick).\n"
@@ -1768,25 +1829,125 @@ class AiTutorService:
         if "CHƯA ĐÚNG" in analysis[:300].upper() or "SAI" in analysis[:300].upper():
             verdict = "INCORRECT"
 
-                # Bind exact 3-candle timestamps to suggested_zone so AI box touches the 3 candles on chart!
+                # Bind exact candle timestamps and coordinates to suggested_zone for OB, FVG, and Liquidity!
         if suggested_zone:
             z_high = float(suggested_zone.get("priceHigh", 0))
             z_low = float(suggested_zone.get("priceLow", 0))
-            matched_fvg = None
-            if detected_fvgs:
+            z_type = str(suggested_zone.get("type", "")).upper()
+            first_label = str(first_draw.get("label", "") + " " + first_draw.get("name", "") + " " + first_draw.get("tag", "")).upper()
+
+            matched = False
+
+            # Case A: If user or AI zone is an Order Block (OB)
+            if "ORDER BLOCK" in z_type or "OB" in z_type or "ORDER BLOCK" in first_label or "OB" in first_label:
+                matched_ob = None
+                if detected_obs:
+                    for ob in detected_obs:
+                        ob_h = float(ob.get("priceHigh", 0))
+                        ob_l = float(ob.get("priceLow", 0))
+                        # Match if price ranges overlap within 5% tolerance
+                        if abs(ob_h - z_high) / max(1.0, z_high) < 0.06 and abs(ob_l - z_low) / max(1.0, z_low) < 0.06:
+                            matched_ob = ob
+                            break
+                    if not matched_ob and detected_obs:
+                        # Match closest OB to user drawing center
+                        u_mid = (z_high + z_low) / 2
+                        matched_ob = min(detected_obs, key=lambda o: abs((o['priceHigh'] + o['priceLow'])/2 - u_mid))
+
+                if matched_ob:
+                    suggested_zone["type"] = matched_ob["type"]
+                    suggested_zone["priceHigh"] = matched_ob["priceHigh"]
+                    suggested_zone["priceLow"] = matched_ob["priceLow"]
+                    suggested_zone["startTimestamp"] = matched_ob["startTimestamp"]
+                    u_end = first_draw.get("timeEnd")
+                    suggested_zone["endTimestamp"] = u_end or (klines[-1].get("timestamp") if klines else None)
+                    matched = True
+
+            # Case B: If user or AI zone is a Fair Value Gap (FVG)
+            if not matched and ("FVG" in z_type or "FAIR VALUE" in z_type or "FVG" in first_label or "GAP" in first_label):
+                matched_fvg = None
+                if detected_fvgs:
+                    for fvg in detected_fvgs:
+                        f_top = float(fvg.get("top", 0))
+                        f_bot = float(fvg.get("bottom", 0))
+                        if abs(f_top - z_high) / max(1.0, z_high) < 0.06 and abs(f_bot - z_low) / max(1.0, z_low) < 0.06:
+                            matched_fvg = fvg
+                            break
+                    if not matched_fvg and detected_fvgs:
+                        u_mid = (z_high + z_low) / 2
+                        matched_fvg = min(detected_fvgs, key=lambda f: abs((f['top'] + f['bottom'])/2 - u_mid))
+
+                if matched_fvg:
+                    suggested_zone["type"] = matched_fvg["type"]
+                    suggested_zone["priceHigh"] = matched_fvg["top"]
+                    suggested_zone["priceLow"] = matched_fvg["bottom"]
+                    suggested_zone["startTimestamp"] = matched_fvg["startTimestamp"]
+                    u_end = first_draw.get("timeEnd")
+                    suggested_zone["endTimestamp"] = u_end or (klines[-1].get("timestamp") if klines else None)
+                    matched = True
+
+            # Case C: Fallback to student's exact drawing anchor timestamps
+            if not suggested_zone.get("startTimestamp") and first_draw.get("timeStart"):
+                suggested_zone["startTimestamp"] = first_draw.get("timeStart")
+                suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else None)
+
+                # Comprehensive Timestamp & Concept Binding for ALL Smart Money Patterns
+        if suggested_zone:
+            z_high = float(suggested_zone.get("priceHigh", 0))
+            z_low = float(suggested_zone.get("priceLow", 0))
+            z_type = str(suggested_zone.get("type", "")).upper()
+            z_name = str(suggested_zone.get("name", "")).upper()
+            first_label = str(first_draw.get("label", "")).upper()
+            first_tag = str(first_draw.get("tag", "")).upper()
+            first_concept = str(first_draw.get("detectedConcept", "")).upper()
+
+            # Priority 1: Match with detected FVGs if user or AI indicates FVG
+            is_fvg = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["FVG", "FAIR VALUE", "IMBALANCE", "GAP"])
+            if is_fvg and detected_fvgs:
+                matched_fvg = None
                 for fvg in detected_fvgs:
                     f_top = float(fvg.get("top", 0))
                     f_bot = float(fvg.get("bottom", 0))
                     if abs(f_top - z_high) / max(1.0, z_high) < 0.05 and abs(f_bot - z_low) / max(1.0, z_low) < 0.05:
                         matched_fvg = fvg
                         break
+                if not matched_fvg:
+                    # Pick closest FVG to user zone
+                    matched_fvg = min(detected_fvgs, key=lambda f: abs(((f['top']+f['bottom'])/2) - user_mid))
 
-            if matched_fvg and matched_fvg.get("startTimestamp"):
-                suggested_zone["startTimestamp"] = matched_fvg["startTimestamp"]
-                u_end = first_draw.get("timeEnd")
-                latest_t = klines[-1].get("timestamp") if klines else matched_fvg.get("c3_timestamp")
-                suggested_zone["endTimestamp"] = u_end or latest_t
-            elif not suggested_zone.get("startTimestamp") and first_draw.get("timeStart"):
+                if matched_fvg:
+                    suggested_zone["type"] = matched_fvg["type"]
+                    suggested_zone["name"] = matched_fvg["type"]
+                    suggested_zone["label"] = f"AI: {matched_fvg['type']}"
+                    suggested_zone["priceHigh"] = matched_fvg["top"]
+                    suggested_zone["priceLow"] = matched_fvg["bottom"]
+                    suggested_zone["startTimestamp"] = matched_fvg.get("startTimestamp") or matched_fvg.get("c1_timestamp")
+                    suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else matched_fvg.get("c3_timestamp"))
+
+            # Priority 2: Match with detected OBs if user or AI indicates Order Block
+            is_ob = any(k in z_type or k in z_name or k in first_label or k in first_tag or k in first_concept for k in ["ORDER BLOCK", "OB", "BLOCK"])
+            if is_ob and detected_obs and not suggested_zone.get("startTimestamp"):
+                matched_ob = None
+                for ob in detected_obs:
+                    ob_h = float(ob.get("priceHigh", 0))
+                    ob_l = float(ob.get("priceLow", 0))
+                    if abs(ob_h - z_high) / max(1.0, z_high) < 0.05 and abs(ob_l - z_low) / max(1.0, z_low) < 0.05:
+                        matched_ob = ob
+                        break
+                if not matched_ob:
+                    matched_ob = min(detected_obs, key=lambda o: abs(((o['priceHigh']+o['priceLow'])/2) - user_mid))
+
+                if matched_ob:
+                    suggested_zone["type"] = matched_ob["type"]
+                    suggested_zone["name"] = matched_ob["type"]
+                    suggested_zone["label"] = f"AI: {matched_ob['type']}"
+                    suggested_zone["priceHigh"] = matched_ob["priceHigh"]
+                    suggested_zone["priceLow"] = matched_ob["priceLow"]
+                    suggested_zone["startTimestamp"] = matched_ob.get("startTimestamp")
+                    suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else None)
+
+            # Priority 3: Fallback timestamp binding using user drawing coordinates
+            if not suggested_zone.get("startTimestamp") and first_draw.get("timeStart"):
                 suggested_zone["startTimestamp"] = first_draw.get("timeStart")
                 suggested_zone["endTimestamp"] = first_draw.get("timeEnd") or (klines[-1].get("timestamp") if klines else None)
 

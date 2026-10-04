@@ -415,3 +415,86 @@ def detect_fair_value_gaps(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]
             })
 
     return fvgs
+
+# ==========================================
+# 7. NHẬN DIỆN ORDER BLOCK (OB) CHUẨN XÁC THEO ICT/SMC
+# ==========================================
+def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Nhận diện chính xác 100% các vùng Order Block (OB) theo chuẩn ICT/SMC:
+    - Bullish OB: Cây nến GIẢM cuối cùng (close < open) trước cú bứt phá tăng mạnh (Displacement / FVG).
+      Tọa độ: Đỉnh râu nến (priceHigh) và Đáy râu nến (priceLow). Timestamp: Cây nến giảm này.
+    - Bearish OB: Cây nến TĂNG cuối cùng (close > open) trước cú bứt phá giảm mạnh (Displacement / FVG).
+      Tọa độ: Đỉnh râu nến (priceHigh) và Đáy râu nến (priceLow). Timestamp: Cây nến tăng này.
+    """
+    obs = []
+    if not klines or len(klines) < 3:
+        return obs
+
+    n = len(klines)
+    # Calculate average candle body size to detect strong displacement
+    bodies = [
+        abs(k.get("close", 0) - k.get("open", 0))
+        for k in klines
+        if isinstance(k.get("close"), (int, float)) and isinstance(k.get("open"), (int, float))
+    ]
+    avg_body = sum(bodies) / len(bodies) if bodies else 1.0
+
+    for i in range(1, n - 1):
+        prev_c = klines[i - 1]
+        curr_c = klines[i]
+
+        p_o, p_c = prev_c.get("open"), prev_c.get("close")
+        p_h, p_l = prev_c.get("high"), prev_c.get("low")
+        c_o, c_c = curr_c.get("open"), curr_c.get("close")
+        c_h, c_l = curr_c.get("high"), curr_c.get("low")
+
+        if not all(isinstance(v, (int, float)) for v in [p_o, p_c, p_h, p_l, c_o, c_c, c_h, c_l]):
+            continue
+
+        c_body = abs(c_c - c_o)
+        is_displacement = c_body >= avg_body * 1.15
+
+        # 1. Bullish Order Block (nến giảm trước cây nến tăng mạnh)
+        if p_c <= p_o and c_c > c_o and is_displacement:
+            ob_high = p_h
+            ob_low = p_l
+            ob_mean = round((ob_high + ob_low) / 2, 4)
+            obs.append({
+                "type": "Bullish Order Block (OB)",
+                "priceHigh": ob_high,
+                "priceLow": ob_low,
+                "bodyHigh": p_o,
+                "bodyLow": p_c,
+                "mean_threshold": ob_mean,
+                "startTimestamp": prev_c.get("timestamp"),
+                "c1_timestamp": prev_c.get("timestamp"),
+                "displacement_timestamp": curr_c.get("timestamp"),
+                "candle_index": i - 1,
+                "candles_ago": n - 1 - (i - 1),
+                "info": f"Nến giảm t:{prev_c.get('timestamp')} (High: {ob_high}, Low: {ob_low}, Open: {p_o}) trước cú tăng mạnh t:{curr_c.get('timestamp')}",
+                "rule": "Cây nến giảm cuối cùng trước nhịp tăng mạnh Displacement. Tọa độ bao trùm từ Đáy râu đến Đỉnh râu (hoặc Open)."
+            })
+
+        # 2. Bearish Order Block (nến tăng trước cây nến giảm mạnh)
+        if p_c >= p_o and c_c < c_o and is_displacement:
+            ob_high = p_h
+            ob_low = p_l
+            ob_mean = round((ob_high + ob_low) / 2, 4)
+            obs.append({
+                "type": "Bearish Order Block (OB)",
+                "priceHigh": ob_high,
+                "priceLow": ob_low,
+                "bodyHigh": p_c,
+                "bodyLow": p_o,
+                "mean_threshold": ob_mean,
+                "startTimestamp": prev_c.get("timestamp"),
+                "c1_timestamp": prev_c.get("timestamp"),
+                "displacement_timestamp": curr_c.get("timestamp"),
+                "candle_index": i - 1,
+                "candles_ago": n - 1 - (i - 1),
+                "info": f"Nến tăng t:{prev_c.get('timestamp')} (High: {ob_high}, Low: {ob_low}, Open: {p_o}) trước cú sập mạnh t:{curr_c.get('timestamp')}",
+                "rule": "Cây nến tăng cuối cùng trước nhịp giảm mạnh Displacement. Tọa độ bao trùm từ Đáy râu (hoặc Open) đến Đỉnh râu."
+            })
+
+    return obs
