@@ -330,7 +330,7 @@ export const UpgradeProModal: React.FC<UpgradeProModalProps> = ({
                 </h4>
                 
                 <div className="flex items-baseline gap-1 mt-1 mb-3">
-                  <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">2129.000₫</span>
+                  <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">299.000₫</span>
                   <span className="text-xs text-slate-400">{isEn ? '/ 30 days' : '/ 30 ngày'}</span>
                 </div>
 
@@ -406,7 +406,7 @@ export const UpgradeProModal: React.FC<UpgradeProModalProps> = ({
               <>
                 <QrCode className="w-4 h-4" />
                 <span>
-                  {isEn ? 'Pay for PRO Plan • 2129,000₫ (Scan VietQR)' : 'Thanh toán Gói PRO • 2129.000₫ (Quét mã VietQR)'}
+                  {isEn ? 'Pay for PRO Plan • 299,000₫ (Scan VietQR)' : 'Thanh toán Gói PRO • 299.000₫ (Quét mã VietQR)'}
                 </span>
                 <ArrowRight className="w-4 h-4" />
               </>

@@ -5,64 +5,121 @@ import { protect, optionalProtect } from '../middleware/authMiddleware';
 const router = Router();
 const PYTHON_URL = (process.env.PYTHON_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
 
-// 1. Create Checkout Link (Requires Auth)
-router.post('/create-checkout', protect, async (req: any, res: Response) => {
-  try {
-    const userId = req.user?._id?.toString();
-    const token = req.headers.authorization?.startsWith('Bearer ')
-      ? req.headers.authorization.split(' ')[1]
-      : req.cookies?.token;
-    const authHeader = token ? `Bearer ${token}` : req.headers.authorization;
-    const url = `${PYTHON_URL}/api/v1/payment/create-checkout`;
+import crypto from 'crypto';
 
-    let lastError: any = null;
-    const maxAttempts = 3;
+const PAYOS_CLIENT_ID = process.env.PAYOS_CLIENT_ID || '36b42cdb-88d3-495a-86c0-8ab0ec569930';
+const PAYOS_API_KEY = process.env.PAYOS_API_KEY || '4be5cbe4-49ed-4440-b086-3b8b58e9ddd0';
+const PAYOS_CHECKSUM_KEY = process.env.PAYOS_CHECKSUM_KEY || 'ab22898958a2c88fb47eeda5c8c0447a540252f2071a6f6476bd81ac33510b5c';
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(userId ? { 'x-user-id': userId } : {}),
-            ...(authHeader ? { Authorization: authHeader } : {})
-          },
-          body: JSON.stringify(req.body),
-          signal: AbortSignal.timeout(35000)
+function createPayOSSignature(data: Record<string, any>, checksumKey: string): string {
+  const sortedKeys = ['amount', 'cancelUrl', 'description', 'orderCode', 'returnUrl'];
+  const signData = sortedKeys
+    .filter(k => data[k] !== undefined && data[k] !== null)
+    .map(k => `${k}=${data[k]}`)
+    .join('&');
+  return crypto.createHmac('sha256', checksumKey).update(signData).digest('hex');
+}
+
+async function createDirectPayOSCheckout(userId: string, body: any): Promise<any> {
+  const isPro = String(body.plan || '').toUpperCase().includes('PRO');
+  const amount = isPro ? 299000 : 129000;
+  const shortUid = String(userId).slice(-8);
+  const description = `${isPro ? 'PRO' : 'PLUS'} ${shortUid}`.slice(0, 25);
+  const orderCode = Math.floor(100000000 + Math.random() * 800000000);
+  
+  const returnUrl = body.returnUrl || process.env.PAYOS_RETURN_URL || 'http://localhost:5173/payment/success';
+  const cancelUrl = body.cancelUrl || process.env.PAYOS_CANCEL_URL || 'http://localhost:5173/payment/cancel';
+
+  const payload: Record<string, any> = {
+    orderCode,
+    amount,
+    description,
+    cancelUrl,
+    returnUrl
+  };
+
+  payload.signature = createPayOSSignature(payload, PAYOS_CHECKSUM_KEY);
+
+  const res = await fetch('https://api-merchant.payos.vn/v2/payment-requests', {
+    method: 'POST',
+    headers: {
+      'x-client-id': PAYOS_CLIENT_ID,
+      'x-api-key': PAYOS_API_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const json: any = await res.json();
+  if (json.code === '00' && json.data?.checkoutUrl) {
+    try {
+      const db = mongoose.connection.db;
+      if (db) {
+        await db.collection('payments').insertOne({
+          user_id: String(userId),
+          order_code: orderCode,
+          plan: isPro ? 'PRO' : 'PLUS',
+          amount,
+          status: 'PENDING',
+          payment_provider: 'PAYOS',
+          checkout_url: json.data.checkoutUrl,
+          qr_code: json.data.qrCode,
+          created_at: new Date(),
+          paid_at: null
         });
-
-        if (!resp.ok) {
-          if ((resp.status === 502 || resp.status === 503 || resp.status === 504) && attempt < maxAttempts) {
-            console.warn(`[Payment Route] Python returned ${resp.status} on attempt ${attempt}. Retrying in 5s for cold-start...`);
-            await new Promise(r => setTimeout(r, 5000));
-            continue;
-          }
-          const errorText = await resp.text();
-          const isHtml = errorText.trim().startsWith('<') || errorText.includes('<!DOCTYPE html');
-          const cleanMsg = isHtml
-            ? `Cổng thanh toán đang khởi động lại (${resp.status} Bad Gateway). Vui lòng thử lại sau 20-30 giây.`
-            : errorText.slice(0, 300);
-          return res.status(resp.status).json({ success: false, message: cleanMsg });
-        }
-
-        const data = await resp.json();
-        return res.status(resp.status).json(data);
-      } catch (err: any) {
-        lastError = err;
-        if (attempt < maxAttempts) {
-          console.warn(`[Payment Route] Connection error on attempt ${attempt}: ${err?.message}. Retrying...`);
-          await new Promise(r => setTimeout(r, 4000));
-        }
       }
+    } catch (dbErr) {
+      console.warn('Could not save pending payment to DB:', dbErr);
     }
 
-    return res.status(500).json({ 
-      success: false, 
-      message: 'Máy chủ thanh toán đang khởi động lại trên Render. Vui lòng bấm thử lại sau 20-30 giây.' 
+    return {
+      success: true,
+      orderCode,
+      checkoutUrl: json.data.checkoutUrl,
+      qrCode: json.data.qrCode
+    };
+  }
+
+  throw new Error(json.desc || 'PayOS API error');
+}
+
+// 1. Create Checkout Link (Requires Auth)
+router.post('/create-checkout', protect, async (req: any, res: Response) => {
+  const userId = req.user?._id?.toString();
+  const token = req.headers.authorization?.startsWith('Bearer ')
+    ? req.headers.authorization.split(' ')[1]
+    : req.cookies?.token;
+  const authHeader = token ? `Bearer ${token}` : req.headers.authorization;
+  const url = `${PYTHON_URL}/api/v1/payment/create-checkout`;
+
+  // 1. Try Python microservice with fast timeout (4s)
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(userId ? { 'x-user-id': userId } : {}),
+        ...(authHeader ? { Authorization: authHeader } : {})
+      },
+      body: JSON.stringify(req.body),
+      signal: AbortSignal.timeout(4000)
     });
-  } catch (error: any) {
-    console.error('Error forwarding create-checkout to python:', error);
-    return res.status(500).json({ success: false, message: 'Lỗi kết nối cổng thanh toán. Vui lòng thử lại.' });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      return res.status(resp.status).json(data);
+    }
+  } catch (pythonErr: any) {
+    console.warn('[Payment Route] Python service offline or sleeping. Seamlessly using Direct PayOS Checkout fallback:', pythonErr.message);
+  }
+
+  // 2. Direct PayOS fallback: Generates real VietQR link immediately without python dependency!
+  try {
+    const directResult = await createDirectPayOSCheckout(userId, req.body);
+    return res.json(directResult);
+  } catch (directErr: any) {
+    console.error('[Payment Route] Direct PayOS checkout failed:', directErr);
+    return res.status(500).json({ success: false, message: directErr.message || 'Lỗi kết nối cổng thanh toán. Vui lòng thử lại.' });
   }
 });
 
