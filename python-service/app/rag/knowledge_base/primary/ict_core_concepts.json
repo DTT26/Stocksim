@@ -148,5 +148,36 @@
     "publishedDate": "2022-01-01",
     "sourceType": "PRIMARY",
     "language": "vi"
+  },
+  {
+    "id": "ict_008",
+    "title": "PD Array (Price Delivery Array) Matrix & Institutional Footprints",
+    "concept": "PD Array (Price Delivery Array)",
+    "framework": "ICT",
+    "content": "Trong tài liệu giáo trình ICT, PD Array là viết tắt của Price Delivery Array (Mảng cấu trúc giao hàng giá). Đây là tập hợp các dấu chân thể chế (institutional footprints) mà dòng tiền thông minh để lại trên biểu đồ, đại diện cho những 'công việc chưa hoàn thành' (unfinished business) của các tổ chức lớn.\n\nDưới đây là định nghĩa chi tiết của từng vùng PD Array được hệ thống hóa trong tài liệu:\n\n1. Các Vùng PD Array Cốt Lõi (Core Toolkit - Part IV):\n• Order Block (OB - Khối Lệnh):\n  - Định nghĩa: Là cây nến ngược chiều cuối cùng trước một đợt dịch chuyển/đẩy giá dứt khoát (Displacement).\n  - Bản chất: Đánh dấu vùng giá mà các thể chế tích lũy vị thế trước khi bứt phá. Khi giá quay trở lại OB, các thể chế có xu hướng bảo vệ vị thế khiến giá bật nảy.\n• Fair Value Gap (FVG - Khoảng Trống Giá Giá Trị Hợp Lý):\n  - Định nghĩa: Là khoảng trống mất cân bằng giá tạo bởi chuỗi 3 cây nến liên tiếp khi cây nến thứ 2 đẩy dốc quá nhanh (khoảng hở giữa High nến 1 và Low nến 3 đối với Bullish FVG, đo chuẩn theo râu nến Wicks).\n  - Bản chất: Thể hiện sự giao hàng một chiều thiếu hiệu quả; thuật toán sẽ đưa giá quay lại vùng FVG để rebalance (lấp khoảng trống) trước khi tiếp tục xu hướng.\n• Breaker Block (Khối Phá Vỡ / Khối Lật Polarity):\n  - Định nghĩa: Là một khối Order Block thất bại bị giá đâm xuyên qua, làm thay đổi cấu trúc thị trường (MSS / Structure Break).\n  - Bản chất: Sau khi bị phá vỡ, khối này bị lật ngược vai trò (từ Hỗ trợ chuyển thành Kháng cự hoặc ngược lại). Thường xuất hiện ở các nhịp đảo chiều xu hướng.\n• Mitigation Block (Khối Giảm Thải / Giảm Thừa):\n  - Định nghĩa: Là vùng giá mà các thể chế quay trở lại để khớp nốt các lệnh dở dang hoặc giảm thiểu rủi ro cho vị thế cũ.\n  - Khác biệt với Breaker: Mitigation Block KHÔNG YÊU CẦU xuất hiện sự phá vỡ cấu trúc (Structure Break) trước đó và thường đóng vai trò là công cụ tiếp diễn xu hướng.\n\n2. Các Dạng PD Array Bổ Trợ & Nâng Cao (Advanced PD Arrays):\n• Inversion Fair Value Gap (IFVG): Khoảng trống FVG bị giá đâm thủng và lật ngược vai trò hỗ trợ/kháng cự.\n• Balanced Price Range (BPR): Vùng giá cân bằng hình thành khi hai khoảng trống FVG ngược chiều đè chồng lên nhau.\n• Volume Imbalance (VI): Khoảng trống hình thành giữa giá Đóng cửa của nến trước và giá Mở cửa của nến sau (khoảng hở giữa 2 thân nến).\n• Rejection Block: Vùng râu nến dài thể hiện sự từ chối giá dứt khoát.\n• NDOG / NWOG (New Day / New Week Opening Gap): Khoảng trống giá mở cửa ngày mới hoặc tuần mới.\n• Hidden OB / Propulsion Block / Suspension Block: Các dạng khối nến thể chế ẩn nằm ngay bên trong cây nến đẩy Displacement/Delivery.\n\n3. Quy Tắc Sử Dụng PD Array Theo Tài Liệu:\n• Bộ lọc Vị trí (Premium / Discount Filter):\n  - Chỉ tìm PD Array để MUA ở nửa Discount (nửa dưới 50% Dealing Range).\n  - Chỉ tìm PD Array để BÁN ở nửa Premium (nửa trên 50% Dealing Range).\n• Hợp lưu (Confluence): Điểm vào lệnh có xác suất cao nhất là nơi xuất hiện sự đè chồng của nhiều PD Array (ví dụ: Order Block đè chồng lên Fair Value Gap) nằm đúng bối cảnh.",
+    "tags": [
+      "ICT",
+      "PD Array",
+      "Price Delivery Array",
+      "Order Block",
+      "OB",
+      "Fair Value Gap",
+      "FVG",
+      "Breaker Block",
+      "Mitigation Block",
+      "IFVG",
+      "BPR",
+      "Volume Imbalance",
+      "Rejection Block",
+      "Premium",
+      "Discount",
+      "Confluence"
+    ],
+    "source": "Inner Circle Trader (ICT) Mentorship & Market Maker Primer",
+    "sourceUrl": "https://www.youtube.com/@InnerCircleTrader",
+    "author": "Michael J. Huddleston (The Inner Circle Trader)",
+    "publishedDate": "2022-01-01",
+    "sourceType": "PRIMARY",
+    "language": "vi"
   }
 ]

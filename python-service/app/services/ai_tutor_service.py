@@ -48,53 +48,72 @@ ICT_SMC_CANONICAL_GUIDELINES = """
 ==================================================
 📚 BỘ QUY CHUẨN ĐỊNH NGHĨA CHÍNH XÁC ICT / SMC (INNER CIRCLE TRADER & SMART MONEY CONCEPTS):
 ==================================================
+Trong tài liệu giáo trình ICT, **PD Array** là viết tắt của **Price Delivery Array** (Mảng cấu trúc giao hàng giá). Đây là tập hợp các dấu chân thể chế (institutional footprints) mà dòng tiền thông minh để lại trên biểu đồ, đại diện cho những 'công việc chưa hoàn thành' (unfinished business) của các tổ chức lớn.
+
 Khi giải thích hoặc chấm bài bất kỳ khái niệm nào về ICT / SMC, bạn BẮT BUỘC phải tuân thủ 100% định nghĩa chuẩn xác sau:
 
+---
+### 1. CÁC VÙNG PD ARRAY CỐT LÕI (CORE TOOLKIT - PART IV)
+
+1. ORDER BLOCK (OB - Khối Lệnh Thể Chế):
+   - ĐỊNH NGHĨA: Là cây nến ngược chiều cuối cùng trước một đợt dịch chuyển/đẩy giá dứt khoát (Displacement).
+     + Bullish Order Block (+OB): CÂY NẾN GIẢM CUỐI CÙNG (Last Down-close Candle, close <= open) trước nhịp tăng bứt phá tạo Displacement, FVG và phá vỡ cấu trúc đỉnh (BOS / MSS).
+     + Bearish Order Block (-OB): CÂY NẾN TĂNG CUỐI CÙNG (Last Up-close Candle, close >= open) trước nhịp sập giảm tạo Displacement, FVG và phá vỡ cấu trúc đáy (BOS / MSS).
+   - BẢN CHẤT: Đánh dấu vùng giá mà các thể chế tích lũy vị thế trước khi bứt phá. Khi giá quay trở lại OB, các thể chế có xu hướng bảo vệ vị thế khiến giá bật nảy.
+   - BIÊN ĐỘ & TỌA ĐỘ CHUẨN: Lấy toàn bộ cây nến bao gồm cả râu nến (High đến Low). Mốc 50% Mean Threshold (M.T) là điểm cân bằng trọng yếu.
+   - QUY TẮC CHẤM BÀI: Nếu học viên khoanh đúng cây nến giảm cuối cùng (Bullish OB) hoặc nến tăng cuối cùng (Bearish OB) trước nhịp Displacement, học viên đã vẽ HOÀN TOÀN ĐÚNG 100% THEO ICT (Kết luận: ĐÚNG, Score: 90 - 100). CẤM TUYỆT ĐỐI không được bảo học viên sai!
+
+2. FAIR VALUE GAP (FVG - Khoảng Trống Giá Giá Trị Hợp Lý):
+   - ĐỊNH NGHĨA: Là khoảng trống mất cân bằng giá tạo bởi chuỗi 3 cây nến liên tiếp khi cây nến thứ 2 đẩy dốc quá nhanh.
+     + Bullish FVG: Khoảng hở giữa ĐỈNH RÂU NẾN 1 (High Wick) và ĐÁY RÂU NẾN 3 (Low Wick).
+     + Bearish FVG: Khoảng hở giữa ĐÁY RÂU NẾN 1 (Low Wick) và ĐỈNH RÂU NẾN 3 (High Wick).
+   - BẢN CHẤT: Thể hiện sự giao hàng một chiều thiếu hiệu quả; thuật toán IPDA sẽ đưa giá quay lại vùng FVG để rebalance (lấp khoảng trống) trước khi tiếp tục xu hướng.
+   - QUY TẮC BẮT BUỘC: ĐO THEO RÂU NẾN (WICKS) CỦA NẾN 1 VÀ NẾN 3. TUYỆT ĐỐI KHÔNG ĐƯỢC LẤY THEO THÂN NẾN! Mốc 50% Consequent Encroachment (C.E) là trung điểm cân bằng.
+
+3. BREAKER BLOCK (Khối Phá Vỡ / Khối Lật Polarity):
+   - ĐỊNH NGHĨA: Là một khối Order Block thất bại bị giá đâm xuyên qua dứt khoát, làm thay đổi cấu trúc thị trường (MSS / Structure Break).
+   - BẢN CHẤT: Sau khi bị phá vỡ, khối này bị lật ngược vai trò (từ Hỗ trợ chuyển thành Kháng cự hoặc ngược lại). Thường xuất hiện sau khi giá đã quét sạch thanh khoản BSL/SSL và báo hiệu đảo chiều xu hướng.
+
+4. MITIGATION BLOCK (Khối Giảm Thải / Giảm Thừa):
+   - ĐỊNH NGHĨA: Là vùng giá mà các thể chế quay trở lại để khớp nốt các lệnh dở dang hoặc giảm thiểu rủi ro cho vị thế cũ.
+   - PHÂN BIỆT VỚI BREAKER: Mitigation Block KHÔNG YÊU CẦU xuất hiện sự phá vỡ cấu trúc (Structure Break) trước đó và thường đóng vai trò là công cụ tiếp diễn xu hướng (Continuation).
+
+---
+### 2. CÁC DẠNG PD ARRAY BỔ TRỢ & NÂNG CAO (ADVANCED PD ARRAYS)
+
+• INVERSION FAIR VALUE GAP (IFVG): Khoảng trống FVG bị giá đâm thủng dứt khoát và lật ngược vai trò từ hỗ trợ sang kháng cự (hoặc ngược lại).
+• BALANCED PRICE RANGE (BPR): Vùng giá cân bằng hình thành khi hai khoảng trống FVG ngược chiều đè chồng lên nhau, thường là vùng nén giá rất mạnh.
+• VOLUME IMBALANCE (VI): Khoảng trống hình thành giữa giá Đóng cửa của nến trước và giá Mở cửa của nến sau (khoảng hở giữa 2 thân nến, râu nến có thể chồng lấn).
+• REJECTION BLOCK: Vùng râu nến dài thể hiện sự từ chối giá dứt khoát tại đỉnh/đáy cực trị.
+• NDOG / NWOG (New Day / New Week Opening Gap): Khoảng trống giá mở cửa giữa phiên đóng cửa hôm trước và mở cửa ngày/tuần mới.
+• HIDDEN OB / PROPULSION BLOCK / SUSPENSION BLOCK: Các dạng khối nến thể chế ẩn nằm ngay bên trong cây nến đẩy Displacement/Delivery.
+
+---
+### 3. THANH KHOẢN VÀ CẤU TRÚC (LIQUIDITY & MARKET STRUCTURE)
+
 1. BSL (Buy-Side Liquidity - Thanh khoản Phía Mua):
-   - VỊ TRÍ: Luôn luôn nằm ở PHÍA TRÊN CÁC ĐỈNH (Old Highs, Swing Highs, Equal Highs - EQH, Previous Day High - PDH, Session Highs).
-   - BẢN CHẤT: Nơi tập trung các lệnh BUY STOP gồm Stop Loss của phe Short và Buy Stop của Breakout Traders.
-   - HÀNH VI SMART MONEY: Smart Money đẩy giá quét vượt đỉnh BSL để khớp lệnh BÁN (Short) của họ ở mức giá cao (Premium).
-   - TUYỆT ĐỐI KHÔNG NÓI: BSL là "lực mua" hay BSL nằm ở dưới đáy (sai hoàn toàn!).
+   - VỊ TRÍ: Nằm ở PHÍA TRÊN CÁC ĐỈNH (Old Highs, Swing Highs, Equal Highs - EQH, Previous Day High - PDH).
+   - BẢN CHẤT: Lệnh Buy Stop của phe Short (Stop Loss) và Breakout Traders. Smart Money quét BSL để khớp lệnh BÁN (Short) ở mức giá cao (Premium). TUYỆT ĐỐI không nói BSL là "lực mua" hay nằm dưới đáy!
 
 2. SSL (Sell-Side Liquidity - Thanh khoản Phía Bán):
-   - VỊ TRÍ: Luôn luôn nằm ở PHÍA DƯỚI CÁC ĐÁY (Old Lows, Swing Lows, Equal Lows - EQL, Previous Day Low - PDL, Session Lows).
-   - BẢN CHẤT: Nơi tập trung các lệnh SELL STOP gồm Stop Loss của phe Long và Sell Stop của Breakdown Traders.
-   - HÀNH VI SMART MONEY: Smart Money đẩy giá đâm thủng đáy SSL để khớp lệnh MUA (Long) của họ ở mức giá rẻ (Discount).
-   - TUYỆT ĐỐI KHÔNG NÓI: SSL là "lực bán" hay SSL nằm ở trên đỉnh (sai hoàn toàn!).
+   - VỊ TRÍ: Nằm ở PHÍA DƯỚI CÁC ĐÁY (Old Lows, Swing Lows, Equal Lows - EQL, Previous Day Low - PDL).
+   - BẢN CHẤT: Lệnh Sell Stop của phe Long (Stop Loss) và Breakdown Traders. Smart Money quét SSL để khớp lệnh MUA (Long) ở mức giá rẻ (Discount). TUYỆT ĐỐI không nói SSL là "lực bán" hay nằm trên đỉnh!
 
 3. LIQUIDITY SWEEP (Săn / Quét thanh khoản - Raid / Turtle Soup):
-   - Giá chỉ đâm râu nến (Wick) qua đỉnh BSL hoặc đáy SSL để gom thanh khoản rồi lập tức rút chân đóng nến quay ngược lại bên trong (SFP - Swing Failure Pattern) -> Tín hiệu chuẩn bị đảo chiều.
-   - Phân biệt với LIQUIDITY RUN (Expansion): Thân nến đóng cửa dứt khoát vượt qua kèm nến Displacement dài -> Bứt phá tiếp diễn xu hướng.
+   - Giá chỉ đâm râu nến (Wick) qua đỉnh BSL hoặc đáy SSL rồi lập tức rút chân đóng nến quay ngược lại bên trong (SFP) -> Chuẩn bị đảo chiều.
+   - Phân biệt với LIQUIDITY RUN (Expansion): Thân nến đóng cửa vượt đỉnh/đáy kèm nến Displacement dài -> Bứt phá tiếp diễn.
 
-4. ORDER BLOCK (OB - Khối lệnh của Smart Money):
-   - ĐỊNH NGHĨA & NGUYÊN TẮC BẮT BUỘC:
-     + Bullish Order Block (OB Tăng giá): Là CÂY NẾN GIẢM CUỐI CÙNG (Last Down-close Candle, close <= open) ngay trước nhịp tăng bứt phá với xung lượng cực mạnh (Displacement) tạo ra Fair Value Gap (FVG) và phá vỡ cấu trúc đỉnh (BOS / MSS).
-       * Tọa độ chuẩn xác: Lấy toàn bộ cây nến bao gồm cả râu nến (từ Đỉnh râu High / Open xuống Đáy râu Low).
-       * Mốc 50% Mean Threshold (M.T): Trung điểm (High + Low) / 2 của cây nến OB. Nếu giá hồi về test M.T rồi rút chân, OB giữ được sức mạnh lớn nhất.
-     + Bearish Order Block (OB Giảm giá): Là CÂY NẾN TĂNG CUỐI CÙNG (Last Up-close Candle, close >= open) ngay trước nhịp sập giảm với xung lượng cực mạnh (Displacement) tạo ra Fair Value Gap (FVG) và phá vỡ cấu trúc đáy (BOS / MSS).
-       * Tọa độ chuẩn xác: Lấy toàn bộ cây nến bao gồm cả râu nến (từ Đáy râu Low / Open lên Đỉnh râu High).
-       * Mốc 50% Mean Threshold (M.T): Trung điểm (High + Low) / 2 của cây nến OB.
-   - QUY TẮC CHẤM BÀI CHO ORDER BLOCK:
-     + Nếu học viên khoanh đúng cây nến giảm cuối cùng (với Bullish OB) hoặc cây nến tăng cuối cùng (với Bearish OB) trước nhịp sóng đẩy Displacement, học viên đã vẽ HOÀN TOÀN ĐÚNG CHUẨN XÁC 100% THEO ICT!
-     + KẾT LUẬN: ĐÚNG (Score: 85 - 100).
-     + CẤM TUYỆT ĐỐI không được bảo học viên vẽ sai khi họ đã xác định đúng cây nến cực trị này!
+4. CẤU TRÚC THỊ TRƯỜNG:
+   - BOS (Break of Structure): Phá vỡ cấu trúc tiếp diễn xu hướng cũ.
+   - MSS / CHoCH (Market Structure Shift / Change of Character): Đảo chiều cấu trúc sang xu hướng mới kèm Displacement và FVG.
 
-5. FAIR VALUE GAP (FVG - Khoảng trống giá trị công bằng / Imbalance):
-   - ĐỊNH NGHĨA VÀ NGUYÊN TẮC BẮT BUỘC VỀ RÂU NẾN (WICKS):
-     + FVG xuất hiện trong chuỗi 3 nến liên tiếp [Nến 1, Nến 2, Nến 3]. Nến 2 là cây nến tăng/giảm cực mạnh (Displacement).
-     + VÙNG FVG ĐƯỢC XÁC ĐỊNH BỞI KHOẢNG TRỐNG GIỮA RÂU NẾN 1 VÀ RÂU NẾN 3. TUYỆT ĐỐI KHÔNG LẤY THEO THÂN NẾN!
-     + Bullish FVG (FVG Tăng giá): Biên dưới = Đỉnh râu cao nhất của Nến 1 (High Wick). Biên trên = Đáy râu thấp nhất của Nến 3 (Low Wick). Vùng giá giữa 2 đầu râu này chính là Bullish FVG.
-     + Bearish FVG (FVG Giảm giá): Biên trên = Đáy râu thấp nhất của Nến 1 (Low Wick). Biên dưới = Đỉnh râu cao nhất của Nến 3 (High Wick). Vùng giá giữa 2 đầu râu này chính là Bearish FVG.
-     + 50% Consequent Encroachment (C.E): Mốc cân bằng ở chính giữa 2 đầu râu nến: (Râu 1 + Râu 3) / 2.
-   - QUY TẮC CHẤM BÀI: Nếu học viên vẽ vùng FVG nối từ Râu Nến 1 đến Râu Nến 3, học viên vẽ HOÀN TOÀN CHUẨN XÁC 100% THEO ICT (Score: 90 - 100). Cấm trừ điểm vì không lấy theo thân nến!
+---
+### 4. QUY TẮC VÀNG KHI SỬ DỤNG PD ARRAY
 
-6. CẤU TRÚC THỊ TRƯỜNG (BOS vs CHoCH / MSS):
-   - BOS (Break of Structure - Phá vỡ cấu trúc tiếp diễn): Giá tiếp tục xu hướng cũ, thân nến đóng cửa vượt qua đỉnh cũ (Uptrend) hoặc đáy cũ (Downtrend).
-   - CHoCH / MSS (Change of Character / Market Structure Shift - Đảo chiều cấu trúc): Giá phá vỡ đỉnh dẫn tới đáy thấp nhất (chuyển từ Giảm sang Tăng) hoặc đáy dẫn tới đỉnh cao nhất (chuyển từ Tăng sang Giảm), mở ra chu kỳ mới kèm Displacement và FVG.
-
-7. BREAKER BLOCK & SUPPLY / DEMAND:
-   - Breaker Block: Một Order Block bị giá đâm xuyên qua không thể đỡ được giá (Failed OB), sau đó quay đầu test lại và đảo ngược vai trò từ Kháng cự thành Hỗ trợ hoặc ngược lại.
-   - Vùng Cung / Cầu (Supply / Demand): Vùng nến tích lũy cơ sở (Base) trước nhịp bứt phá mạnh (Rally/Drop)."""
+1. BỘ LỌC VỊ TRÍ (PREMIUM / DISCOUNT FILTER):
+   - Chỉ tìm PD Array để MUA ở nửa DISCOUNT (nửa dưới 50% Dealing Range / Fibonacci < 0.5).
+   - Chỉ tìm PD Array để BÁN ở nửa PREMIUM (nửa trên 50% Dealing Range / Fibonacci > 0.5).
+2. HỢP LƯU (CONFLUENCE): Điểm vào lệnh có xác suất cao nhất là nơi xuất hiện sự đè chồng của nhiều PD Array (Ví dụ: Order Block đè chồng lên Fair Value Gap) nằm đúng bối cảnh Premium/Discount."""
 
 class AiTutorService:
     """
