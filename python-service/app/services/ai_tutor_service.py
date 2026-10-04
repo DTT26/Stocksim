@@ -1974,18 +1974,19 @@ class AiTutorService:
 
         elif is_user_ob:
             matched_ob = None
-            if detected_obs:
+            pref_type = "Bearish" if ("BEARISH" in first_label or "BEARISH" in first_concept or "-" in first_user_label) else ("Bullish" if ("BULLISH" in first_label or "BULLISH" in first_concept or "+" in first_user_label) else None)
+            
+            # 1. First priority: find exact candle right at student's drawn coordinates
+            loc_ob = find_order_block_at_candle(klines, u_time_start, user_p_high, user_p_low, preferred_type=pref_type)
+            if loc_ob:
+                matched_ob = loc_ob
+            elif detected_obs:
                 if u_time_start:
                     time_candidates = [o for o in detected_obs if abs(o.get("startTimestamp", 0) - u_time_start) <= 1000 * 60 * 60 * 24 * 3]
                     if time_candidates:
                         matched_ob = min(time_candidates, key=lambda o: abs(o.get("startTimestamp", 0) - u_time_start))
                 if not matched_ob:
                     matched_ob = min(detected_obs, key=lambda o: abs(((o['priceHigh'] + o['priceLow']) / 2) - user_mid))
-
-            if not matched_ob:
-                loc_ob = find_order_block_at_candle(klines, u_time_start, user_p_high, user_p_low)
-                if loc_ob:
-                    matched_ob = loc_ob
 
             if matched_ob:
                 suggested_zone = {

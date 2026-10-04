@@ -528,10 +528,28 @@ export const drawAiCorrectionOverlay = (suggestedZone: {
       }
     }
 
-    const finalT1: number = t1 || (klines[Math.max(0, klines.length - 15)]?.timestamp) || (Date.now() - 3600000 * 4);
-    const finalT2: number = (!t2 || t2 <= finalT1)
-      ? ((lastKline?.timestamp && lastKline.timestamp > finalT1) ? lastKline.timestamp : (finalT1 + 3600000 * 24 * 7))
-      : t2;
+    const candleInterval = klines.length >= 2 ? Math.abs(klines[1].timestamp - klines[0].timestamp) : 3600000;
+    let finalT1: number = t1 || (klines[Math.max(0, klines.length - 15)]?.timestamp) || (Date.now() - 3600000 * 4);
+    let finalT2: number = t2 || 0;
+
+    const isOrderBlockType = zType.includes('ORDER BLOCK') || zType.includes('OB') || zType.includes('BLOCK');
+    const isFvgType = zType.includes('FVG') || zType.includes('GAP') || zType.includes('IMBALANCE');
+
+    if (isOrderBlockType) {
+      // Order Block strictly encapsulates the single institutional candle (1 to 2 candles wide max)
+      if (!finalT2 || finalT2 <= finalT1 || (finalT2 - finalT1) > candleInterval * 4) {
+        finalT2 = finalT1 + Math.max(1, candleInterval) * 2;
+      }
+    } else if (isFvgType) {
+      // FVG encapsulates the 3-candle imbalance range
+      if (!finalT2 || finalT2 <= finalT1 || (finalT2 - finalT1) > candleInterval * 6) {
+        finalT2 = finalT1 + Math.max(1, candleInterval) * 3;
+      }
+    } else {
+      if (!finalT2 || finalT2 <= finalT1) {
+        finalT2 = ((lastKline?.timestamp && lastKline.timestamp > finalT1) ? lastKline.timestamp : (finalT1 + 3600000 * 24 * 7));
+      }
+    }
 
     // Determine colors according to concept
     let fillColor = 'rgba(245, 158, 11, 0.22)';

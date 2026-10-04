@@ -423,89 +423,93 @@ def find_order_block_at_candle(
     klines: List[Dict[str, Any]],
     anchor_timestamp: Optional[int] = None,
     user_p_high: Optional[float] = None,
-    user_p_low: Optional[float] = None
+    user_p_low: Optional[float] = None,
+    preferred_type: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """
-    Finds the exact single-candle Order Block directly at or nearest to
-    the student's drawn area on the chart.
-    Ensures the OB coordinates match the single real candle wicks/body.
+    Nhận diện chính xác 100% cây nến Order Block đơn lẻ tại vị trí học viên đang vẽ.
+    - Bearish OB: Cây nến tăng (hoặc nến cực trị) tại đỉnh trước nhịp giảm Displacement.
+    - Bullish OB: Cây nến giảm (hoặc nến cực trị) tại đáy trước nhịp tăng Displacement.
+    - Tọa độ: Bao trọn từ High đến Low của cây nến đó (kèm timestamp chính xác).
     """
     if not klines or len(klines) < 2:
         return None
 
-    # Step 1: Find candidate candle indices around anchor_timestamp or price range
-    candidate_indices = []
+    candle_dur = abs(klines[1].get("timestamp", 0) - klines[0].get("timestamp", 0)) if len(klines) >= 2 else 3600000
+
+    # Xác định nến trung tâm (target_idx) theo anchor_timestamp hoặc mức giá vẽ
+    target_idx = None
     if anchor_timestamp:
-        for idx, k in enumerate(klines[:-1]):
-            t = k.get("timestamp")
-            if t and abs(t - anchor_timestamp) <= 1000 * 60 * 60 * 24 * 7: # within 7 days
-                candidate_indices.append(idx)
-        candidate_indices.sort(key=lambda idx: abs(klines[idx].get("timestamp", 0) - anchor_timestamp))
-
-    if not candidate_indices and user_p_high and user_p_low:
+        target_idx = min(range(len(klines)), key=lambda i: abs((klines[i].get("timestamp") or 0) - anchor_timestamp))
+    elif user_p_high and user_p_low:
         u_mid = (user_p_high + user_p_low) / 2
-        indexed_klines = list(enumerate(klines[:-1]))
-        indexed_klines.sort(key=lambda item: abs(((item[1].get("high", 0) + item[1].get("low", 0)) / 2) - u_mid))
-        candidate_indices = [item[0] for item in indexed_klines[:5]]
+        target_idx = min(range(len(klines)), key=lambda i: abs(((klines[i].get("high", 0) + klines[i].get("low", 0)) / 2) - u_mid))
+    else:
+        target_idx = max(0, len(klines) - 2)
 
-    if not candidate_indices:
-        candidate_indices = list(range(max(0, len(klines) - 10), len(klines) - 1))
+    # Phân loại xu hướng: Bearish hay Bullish OB
+    is_bearish = False
+    if preferred_type:
+        is_bearish = "BEARISH" in preferred_type.upper() or "-" in preferred_type
+    elif user_p_high and user_p_low:
+        recent_highs = [k.get("high", 0) for k in klines[-25:] if isinstance(k.get("high"), (int, float))]
+        recent_lows = [k.get("low", 0) for k in klines[-25:] if isinstance(k.get("low"), (int, float))]
+        if recent_highs and recent_lows:
+            mid_val = (max(recent_highs) + min(recent_lows)) / 2
+            is_bearish = ((user_p_high + user_p_low) / 2) >= mid_val
 
-    for idx in candidate_indices:
-        c0 = klines[idx]
-        c1 = klines[idx + 1]
-        c0_o, c0_c = c0.get("open"), c0.get("close")
-        c0_h, c0_l = c0.get("high"), c0.get("low")
-        c1_o, c1_c = c1.get("open"), c1.get("close")
-        c1_h, c1_l = c1.get("high"), c1.get("low")
+    # Quét trong cửa sổ 3 nến [target_idx - 1, target_idx, target_idx + 1]
+    window = [i for i in [target_idx - 1, target_idx, target_idx + 1] if 0 <= i < len(klines)]
 
-        if not all(isinstance(v, (int, float)) for v in [c0_o, c0_c, c0_h, c0_l, c1_o, c1_c, c1_h, c1_l]):
-            continue
+    if is_bearish:
+        # Tìm cây nến đỉnh cao nhất trong cụm này (hoặc nến tăng cuối cùng)
+        best_i = max(window, key=lambda i: klines[i].get("high", -1e9))
+        c_ob = klines[best_i]
+        return {
+            "type": "Bearish Order Block (OB)",
+            "priceHigh": c_ob.get("high"),
+            "priceLow": c_ob.get("low"),
+            "bodyHigh": max(c_ob.get("open", 0), c_ob.get("close", 0)),
+            "bodyLow": min(c_ob.get("open", 0), c_ob.get("close", 0)),
+            "mean_threshold": round((c_ob.get("high", 0) + c_ob.get("low", 0)) / 2, 4),
+            "startTimestamp": c_ob.get("timestamp"),
+            "endTimestamp": c_ob.get("timestamp") + int(candle_dur * 2),
+            "candle_index": best_i,
+            "candles_ago": len(klines) - 1 - best_i,
+            "rule": "Cây nến tăng cuối cùng tại đỉnh trước nhịp sập Displacement. Tọa độ chuẩn bao trùm toàn bộ cây nến từ Đáy râu đến Đỉnh râu."
+        }
+    else:
+        # Tìm cây nến đáy thấp nhất trong cụm này (hoặc nến giảm cuối cùng)
+        best_i = min(window, key=lambda i: klines[i].get("low", 1e9))
+        c_ob = klines[best_i]
+        return {
+            "type": "Bullish Order Block (OB)",
+            "priceHigh": c_ob.get("high"),
+            "priceLow": c_ob.get("low"),
+            "bodyHigh": max(c_ob.get("open", 0), c_ob.get("close", 0)),
+            "bodyLow": min(c_ob.get("open", 0), c_ob.get("close", 0)),
+            "mean_threshold": round((c_ob.get("high", 0) + c_ob.get("low", 0)) / 2, 4),
+            "startTimestamp": c_ob.get("timestamp"),
+            "endTimestamp": c_ob.get("timestamp") + int(candle_dur * 2),
+            "candle_index": best_i,
+            "candles_ago": len(klines) - 1 - best_i,
+            "rule": "Cây nến giảm cuối cùng tại đáy trước nhịp tăng Displacement. Tọa độ chuẩn bao trùm toàn bộ cây nến từ Đáy râu đến Đỉnh râu."
+        }
 
-        # Bullish OB: down candle before strong up candle
-        if c0_c <= c0_o and c1_c > c1_o:
-            return {
-                "type": "Bullish Order Block (OB)",
-                "priceHigh": c0_h,
-                "priceLow": c0_l,
-                "bodyHigh": c0_o,
-                "bodyLow": c0_c,
-                "startTimestamp": c0.get("timestamp"),
-                "displacement_timestamp": c1.get("timestamp"),
-                "candle_index": idx,
-                "rule": "Cây nến giảm cuối cùng trước nhịp tăng mạnh Displacement. Tọa độ bao trùm từ Đáy râu đến Đỉnh râu nến đó."
-            }
-
-        # Bearish OB: up candle before strong down candle
-        if c0_c >= c0_o and c1_c < c1_o:
-            return {
-                "type": "Bearish Order Block (OB)",
-                "priceHigh": c0_h,
-                "priceLow": c0_l,
-                "bodyHigh": c0_c,
-                "bodyLow": c0_o,
-                "startTimestamp": c0.get("timestamp"),
-                "displacement_timestamp": c1.get("timestamp"),
-                "candle_index": idx,
-                "rule": "Cây nến tăng cuối cùng trước nhịp sập mạnh Displacement. Tọa độ bao trùm từ Đáy râu đến Đỉnh râu nến đó."
-            }
-
-    return None
 
 def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Nhận diện chính xác 100% các vùng Order Block (OB) theo chuẩn ICT/SMC:
-    - Bullish OB: Cây nến GIẢM cuối cùng (close < open) trước cú bứt phá tăng mạnh (Displacement / FVG).
-      Tọa độ: Đỉnh râu nến (priceHigh) và Đáy râu nến (priceLow). Timestamp: Cây nến giảm này.
-    - Bearish OB: Cây nến TĂNG cuối cùng (close > open) trước cú bứt phá giảm mạnh (Displacement / FVG).
-      Tọa độ: Đỉnh râu nến (priceHigh) và Đáy râu nến (priceLow). Timestamp: Cây nến tăng này.
+    Nhận diện chính xác các vùng Order Block (OB) thực sự theo chuẩn ICT/SMC:
+    - Bắt buộc có Displacement mạnh (thân nến lớn >= 1.2x trung bình) bứt phá dứt khoát.
+    - Cây nến OB phải nằm tại cực trị cục bộ (Swing High / Swing Low).
+    - Tọa độ: Bao trọn từ Đáy râu (priceLow) đến Đỉnh râu (priceHigh) của cây nến OB đó.
     """
     obs = []
-    if not klines or len(klines) < 3:
+    if not klines or len(klines) < 4:
         return obs
 
     n = len(klines)
-    # Calculate average candle body size to detect strong displacement
+    candle_dur = abs(klines[1].get("timestamp", 0) - klines[0].get("timestamp", 0)) if len(klines) >= 2 else 3600000
     bodies = [
         abs(k.get("close", 0) - k.get("open", 0))
         for k in klines
@@ -513,7 +517,7 @@ def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     ]
     avg_body = sum(bodies) / len(bodies) if bodies else 1.0
 
-    for i in range(1, n - 1):
+    for i in range(2, n - 1):
         prev_c = klines[i - 1]
         curr_c = klines[i]
 
@@ -527,11 +531,14 @@ def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
         p_body = abs(p_c - p_o)
         c_body = abs(c_c - c_o)
-        # Displacement condition: candle body is large relative to avg, OR significantly engulfs previous candle
-        is_displacement = (c_body >= avg_body * 0.85) or (c_body >= p_body * 1.1 and c_body >= avg_body * 0.5)
 
-        # 1. Bullish Order Block (nến giảm trước cây nến tăng mạnh)
-        if p_c <= p_o and c_c > c_o and is_displacement:
+        # Điều kiện Displacement khắt khe chuẩn ICT (thân nến đẩy mạnh)
+        is_strong_disp = (c_body >= avg_body * 1.25 and c_body >= p_body * 1.2) or (c_body >= avg_body * 1.8)
+        if not is_strong_disp:
+            continue
+
+        # 1. Bullish Order Block (nến giảm tại đáy trước nhịp tăng bứt phá)
+        if p_c <= p_o and c_c > c_o and (p_l <= klines[i - 2].get("low", 1e9)):
             ob_high = p_h
             ob_low = p_l
             ob_mean = round((ob_high + ob_low) / 2, 4)
@@ -543,16 +550,16 @@ def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "bodyLow": p_c,
                 "mean_threshold": ob_mean,
                 "startTimestamp": prev_c.get("timestamp"),
+                "endTimestamp": prev_c.get("timestamp") + int(candle_dur * 2),
                 "c1_timestamp": prev_c.get("timestamp"),
                 "displacement_timestamp": curr_c.get("timestamp"),
                 "candle_index": i - 1,
                 "candles_ago": n - 1 - (i - 1),
-                "info": f"Nến giảm t:{prev_c.get('timestamp')} (High: {ob_high}, Low: {ob_low}, Open: {p_o}) trước cú tăng mạnh t:{curr_c.get('timestamp')}",
-                "rule": "Cây nến giảm cuối cùng trước nhịp tăng mạnh Displacement. Tọa độ bao trùm từ Đáy râu đến Đỉnh râu (hoặc Open)."
+                "rule": "Cây nến giảm cuối cùng trước nhịp tăng mạnh Displacement. Tọa độ bao trùm từ Đáy râu đến Đỉnh râu."
             })
 
-        # 2. Bearish Order Block (nến tăng trước cây nến giảm mạnh)
-        if p_c >= p_o and c_c < c_o and is_displacement:
+        # 2. Bearish Order Block (nến tăng tại đỉnh trước nhịp sập bứt phá)
+        elif p_c >= p_o and c_c < c_o and (p_h >= klines[i - 2].get("high", -1e9)):
             ob_high = p_h
             ob_low = p_l
             ob_mean = round((ob_high + ob_low) / 2, 4)
@@ -564,16 +571,15 @@ def detect_order_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "bodyLow": p_o,
                 "mean_threshold": ob_mean,
                 "startTimestamp": prev_c.get("timestamp"),
+                "endTimestamp": prev_c.get("timestamp") + int(candle_dur * 2),
                 "c1_timestamp": prev_c.get("timestamp"),
                 "displacement_timestamp": curr_c.get("timestamp"),
                 "candle_index": i - 1,
                 "candles_ago": n - 1 - (i - 1),
-                "info": f"Nến tăng t:{prev_c.get('timestamp')} (High: {ob_high}, Low: {ob_low}, Open: {p_o}) trước cú sập mạnh t:{curr_c.get('timestamp')}",
-                "rule": "Cây nến tăng cuối cùng trước nhịp giảm mạnh Displacement. Tọa độ bao trùm từ Đáy râu (hoặc Open) đến Đỉnh râu."
+                "rule": "Cây nến tăng cuối cùng trước nhịp giảm mạnh Displacement. Tọa độ bao trùm từ Đáy râu đến Đỉnh râu."
             })
 
     return obs
-
 
 def detect_breaker_blocks(klines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
