@@ -87,7 +87,7 @@ export interface UserChartDrawing {
   name: string;
   label?: string;            // Display title: e.g. "Order Block (OB)" or user-defined text
   userLabel?: string;        // Raw text annotated on the chart
-  tag?: string;              // Normalized SMC tag: 'OB' | 'FVG' | 'BOS' | 'CHOCH' | 'LIQUIDITY' | 'BREAKER' | 'SUPPLY_DEMAND' | ''
+  tag?: string;              // Normalized SMC tag: 'OB' | 'FVG' | 'IFVG' | 'CISD' | 'BOS' | 'CHOCH' | 'LIQUIDITY' | 'BREAKER' | 'MITIGATION' | 'VI' | 'REJECTION' | 'SUPPLY_DEMAND' | ''
   detectedConcept?: string;  // Detailed SMC concept classification
   points: Array<{
     timestamp?: number;
@@ -127,56 +127,119 @@ export const detectSmcConcept = (text: string, overlayName: string): { tag: stri
   const clean = (text || '').trim();
   const lower = clean.toLowerCase();
 
-  if (/\b(fvg|fair\s*value\s*gap|imbalance|khoảng\s*trống|mất\s*cân\s*bằng)\b/i.test(lower)) {
+  // 1. INVERSION FVG (MUST BE CHECKED BEFORE FVG)
+  if (/(ifvg|inversion\s*fvg|inversion|fvg\s*đảo|khoảng\s*trống\s*đảo)/i.test(lower) || lower.includes('ifvg') || lower.includes('inversion')) {
+    return {
+      tag: 'IFVG',
+      detectedConcept: 'Inversion FVG (IFVG)',
+      displayLabel: clean ? `Inversion FVG (${clean})` : 'Inversion FVG (IFVG)'
+    };
+  }
+
+  // 2. CISD (Change In State of Delivery) - DO NOT CONFUSE WITH FVG!
+  if (/(cisd|change\s*in\s*state\s*of\s*delivery|state\s*of\s*delivery|đổi\s*trạng\s*thái)/i.test(lower) || lower.includes('cisd')) {
+    return {
+      tag: 'CISD',
+      detectedConcept: 'Change In State of Delivery (CISD)',
+      displayLabel: clean ? `CISD (${clean})` : 'Change In State of Delivery (CISD)'
+    };
+  }
+
+  // 3. VOLUME IMBALANCE (VI)
+  if (/(vi|volume\s*imbalance|hở\s*thân|gap\s*thân)/i.test(lower)) {
+    return {
+      tag: 'VI',
+      detectedConcept: 'Volume Imbalance (VI)',
+      displayLabel: clean ? `Volume Imbalance (${clean})` : 'Volume Imbalance (VI)'
+    };
+  }
+
+  // 4. REJECTION BLOCK (RB)
+  if (/(rb|rejection\s*block|rejection|râu\s*từ\s*chối)/i.test(lower)) {
+    return {
+      tag: 'REJECTION',
+      detectedConcept: 'Rejection Block',
+      displayLabel: clean ? `Rejection Block (${clean})` : 'Rejection Block'
+    };
+  }
+
+  // 5. FAIR VALUE GAP (FVG)
+  if (/(fvg|fair\s*value\s*gap|imbalance|khoảng\s*trống|mất\s*cân\s*bằng)/i.test(lower)) {
     return {
       tag: 'FVG',
       detectedConcept: 'Fair Value Gap (FVG)',
       displayLabel: clean ? `Fair Value Gap (${clean})` : 'Fair Value Gap (FVG)'
     };
   }
-  if (/\b(ob|order\s*block|orderblock|khối\s*lệnh|khe\s*lệnh)\b/i.test(lower)) {
+
+  // 6. ORDER BLOCK (OB)
+  if (/(ob|order\s*block|orderblock|khối\s*lệnh|khe\s*lệnh)/i.test(lower)) {
     return {
       tag: 'OB',
       detectedConcept: 'Order Block (OB)',
       displayLabel: clean ? `Order Block (${clean})` : 'Order Block (OB)'
     };
   }
-  if (/\b(bos|break\s*of\s*structure|phá\s*vỡ\s*cấu\s*trúc)\b/i.test(lower)) {
+
+  // 7. BOS / MSS / CHOCH
+  if (/(bos|break\s*of\s*structure|phá\s*vỡ\s*cấu\s*trúc)/i.test(lower)) {
     return {
       tag: 'BOS',
       detectedConcept: 'Break of Structure (BOS)',
       displayLabel: clean ? `Break of Structure (${clean})` : 'Break of Structure (BOS)'
     };
   }
-  if (/\b(choch|ch|change\s*of\s*character|đổi\s*tính\s*chất)\b/i.test(lower)) {
+  if (/(choch|ch|change\s*of\s*character|đổi\s*tính\s*chất|mss)/i.test(lower)) {
     return {
       tag: 'CHOCH',
       detectedConcept: 'Change of Character (CHoCH)',
       displayLabel: clean ? `Change of Character (${clean})` : 'Change of Character (CHoCH)'
     };
   }
-  if (/\b(liq|liquidity|bsl|ssl|pool|thanh\s*khoản)\b/i.test(lower)) {
+
+  // 8. LIQUIDITY
+  if (/(liq|liquidity|bsl|ssl|pool|thanh\s*khoản)/i.test(lower)) {
     return {
       tag: 'LIQUIDITY',
       detectedConcept: 'Liquidity Pool (Thanh khoản)',
       displayLabel: clean ? `Liquidity (${clean})` : 'Liquidity Pool (Thanh khoản)'
     };
   }
-  if (/\b(bb|breaker|breaker\s*block)\b/i.test(lower)) {
+
+  // 9. BREAKER BLOCK
+  if (/(bearish\s*breaker|breaker\s*giảm)/i.test(lower)) {
+    return {
+      tag: 'BREAKER',
+      detectedConcept: 'Bearish Breaker Block',
+      displayLabel: clean ? `Bearish Breaker (${clean})` : 'Bearish Breaker Block'
+    };
+  }
+  if (/(bullish\s*breaker|breaker\s*tăng)/i.test(lower)) {
+    return {
+      tag: 'BREAKER',
+      detectedConcept: 'Bullish Breaker Block',
+      displayLabel: clean ? `Bullish Breaker (${clean})` : 'Bullish Breaker Block'
+    };
+  }
+  if (/(bb|breaker|breaker\s*block)/i.test(lower)) {
     return {
       tag: 'BREAKER',
       detectedConcept: 'Breaker Block',
       displayLabel: clean ? `Breaker Block (${clean})` : 'Breaker Block'
     };
   }
-  if (/\b(mb|mitigation|mitigation\s*block)\b/i.test(lower)) {
+
+  // 10. MITIGATION BLOCK
+  if (/(mb|mitigation|mitigation\s*block)/i.test(lower)) {
     return {
       tag: 'MITIGATION',
       detectedConcept: 'Mitigation Block',
       displayLabel: clean ? `Mitigation Block (${clean})` : 'Mitigation Block'
     };
   }
-  if (/\b(sd|supply|demand|cung|cầu)\b/i.test(lower)) {
+
+  // 11. SUPPLY / DEMAND
+  if (/(sd|supply|demand|cung|cầu)/i.test(lower)) {
     return {
       tag: 'SUPPLY_DEMAND',
       detectedConcept: 'Vùng Cung / Cầu (Supply / Demand)',
