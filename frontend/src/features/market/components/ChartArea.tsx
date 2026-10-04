@@ -4143,6 +4143,7 @@ export const ChartArea = ({
     if (debouncedSaveTimerRef.current) clearTimeout(debouncedSaveTimerRef.current);
     debouncedSaveTimerRef.current = setTimeout(() => {
       saveDrawingsRef.current?.();
+      window.dispatchEvent(new CustomEvent('stocksim-drawings-changed'));
     }, 150);
   };
   globalTriggerAutoSave = triggerAutoSaveDrawings;

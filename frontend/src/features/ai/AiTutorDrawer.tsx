@@ -648,13 +648,12 @@ export const AiTutorDrawer = ({
       login();
       return;
     }
-    let currentDrawings = detectedDrawings;
-    let currentKlines = detectedKlines;
-    if (!currentDrawings || currentDrawings.length === 0) {
-      const currentData = handleScanDrawings();
-      currentDrawings = currentData.drawings;
-      currentKlines = currentData.klines;
-    }
+    // Always rescan live from chart so freshly typed text (e.g. FVG D) or modified coordinates are 100% current!
+    const liveData = getChartDrawingsData();
+    let currentDrawings = liveData.drawings && liveData.drawings.length > 0 ? liveData.drawings : detectedDrawings;
+    let currentKlines = liveData.klines && liveData.klines.length > 0 ? liveData.klines : detectedKlines;
+    setDetectedDrawings(currentDrawings);
+    setDetectedKlines(currentKlines);
     if (!currentDrawings || currentDrawings.length === 0) {
       setInspectError(
         isEn
