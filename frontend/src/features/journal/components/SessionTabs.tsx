@@ -17,22 +17,22 @@ export const SessionTabs: React.FC<SessionTabsProps> = ({
   const tabs: { id: JournalTabId; label: string; icon: React.ReactNode; count?: number }[] = [
     {
       id: 'overview',
-      label: 'Overview',
+      label: 'Tổng quan',
       icon: <LayoutDashboard className="w-4 h-4" />
     },
     {
       id: 'analysis',
-      label: 'Analysis',
+      label: 'Phân tích',
       icon: <LineChart className="w-4 h-4" />
     },
     {
       id: 'breakdown',
-      label: 'Breakdown',
+      label: 'Chi tiết',
       icon: <PieChart className="w-4 h-4" />
     },
     {
       id: 'trades',
-      label: 'Trades',
+      label: 'Lịch sử lệnh',
       icon: <ListFilter className="w-4 h-4" />,
       count: tradesCount
     }

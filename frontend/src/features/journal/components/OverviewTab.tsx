@@ -87,41 +87,41 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ session }) => {
       <div>
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2">
           <DollarSign className="w-4 h-4 text-blue-500" />
-          <span>Session Information</span>
+          <span>Thông tin Phiên giao dịch</span>
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
           <MetricCard
-            label="Starting Balance"
+            label="Vốn Ban đầu"
             value={formatMoneyVND(initialBalance)}
-            subValue="Initial capital"
+            subValue="Số dư ban đầu"
           />
           <MetricCard
-            label="Ending Balance"
+            label="Số dư Hiện tại"
             value={formatMoneyVND(endingBalance)}
-            subValue="Current portfolio equity"
+            subValue="Tổng tài sản ròng"
           />
           <MetricCard
-            label="Net P&L"
+            label="Lợi nhuận Ròng"
             value={formatMoneyVND(netPnL, true)}
             trend={netPnL >= 0 ? 'up' : 'down'}
-            subValue="Realized outcome"
+            subValue="Kết quả thực tế"
           />
           <MetricCard
-            label="Return"
+            label="Tỷ suất Sinh lời"
             value={formatPercent(returnRate, true)}
             trend={returnRate >= 0 ? 'up' : 'down'}
-            subValue="ROI on initial balance"
+            subValue="Tỷ suất trên vốn"
           />
           <MetricCard
-            label="Trades"
+            label="Tổng Lệnh"
             value={trades.length || session.tradesCount}
-            subValue="Executed closed trades"
+            subValue="Lệnh đã thực thi"
           />
           <MetricCard
-            label="Win Rate"
+            label="Tỷ lệ Thắng"
             value={formatPercent(winRate, false)}
             trend={winRate >= 50 ? 'up' : 'down'}
-            subValue={`${winningTrades.length} wins / ${trades.length} total`}
+            subValue={`${winningTrades.length} thắng / ${trades.length} lệnh`}
           />
         </div>
       </div>
@@ -130,34 +130,34 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ session }) => {
       <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-5 sm:p-6 shadow-sm">
         <h2 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-indigo-500" />
-          <span>Performance Results</span>
+          <span>Kết quả Hiệu suất</span>
         </h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#161f31] border border-slate-200/60 dark:border-[#253047]/60">
             <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
-              Net P&L
+              Lợi nhuận Ròng
             </span>
             <div className={`text-xl sm:text-2xl font-bold mt-1 ${netPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
               {formatMoneyVND(netPnL, true)}
             </div>
-            <p className="text-xs text-slate-400 mt-1">Total realized net profit</p>
+            <p className="text-xs text-slate-400 mt-1">Tổng lãi/lỗ ròng thực tế</p>
           </div>
 
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#161f31] border border-slate-200/60 dark:border-[#253047]/60">
             <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
-              Trades Summary
+              Tổng kết Lệnh
             </span>
             <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">
-              {trades.length} Trades
+              {trades.length} Lệnh
             </div>
             <p className="text-xs text-emerald-500 dark:text-emerald-400 font-semibold mt-1">
-              {winningTrades.length} Wins <span className="text-slate-400 font-normal">•</span> <span className="text-rose-500 dark:text-rose-400">{losingTrades.length} Losses</span>
+              {winningTrades.length} Thắng <span className="text-slate-400 font-normal">•</span> <span className="text-rose-500 dark:text-rose-400">{losingTrades.length} Thua</span>
             </p>
           </div>
 
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#161f31] border border-slate-200/60 dark:border-[#253047]/60">
             <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
-              Win Rate
+              Tỷ lệ Thắng
             </span>
             <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">
               {formatPercent(winRate, false)}
@@ -172,12 +172,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ session }) => {
 
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#161f31] border border-slate-200/60 dark:border-[#253047]/60">
             <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
-              Avg P&L / Trade
+              Lợi nhuận TB / Lệnh
             </span>
             <div className={`text-xl sm:text-2xl font-bold mt-1 ${avgPnLPerTrade >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
               {formatMoneyVND(avgPnLPerTrade, true)}
             </div>
-            <p className="text-xs text-slate-400 mt-1">Expected return per trade</p>
+            <p className="text-xs text-slate-400 mt-1">Lợi nhuận kỳ vọng mỗi lệnh</p>
           </div>
         </div>
       </div>
@@ -187,39 +187,39 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ session }) => {
         {/* P&L Breakdown */}
         <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-5 sm:p-6 shadow-sm">
           <h2 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center justify-between">
-            <span>P&L Breakdown</span>
+            <span>Chi tiết Lãi / Lỗ</span>
             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-              Realized
+              Thực tế
             </span>
           </h2>
 
           <div className="space-y-3.5 text-sm">
             <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-[#1f283e]">
-              <span className="text-slate-500 dark:text-slate-400">Gross Profit</span>
+              <span className="text-slate-500 dark:text-slate-400">Tổng Lãi Gộp</span>
               <span className="font-bold text-emerald-500">{formatMoneyVND(grossProfit, true)}</span>
             </div>
             <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-[#1f283e]">
-              <span className="text-slate-500 dark:text-slate-400">Gross Loss</span>
+              <span className="text-slate-500 dark:text-slate-400">Tổng Lỗ Gộp</span>
               <span className="font-bold text-rose-500">{formatMoneyVND(-grossLoss, true)}</span>
             </div>
             <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-[#1f283e]">
-              <span className="text-slate-500 dark:text-slate-400">Average Win</span>
+              <span className="text-slate-500 dark:text-slate-400">Mức Thắng TB</span>
               <span className="font-bold text-emerald-500">{formatMoneyVND(avgWin, true)}</span>
             </div>
             <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-[#1f283e]">
-              <span className="text-slate-500 dark:text-slate-400">Average Loss</span>
+              <span className="text-slate-500 dark:text-slate-400">Mức Lỗ TB</span>
               <span className="font-bold text-rose-500">{formatMoneyVND(-avgLoss, true)}</span>
             </div>
             <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-[#1f283e]">
-              <span className="text-slate-500 dark:text-slate-400">Largest Win</span>
+              <span className="text-slate-500 dark:text-slate-400">Lệnh Lãi Lớn Nhất</span>
               <span className="font-bold text-emerald-500">{formatMoneyVND(largestWin, true)}</span>
             </div>
             <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-[#1f283e]">
-              <span className="text-slate-500 dark:text-slate-400">Largest Loss</span>
+              <span className="text-slate-500 dark:text-slate-400">Lệnh Lỗ Lớn Nhất</span>
               <span className="font-bold text-rose-500">{formatMoneyVND(largestLoss, true)}</span>
             </div>
             <div className="flex items-center justify-between pt-1">
-              <span className="text-slate-900 dark:text-white font-bold">Profit Factor</span>
+              <span className="text-slate-900 dark:text-white font-bold">Hệ số Lợi nhuận (Profit Factor)</span>
               <span className="font-extrabold text-blue-600 dark:text-blue-400 text-base">
                 {profitFactor !== null && profitFactor !== Infinity ? `${profitFactor}x` : 'N/A'}
               </span>
@@ -232,34 +232,34 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ session }) => {
           <h2 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <Award className="w-5 h-5 text-amber-500" />
-              <span>Trading Quality</span>
+              <span>Chất lượng Giao dịch</span>
             </span>
-            <span className="text-xs text-slate-400">Hover [?] for formulas</span>
+            <span className="text-xs text-slate-400">Rê chuột [?] xem công thức</span>
           </h2>
 
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <MetricCard
-              label="Profit Factor"
+              label="Hệ số Lợi nhuận (PF)"
               value={profitFactor !== null && profitFactor !== Infinity ? `${profitFactor}x` : 'N/A'}
-              tooltip="Gross profit divided by gross loss. A value above 1.0 means total profits are greater than total losses."
+              tooltip="Tổng lãi gộp chia cho tổng lỗ gộp. Giá trị trên 1.0 nghĩa là tài khoản sinh lời."
               trend={profitFactor && profitFactor > 1.2 ? 'up' : 'neutral'}
             />
             <MetricCard
-              label="Payoff Ratio"
+              label="Tỷ lệ Lời / Lỗ (Payoff)"
               value={payoffRatio !== null ? `${payoffRatio}` : 'N/A'}
-              tooltip="Average Win divided by Average Loss. Indicates how much you gain on winning trades relative to what you give up on losses."
+              tooltip="Mức thắng trung bình chia cho mức lỗ trung bình. Cho biết tỷ lệ giữa khoản lãi so với rủi ro mất đi khi thua."
               trend={payoffRatio && payoffRatio > 1.5 ? 'up' : 'neutral'}
             />
             <MetricCard
-              label="Expectancy"
+              label="Kỳ vọng Toán học"
               value={formatMoneyVND(expectancy, true)}
-              tooltip="(Win Rate × Average Win) - (Loss Rate × Average Loss). The mathematical average amount your trading is expected to return per trade."
+              tooltip="(Tỷ lệ thắng × Lãi TB) - (Tỷ lệ thua × Lỗ TB). Lợi nhuận trung bình kỳ vọng mang về trên mỗi lệnh giao dịch."
               trend={expectancy >= 0 ? 'up' : 'down'}
             />
             <MetricCard
-              label="Recovery Factor"
+              label="Hệ số Phục hồi"
               value={recoveryFactor !== null ? `${recoveryFactor}` : 'N/A'}
-              tooltip="Net Profit divided by Maximum Drawdown. Measures how quickly the portfolio overcomes its worst drawdown."
+              tooltip="Lợi nhuận ròng chia cho Sụt giảm tối đa (Max Drawdown). Đánh giá tốc độ vượt qua đợt sụt giảm tài sản lớn nhất."
               trend={recoveryFactor && recoveryFactor > 2 ? 'up' : 'neutral'}
             />
           </div>
@@ -272,40 +272,40 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ session }) => {
         <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-5 sm:p-6 shadow-sm">
           <h2 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-rose-500" />
-            <span>Risk Management</span>
+            <span>Quản trị Rủi ro</span>
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <MetricCard
-              label="Max Drawdown"
+              label="Sụt giảm Tối đa (Drawdown)"
               value={maxDDPercent > 0 ? `-${maxDDPercent}%` : '0.00%'}
               subValue={maxDDAmount > 0 ? formatMoneyVND(-maxDDAmount, false) : undefined}
-              tooltip="The largest peak-to-trough drop in portfolio balance before a new peak is reached."
+              tooltip="Khoảng sụt giảm lớn nhất từ đỉnh tài sản trước đó đến đáy sâu nhất."
               trend={maxDDPercent > 10 ? 'down' : 'neutral'}
             />
             <MetricCard
-              label="Sharpe Ratio"
+              label="Chỉ số Sharpe"
               value={sharpe !== null ? sharpe : 'N/A'}
               tooltip={
                 sharpe !== null
-                  ? 'Measures excess return relative to total return volatility. Higher is better.'
-                  : 'Not enough trading data to calculate this metric (minimum 5 trades required).'
+                  ? 'Đo lường tỷ suất sinh lời vượt trội so với mức biến động rủi ro. Chỉ số càng cao càng tốt.'
+                  : 'Chưa đủ dữ liệu lệnh để tính chỉ số Sharpe (yêu cầu tối thiểu 5 lệnh).'
               }
               trend={sharpe && sharpe > 1.0 ? 'up' : 'neutral'}
             />
             <MetricCard
-              label="Stop Loss Usage"
+              label="Tỷ lệ Đặt Cắt lỗ (SL)"
               value={slUsagePercent !== null ? `${slUsagePercent}%` : 'N/A'}
               tooltip={
                 slUsagePercent !== null
-                  ? 'Percentage of trades executed with a predefined Stop Loss order.'
-                  : 'No Stop Loss data recorded in this session.'
+                  ? 'Tỷ lệ phần trăm các lệnh có thiết lập mức giá Cắt lỗ (Stop Loss) trước.'
+                  : 'Chưa có dữ liệu Stop Loss được ghi nhận trong phiên này.'
               }
               trend={slUsagePercent && slUsagePercent >= 80 ? 'up' : 'neutral'}
             />
             <MetricCard
-              label="Risk / Reward"
+              label="Tỷ lệ Risk / Reward"
               value={payoffRatio ? `1 : ${payoffRatio}` : 'N/A'}
-              tooltip="Realized reward-to-risk ratio based on average winning and losing trades."
+              tooltip="Tỷ lệ Lời/Lỗ thực tế dựa trên mức lãi và lỗ trung bình của các lệnh đã đóng."
             />
           </div>
         </div>
@@ -314,29 +314,29 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ session }) => {
         <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-5 sm:p-6 shadow-sm">
           <h2 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
             <Clock className="w-5 h-5 text-blue-500" />
-            <span>Trading Rhythm</span>
+            <span>Nhịp độ Giao dịch</span>
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <MetricCard
-              label="Avg Holding Time"
+              label="Thời gian Giữ lệnh TB"
               value={formatHoldingTime(avgHoldingMins)}
-              subValue="Mean position duration"
+              subValue="Thời lượng mở lệnh trung bình"
             />
             <MetricCard
-              label="Trading Days"
-              value={`${tradingDaysCount} days`}
-              subValue={`${(trades.length / Math.max(1, tradingDaysCount)).toFixed(1)} trades / day`}
+              label="Số Ngày Giao dịch"
+              value={`${tradingDaysCount} ngày`}
+              subValue={`${(trades.length / Math.max(1, tradingDaysCount)).toFixed(1)} lệnh / ngày`}
             />
             <MetricCard
-              label="Best Day"
+              label="Ngày Tốt Nhất"
               value={bestDay ? formatMoneyVND(bestDay.pnl, true) : 'N/A'}
-              subValue={bestDay ? bestDay.date : 'No trades'}
+              subValue={bestDay ? bestDay.date : 'Chưa có lệnh'}
               trend={bestDay && bestDay.pnl > 0 ? 'up' : 'neutral'}
             />
             <MetricCard
-              label="Worst Day"
+              label="Ngày Kém Nhất"
               value={worstDay ? formatMoneyVND(worstDay.pnl, true) : 'N/A'}
-              subValue={worstDay ? worstDay.date : 'No trades'}
+              subValue={worstDay ? worstDay.date : 'Chưa có lệnh'}
               trend={worstDay && worstDay.pnl < 0 ? 'down' : 'neutral'}
             />
           </div>

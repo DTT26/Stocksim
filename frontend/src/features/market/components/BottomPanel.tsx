@@ -74,20 +74,30 @@ export const BottomPanel = ({
       setTransactions([]);
       return;
     }
+    const fetchHistory = async () => {
+      try {
+        const res = await tradingApi.getTransactions(user?._id);
+        if (res.success && res.data) {
+          setTransactions(res.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch transactions', error);
+      }
+    };
+    fetchHistory();
+  }, [refreshTrigger, user]);
+
+  useEffect(() => {
     if (['order_history', 'trade_history', 'position_history', 'cashflow_history'].includes(activeTab)) {
-      const fetchHistory = async () => {
-        try {
-          const res = await tradingApi.getTransactions(user?._id);
+      if (user?._id) {
+        tradingApi.getTransactions(user._id).then(res => {
           if (res.success && res.data) {
             setTransactions(res.data);
           }
-        } catch (error) {
-          console.error('Failed to fetch transactions', error);
-        }
-      };
-      fetchHistory();
+        }).catch(() => null);
+      }
     }
-  }, [activeTab, refreshTrigger, user]);
+  }, [activeTab]);
 
   const posList = user ? Object.entries(positions).map(([symbol, p]) => ({ symbol, ...p })) : [];
   const displayPositions = currentPairOnly 
@@ -125,7 +135,7 @@ export const BottomPanel = ({
 
   const tabs = [
     { id: 'positions', label: `${t('panel.positions', 'Vị thế')} (${posList.length})` },
-    { id: 'orders', label: `${t('panel.orders', 'Lệnh mở')} (${displayPendingOrders.length})` },
+    { id: 'orders', label: `${t('panel.orders', 'Lệnh chờ')} (${displayPendingOrders.length})` },
     { id: 'order_history', label: t('panel.orderHistory', 'Lịch sử đặt lệnh') },
     { id: 'trade_history', label: t('panel.tradeHistory', 'Lịch sử giao dịch') },
     { id: 'position_history', label: t('panel.positionHistory', 'Lịch sử vị thế') },
