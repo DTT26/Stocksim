@@ -137,7 +137,7 @@ const TradeReviewModalInner = ({
   const [review, setReview] = useState<TradeReviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'ICT_RUBRIC' | 'TIMEFRAME_HIERARCHY' | 'CONTEXT' | 'RISK' | 'IMPROVEMENTS'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'ICT_RUBRIC' | 'CONTEXT' | 'RISK' | 'IMPROVEMENTS'>('ALL');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -151,11 +151,27 @@ const TradeReviewModalInner = ({
         const chart = (window as any).__STOCKSIM_CHART__ || (window as any).__currentKlineChart;
         if (chart && typeof chart.getOverlays === 'function') {
           const allOverlays = chart.getOverlays() || [];
-          drawings = allOverlays.filter((o: any) => 
-            !String(o.id || '').startsWith('__sys_') && 
-            !String(o.id || '').startsWith('pending_order_') && 
-            o.name !== 'shift_measure'
-          );
+          drawings = allOverlays.filter((o: any) => {
+            if (!o) return false;
+            const id = String(o.id || '');
+            const name = String(o.name || '');
+            return (
+              !id.startsWith('__sys_') && 
+              !id.startsWith('pending_') && 
+              !id.startsWith('preview_') &&
+              !id.startsWith('active_') &&
+              !id.startsWith('tpsl_') &&
+              !id.startsWith('pos_') &&
+              !id.startsWith('order_') &&
+              !id.startsWith('drag_') &&
+              name !== 'shift_measure' &&
+              name !== 'tpslZone' &&
+              name !== 'orderTpslLine' &&
+              name !== 'aiCorrectionZone' &&
+              name !== 'aiCorrectionBox' &&
+              name !== 'zoomInBox'
+            );
+          });
         }
       } catch (e) {
         drawings = [];
@@ -399,7 +415,6 @@ const TradeReviewModalInner = ({
           {[
             { id: 'ALL', label: isEn ? 'All (Comprehensive)' : 'Tất Cả (Toàn Diện)' },
             { id: 'ICT_RUBRIC', label: isEn ? 'ICT 100-Pt Rubric' : 'Thang Điểm 100 ICT (5 Phần)' },
-            { id: 'TIMEFRAME_HIERARCHY', label: isEn ? '4-Timeframe Flow' : 'Bộ 4 Khung Thời Gian' },
             { id: 'CONTEXT', label: isEn ? 'Setup Checklist' : 'Checklist Kỹ Thuật' },
             { id: 'RISK', label: isEn ? 'Risk & MFE/MAE' : 'Quản Trị Rủi Ro & MFE/MAE' },
             { id: 'IMPROVEMENTS', label: isEn ? 'Takeaways & Coach' : 'Đánh Giá & Bài Học' },
@@ -762,41 +777,69 @@ const TradeReviewModalInner = ({
                       };
                     };
 
-                    const renderSubBadge = (sub: { score: number; max: number; status: string }) => {
+                    const renderRubricCard = (
+                      itemNo: string,
+                      title: string,
+                      sub: { score: number; max: number; status: string; detail: string },
+                      ruleDesc: string
+                    ) => {
                       const isFull = sub.score >= sub.max && sub.max > 0;
                       const isPartial = sub.score > 0 && sub.score < sub.max;
+                      const cleanDetail = (sub.detail || '')
+                        .replace(/^Sai ở [^:]+:\s*/i, '')
+                        .replace(/\(\+?\d+\/?\d*đ?\)/g, '')
+                        .trim();
+
                       return (
-                        <span
-                          className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-bold border ${
+                        <div
+                          className={`p-3 rounded-xl transition-all flex flex-col justify-between ${
                             isFull
-                              ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                              ? 'bg-[#101724]/90 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.05)]'
                               : isPartial
-                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                              : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                              ? 'bg-[#171622]/90 border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.05)]'
+                              : 'bg-[#11141d]/90 border border-[#232838] hover:border-[#2f364a]'
                           }`}
                         >
-                          {sub.score}/{sub.max}
-                        </span>
-                      );
-                    };
+                          <div>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="font-semibold text-slate-200 text-xs">
+                                <span className="font-mono text-slate-400 mr-1.5">{itemNo}</span>
+                                {title}
+                              </div>
+                              <span
+                                className={`px-2 py-0.5 rounded-md font-mono text-[11px] font-bold shrink-0 border ${
+                                  isFull
+                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                    : isPartial
+                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                    : 'bg-slate-800 text-slate-400 border-slate-700/60'
+                                }`}
+                              >
+                                {sub.score}/{sub.max}
+                              </span>
+                            </div>
 
-                    const renderSubDetail = (sub: { score: number; max: number; status: string; detail: string }, shortRule: string) => {
-                      const isFull = sub.score >= sub.max && sub.max > 0;
-                      return (
-                        <div className="space-y-1 text-[10px] leading-snug">
-                          <div className="text-slate-400">
-                            {shortRule}
+                            <p className="text-[11px] text-slate-400/90 mt-1 leading-relaxed">
+                              {ruleDesc}
+                            </p>
                           </div>
-                          {sub.detail && (
+
+                          {cleanDetail && (
                             <div
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-medium border truncate ${
+                              className={`mt-2.5 pt-2 border-t flex items-start gap-1.5 text-[11px] leading-relaxed ${
                                 isFull
-                                  ? 'bg-emerald-950/30 border-emerald-500/25 text-emerald-300/90'
-                                  : 'bg-rose-950/30 border-rose-500/25 text-rose-300/90'
+                                  ? 'border-emerald-500/20 text-emerald-300 font-medium'
+                                  : isPartial
+                                  ? 'border-amber-500/20 text-amber-300'
+                                  : 'border-white/5 text-slate-300'
                               }`}
-                              title={sub.detail}
                             >
-                              {isFull ? '✓ ' : '⚠️ '}{sub.detail.replace(/\(\+?\d+\/?\d*đ?\)/g, '').trim()}
+                              {isFull ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                              ) : (
+                                <AlertCircle className="w-3.5 h-3.5 text-rose-400/80 shrink-0 mt-0.5" />
+                              )}
+                              <span>{cleanDetail}</span>
                             </div>
                           )}
                         </div>
@@ -822,292 +865,107 @@ const TradeReviewModalInner = ({
                     const p5_2 = getSubItem(review.rubricScore?.planAndDiscipline?.items, '5.2', 5);
 
                     return (
-                      <div className="space-y-3">
+                      <div className="space-y-3.5">
                         {/* Phần 1 */}
-                        <div className="rounded-lg border border-emerald-500/20 bg-[#0c1017]/80 p-3 space-y-2">
-                          <div className="flex items-center justify-between">
+                        <div className="rounded-xl border border-emerald-500/25 bg-[#0d121c]/80 p-3.5 space-y-3">
+                          <div className="flex items-center justify-between pb-1 border-b border-emerald-500/10">
                             <div className="flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                              <span className="font-bold text-slate-200 text-xs">
+                              <span className="font-bold text-slate-100 text-xs tracking-wide">
                                 PHẦN 1: BỐI CẢNH KHUNG CAO & ĐỊNH HƯỚNG — [D1 / H4]
                               </span>
                             </div>
-                            <span className="font-mono font-bold text-emerald-400 text-xs">
+                            <span className="font-mono font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                               {review.rubricScore?.htfContext?.score ?? review.rubricScore?.setupValidation.score}/25
                             </span>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
-                            <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-medium">
-                                <span>1.1 Daily Bias & Premium/Discount</span>
-                                {renderSubBadge(p1_1)}
-                              </div>
-                              {renderSubDetail(p1_1, 'MUA ở Discount (<50%), BÁN ở Premium (>50%) Dealing Range.')}
-                            </div>
-                            <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-medium">
-                                <span>1.2 Draw on Liquidity (DOL)</span>
-                                {renderSubBadge(p1_2)}
-                              </div>
-                              {renderSubDetail(p1_2, 'TP hướng thẳng về bể thanh khoản mở (Old High/Low, EQH/EQL).')}
-                            </div>
-                            <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-medium">
-                                <span>1.3 Phản ứng tại HTF POI</span>
-                                {renderSubBadge(p1_3)}
-                              </div>
-                              {renderSubDetail(p1_3, 'Giá xuất phát & bật nảy tại trạm đón HTF POI (OB, FVG D1/H4).')}
-                            </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                            {renderRubricCard('1.1', 'Daily Bias & Premium/Discount', p1_1, 'MUA ở Discount (<50%), BÁN ở Premium (>50%) Dealing Range.')}
+                            {renderRubricCard('1.2', 'Draw on Liquidity (DOL)', p1_2, 'TP hướng thẳng về bể thanh khoản mở (Old High/Low, EQH/EQL).')}
+                            {renderRubricCard('1.3', 'Phản ứng tại HTF POI', p1_3, 'Giá xuất phát & bật nảy tại trạm đón HTF POI (OB, FVG D1/H4).')}
                           </div>
                         </div>
 
                         {/* Phần 2 */}
-                        <div className="rounded-lg border border-amber-500/20 bg-[#0c1017]/80 p-3 space-y-2">
-                          <div className="flex items-center justify-between">
+                        <div className="rounded-xl border border-amber-500/25 bg-[#0d121c]/80 p-3.5 space-y-3">
+                          <div className="flex items-center justify-between pb-1 border-b border-amber-500/10">
                             <div className="flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                              <span className="font-bold text-slate-200 text-xs">
+                              <span className="font-bold text-slate-100 text-xs tracking-wide">
                                 PHẦN 2: THỜI GIAN & PHÂN KỲ SMT — [H1 / Intermarket]
                               </span>
                             </div>
-                            <span className="font-mono font-bold text-amber-400 text-xs">
+                            <span className="font-mono font-bold text-amber-400 text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
                               {review.rubricScore?.timeAndSmt?.score ?? review.rubricScore?.exitPlanning.score}/20
                             </span>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
-                            <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-medium">
-                                <span>2.1 Cửa sổ Khung giờ Vàng (Kill Zone & Macro)</span>
-                                {renderSubBadge(p2_1)}
-                              </div>
-                              {renderSubDetail(p2_1, 'Lệnh kích hoạt trong Killzone (London/NY AM) hoặc Silver Bullet.')}
-                            </div>
-                            <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-medium">
-                                <span>2.2 Phân kỳ SMT Divergence</span>
-                                {renderSubBadge(p2_2)}
-                              </div>
-                              {renderSubDetail(p2_2, 'Phân kỳ tương quan (NQ vs ES, BTC vs ETH) xác nhận đỉnh/đáy.')}
-                            </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                            {renderRubricCard('2.1', 'Cửa sổ Khung giờ Vàng (Kill Zone & Macro)', p2_1, 'Lệnh kích hoạt trong Killzone (London/NY AM) hoặc Silver Bullet.')}
+                            {renderRubricCard('2.2', 'Phân kỳ SMT Divergence', p2_2, 'Phân kỳ tương quan (NQ vs ES, BTC vs ETH) xác nhận đỉnh/đáy.')}
                           </div>
                         </div>
 
                         {/* Phần 3 */}
-                        <div className="rounded-lg border border-cyan-500/20 bg-[#0c1017]/80 p-3 space-y-2">
-                          <div className="flex items-center justify-between">
+                        <div className="rounded-xl border border-cyan-500/25 bg-[#0d121c]/80 p-3.5 space-y-3">
+                          <div className="flex items-center justify-between pb-1 border-b border-cyan-500/10">
                             <div className="flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-                              <span className="font-bold text-slate-200 text-xs">
+                              <span className="font-bold text-slate-100 text-xs tracking-wide">
                                 PHẦN 3: SWEEP, DISPLACEMENT & PD ARRAY — [H1 / M15]
                               </span>
                             </div>
-                            <span className="font-mono font-bold text-cyan-400 text-xs">
+                            <span className="font-mono font-bold text-cyan-400 text-xs bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
                               {review.rubricScore?.sweepAndDisplacement?.score ?? review.rubricScore?.entryDiscipline.score}/25
                             </span>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
-                            <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-medium">
-                                <span>3.1 Nhịp Quét Liquidity Sweep</span>
-                                {renderSubBadge(p3_1)}
-                              </div>
-                              {renderSubDetail(p3_1, 'Đâm râu quét sạch bể thanh khoản SSL/BSL rồi rút chân dứt khoát.')}
-                            </div>
-                            <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-medium">
-                                <span>3.2 Lực đẩy Displacement & MSS</span>
-                                {renderSubBadge(p3_2)}
-                              </div>
-                              {renderSubDetail(p3_2, 'Nến thân lớn dứt khoát xác nhận xung lực & phá vỡ cấu trúc MSS.')}
-                            </div>
-                            <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-medium">
-                                <span>3.3 Trạm đón PD Array Chất Lượng</span>
-                                {renderSubBadge(p3_3)}
-                              </div>
-                              {renderSubDetail(p3_3, 'Vào lệnh tại FVG, Order Block, Breaker Block hoặc iFVG.')}
-                            </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                            {renderRubricCard('3.1', 'Nhịp Quét Liquidity Sweep', p3_1, 'Đâm râu quét sạch bể thanh khoản SSL/BSL rồi rút chân dứt khoát.')}
+                            {renderRubricCard('3.2', 'Lực đẩy Displacement & MSS', p3_2, 'Nến thân lớn dứt khoát xác nhận xung lực & phá vỡ cấu trúc MSS.')}
+                            {renderRubricCard('3.3', 'Trạm đón PD Array Chất Lượng', p3_3, 'Vào lệnh tại FVG, Order Block, Breaker Block hoặc iFVG.')}
                           </div>
                         </div>
 
                         {/* Phần 4 */}
-                        <div className="rounded-lg border border-indigo-500/20 bg-[#0c1017]/80 p-3 space-y-2">
-                          <div className="flex items-center justify-between">
+                        <div className="rounded-xl border border-indigo-500/25 bg-[#0d121c]/80 p-3.5 space-y-3">
+                          <div className="flex items-center justify-between pb-1 border-b border-indigo-500/10">
                             <div className="flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-                              <span className="font-bold text-slate-200 text-xs">
+                              <span className="font-bold text-slate-100 text-xs tracking-wide">
                                 PHẦN 4: VÀO LỆNH & QUẢN TRỊ RỦI RO — [M15 / M5]
                               </span>
                             </div>
-                            <span className="font-mono font-bold text-indigo-400 text-xs">
+                            <span className="font-mono font-bold text-indigo-400 text-xs bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
                               {review.rubricScore?.entryAndRisk?.score ?? (review.rubricScore?.riskManagement?.score ? Math.min(20, Math.round(review.rubricScore.riskManagement.score * 0.8)) : 0)}/20
                             </span>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
-                            <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-medium">
-                                <span>4.1 Tỷ lệ Payoff R:R (≥ 1:2)</span>
-                                {renderSubBadge(p4_1)}
-                              </div>
-                              {renderSubDetail(p4_1, 'Mức R:R thực tế đo về mốc DOL đạt tối thiểu ≥ 1:2.')}
-                            </div>
-                            <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-medium">
-                                <span>4.2 Stop-Loss Invalidation Logic</span>
-                                {renderSubBadge(p4_2)}
-                              </div>
-                              {renderSubDetail(p4_2, 'SL đặt an toàn phía sau râu nến cú Sweep (Protected High/Low).')}
-                            </div>
-                            <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-medium">
-                                <span>4.3 Quản lý Khối lượng (0.5%–1%)</span>
-                                {renderSubBadge(p4_3)}
-                              </div>
-                              {renderSubDetail(p4_3, 'Khối lượng cố định rủi ro 0.5%–1% tài khoản theo SL thực tế.')}
-                            </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                            {renderRubricCard('4.1', 'Tỷ lệ Payoff R:R (≥ 1:2)', p4_1, 'Mức R:R thực tế đo về mốc DOL đạt tối thiểu ≥ 1:2.')}
+                            {renderRubricCard('4.2', 'Stop-Loss Invalidation Logic', p4_2, 'SL đặt an toàn phía sau râu nến cú Sweep (Protected High/Low).')}
+                            {renderRubricCard('4.3', 'Quản lý Khối lượng (0.5%–1%)', p4_3, 'Khối lượng cố định rủi ro 0.5%–1% tài khoản theo SL thực tế.')}
                           </div>
                         </div>
 
                         {/* Phần 5 */}
-                        <div className="rounded-lg border border-purple-500/20 bg-[#0c1017]/80 p-3 space-y-2">
-                          <div className="flex items-center justify-between">
+                        <div className="rounded-xl border border-purple-500/25 bg-[#0d121c]/80 p-3.5 space-y-3">
+                          <div className="flex items-center justify-between pb-1 border-b border-purple-500/10">
                             <div className="flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full bg-purple-400"></span>
-                              <span className="font-bold text-slate-200 text-xs">
+                              <span className="font-bold text-slate-100 text-xs tracking-wide">
                                 PHẦN 5: KỶ LUẬT & TÍNH HỢP LƯU — [Plan Rules]
                               </span>
                             </div>
-                            <span className="font-mono font-bold text-purple-400 text-xs">
+                            <span className="font-mono font-bold text-purple-400 text-xs bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
                               {review.rubricScore?.planAndDiscipline?.score ?? review.rubricScore?.tradeReasoning.score}/10
                             </span>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
-                            <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-medium">
-                                <span>5.1 Tuân thủ Guardrails</span>
-                                {renderSubBadge(p5_1)}
-                              </div>
-                              {renderSubDetail(p5_1, 'Tuân thủ Daily Loss Limit, không vào lệnh trả thù hay FOMO.')}
-                            </div>
-                            <div className="p-2 rounded bg-black/30 border border-white/5 space-y-1">
-                              <div className="flex items-center justify-between text-slate-300 font-medium">
-                                <span>5.2 Hợp lưu Nâng cao (Unicorn Setup)</span>
-                                {renderSubBadge(p5_2)}
-                              </div>
-                              {renderSubDetail(p5_2, 'Hợp lưu Breaker Block + FVG + SMT trong Killzone.')}
-                            </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                            {renderRubricCard('5.1', 'Tuân thủ Guardrails', p5_1, 'Tuân thủ Daily Loss Limit, không vào lệnh trả thù hay FOMO.')}
+                            {renderRubricCard('5.2', 'Hợp lưu Nâng cao (Unicorn Setup)', p5_2, 'Hợp lưu Breaker Block + FVG + SMT trong Killzone.')}
                           </div>
                         </div>
                       </div>
                     );
                   })()}
-                </div>
-              )}
-
-              {/* ============================================================ */}
-              {/* TAB TIMEFRAME_HIERARCHY: BỘ 4 CẤP ĐỘ KHUNG THỜI GIAN GỐI ĐẦU ICT */}
-              {/* ============================================================ */}
-              {(activeTab === 'ALL' || activeTab === 'TIMEFRAME_HIERARCHY') && (
-                <div className="rounded-xl border border-indigo-500/25 bg-[#121622] p-4 shadow-lg space-y-3">
-                  <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300">
-                        <Clock className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-100 text-sm">
-                          {isEn ? '4-Level Hierarchical Timeframe Framework' : 'Bộ 4 Cấp Độ Khung Thời Gian Gối Đầu ICT'}
-                        </h3>
-                        <p className="text-[10px] text-slate-400">
-                          {isEn
-                            ? 'D1/W1 (Bias) → H4/H1 (DOL & Sweep) → M15/M5 (Structure) → M1/M3 (Refinement)'
-                            : 'Khung cao định hướng → Khung trung gian thanh khoản → Khung cấu trúc → Khung tinh chỉnh'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                    {/* D1 / W1 */}
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-[#181d29] to-[#0f121a] border border-blue-500/25 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                            D1 / W1
-                          </span>
-                          <span className="font-bold text-slate-200 text-xs">HTF Context & Daily Bias</span>
-                        </div>
-                        <span className="text-[10px] text-emerald-400 font-semibold">Khung Cao Nhất</span>
-                      </div>
-                      <p className="text-[10px] text-slate-300 leading-snug">
-                        <strong>Nhiệm vụ:</strong> Định hướng Daily Bias, Dealing Range & trạm cản HTF POI.
-                      </p>
-                      <div className="pt-1 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
-                        <span>Trạng thái: <span className="text-slate-200 font-medium">{review.marketContext?.higherTimeframeTrend || 'Bullish'} Bias</span></span>
-                        <span>Phân vùng: <span className="text-emerald-400 font-medium">Discount / Equilibrium</span></span>
-                      </div>
-                    </div>
-
-                    {/* H4 / H1 */}
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-[#181d29] to-[#0f121a] border border-emerald-500/25 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            H4 / H1
-                          </span>
-                          <span className="font-bold text-slate-200 text-xs">Liquidity & DOL</span>
-                        </div>
-                        <span className="text-[10px] text-cyan-400 font-semibold">Khung Trung Gian</span>
-                      </div>
-                      <p className="text-[10px] text-slate-300 leading-snug">
-                        <strong>Nhiệm vụ:</strong> Xác định mục tiêu Draw on Liquidity (DOL) & nhịp Sweep.
-                      </p>
-                      <div className="pt-1 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
-                        <span>DOL Mục tiêu: <span className="text-amber-300 font-medium">{review.summary.takeProfit ? `$${safeFormat(review.summary.takeProfit)}` : (review.marketContext?.dolTarget || 'Old High / Low')}</span></span>
-                        <span>Sweep: <span className="text-cyan-400 font-medium">Confirmed SSL/BSL</span></span>
-                      </div>
-                    </div>
-
-                    {/* M15 / M5 */}
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-[#181d29] to-[#0f121a] border border-amber-500/25 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                            M15 / M5
-                          </span>
-                          <span className="font-bold text-slate-200 text-xs">Structure & Execution</span>
-                        </div>
-                        <span className="text-[10px] text-amber-400 font-semibold">Khung Cấu Trúc</span>
-                      </div>
-                      <p className="text-[10px] text-slate-300 leading-snug">
-                        <strong>Nhiệm vụ:</strong> Bắt nhịp Displacement, xác nhận MSS & đón tại PD Array.
-                      </p>
-                      <div className="pt-1 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
-                        <span>Xung lực: <span className="text-amber-300 font-medium">Displacement thân nến lớn</span></span>
-                        <span>Trạm đón: <span className="text-cyan-300 font-medium">PD Array (FVG / OB)</span></span>
-                      </div>
-                    </div>
-
-                    {/* M1 / M3 */}
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-[#181d29] to-[#0f121a] border border-purple-500/25 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                            M1 / M3
-                          </span>
-                          <span className="font-bold text-slate-200 text-xs">LTF Entry Refinement</span>
-                        </div>
-                        <span className="text-[10px] text-purple-400 font-semibold">Khung Tinh Chỉnh</span>
-                      </div>
-                      <p className="text-[10px] text-slate-300 leading-snug">
-                        <strong>Nhiệm vụ:</strong> Tinh chỉnh SL thắt chặt, kiểm tra SMT & khung giờ Kill Zone.
-                      </p>
-                      <div className="pt-1 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
-                        <span>Protected SL: <span className="text-rose-400 font-medium">Sau râu nến Sweep</span></span>
-                        <span>Khung giờ: <span className="text-purple-300 font-medium">{review.marketContext?.tradingSession || 'Macro / Silver Bullet'}</span></span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
 
