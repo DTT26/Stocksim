@@ -286,7 +286,7 @@ export const TradingTerminal = () => {
         (window as any)._isShiftPressed = false;
       }
     };
-    
+
     window.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mouseup', handleMouseUp);
     window.addEventListener('keydown', handleKeyDown);
@@ -312,6 +312,7 @@ export const TradingTerminal = () => {
   const [replayTime, setReplayTime] = useState<number | null>(null);
   const [replayPrice, setReplayPrice] = useState<number | null>(null);
   const [replayStepTrigger, setReplayStepTrigger] = useState(0);
+  const [replayPrevStepTrigger, setReplayPrevStepTrigger] = useState(0);
   const [replayReloadTrigger, setReplayReloadTrigger] = useState(0);
   const [totalBars, setTotalBars] = useState(1000);
   const [goToRealtimeTrigger, setGoToRealtimeTrigger] = useState(0);
@@ -874,27 +875,39 @@ export const TradingTerminal = () => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
         return;
       }
-      
+
       // Replay Next Step (Shift + ArrowRight)
       if (e.shiftKey && e.key === 'ArrowRight' && isReplaying) {
         e.preventDefault();
+        e.stopPropagation();
         handleReplayNext();
+        return;
+      }
+
+      // Replay Prev Step (Shift + ArrowLeft)
+      if (e.shiftKey && e.key === 'ArrowLeft' && isReplaying) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleReplayPrev();
         return;
       }
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();
+        e.stopPropagation();
         handleUndo();
       } else if (
         (e.ctrlKey || e.metaKey) &&
         (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))
       ) {
         e.preventDefault();
+        e.stopPropagation();
         handleRedo();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    // Use capture phase (true) to intercept the event before it reaches klinecharts canvas
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [undoRedoState.canUndo, undoRedoState.canRedo, isReplaying]);
 
   const handleTPSLDragChange = (type: 'tp' | 'sl' | 'orderPrice', price: number) => {
@@ -1193,7 +1206,6 @@ export const TradingTerminal = () => {
 
   const handleStartReplaySelection = () => {
     setIsSelectingReplayStart(true);
-    setIsReplaying(false);
   };
 
   const handleCancelReplaySelection = () => {
@@ -1265,6 +1277,10 @@ export const TradingTerminal = () => {
 
   const handleReplayNext = () => {
     setReplayStepTrigger(t => t + 1);
+  };
+
+  const handleReplayPrev = () => {
+    setReplayPrevStepTrigger(t => t + 1);
   };
 
   const handleStartSimulation = (config: SimulationConfig) => {
@@ -1346,14 +1362,14 @@ export const TradingTerminal = () => {
                 <span>{currentChallengeLevel.levelName}</span>
               </span>
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${challengeState.status === 'ACTIVE'
-                  ? 'bg-emerald-900/30 text-emerald-400 border-emerald-500/30'
-                  : challengeState.status === 'PAUSED'
-                    ? 'bg-amber-900/30 text-amber-300 border-amber-500/30'
-                    : challengeState.status === 'PASSED'
-                      ? 'bg-purple-900/30 text-purple-400 border-purple-500/30'
-                      : challengeState.status === 'FAILED'
-                        ? 'bg-rose-900/30 text-rose-400 border-rose-500/30'
-                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                ? 'bg-emerald-900/30 text-emerald-400 border-emerald-500/30'
+                : challengeState.status === 'PAUSED'
+                  ? 'bg-amber-900/30 text-amber-300 border-amber-500/30'
+                  : challengeState.status === 'PASSED'
+                    ? 'bg-purple-900/30 text-purple-400 border-purple-500/30'
+                    : challengeState.status === 'FAILED'
+                      ? 'bg-rose-900/30 text-rose-400 border-rose-500/30'
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
                 }`}>
                 {challengeState.status === 'ACTIVE' && '🟢 ĐANG THI (LIVE)'}
                 {challengeState.status === 'PAUSED' && '⏸️ ĐANG TẠM DỪNG'}
@@ -1367,8 +1383,8 @@ export const TradingTerminal = () => {
               <div className="flex items-center gap-1">
                 <span className="text-slate-400">Mục tiêu:</span>
                 <span className={`font-bold font-mono ${challengeState.totalProfitUSD > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
-                  {challengeState.totalProfitUSD > 0 
-                    ? `+$${challengeState.totalProfitUSD.toLocaleString('en-US', { maximumFractionDigits: 0 })}` 
+                  {challengeState.totalProfitUSD > 0
+                    ? `+$${challengeState.totalProfitUSD.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
                     : '$0'} / +${((currentChallengeLevel.capitalUSD * currentChallengeLevel.profitTargetPercent) / 100).toLocaleString('en-US')}
                 </span>
               </div>
@@ -1508,7 +1524,9 @@ export const TradingTerminal = () => {
                   replayTime={replayTime}
                   replayPrice={replayPrice}
                   replayStepTrigger={replayStepTrigger}
+                  replayPrevStepTrigger={replayPrevStepTrigger}
                   replayReloadTrigger={replayReloadTrigger}
+                  onReplayReload={() => setReplayReloadTrigger(t => t + 1)}
                   onReplayTimeChange={setReplayTime}
                   onReplayPriceChange={setReplayPrice}
                   goToRealtimeTrigger={goToRealtimeTrigger}
@@ -1710,9 +1728,9 @@ export const TradingTerminal = () => {
       {/* ─── Mobile Active Panel Drawer (Slide-up modal on mobile) ─── */}
       {activeRightPanel && (
         <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div 
-            className="absolute inset-0" 
-            onClick={() => setActiveRightPanel(null)} 
+          <div
+            className="absolute inset-0"
+            onClick={() => setActiveRightPanel(null)}
           />
           <div className="relative bg-white dark:bg-[#131722] rounded-t-2xl shadow-2xl max-h-[85vh] h-[82vh] flex flex-col border-t border-[#e6e8ea] dark:border-[#2a2e39] z-10 animate-in slide-in-from-bottom duration-200">
             {/* Header */}
@@ -1817,11 +1835,10 @@ export const TradingTerminal = () => {
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-[#131722] border-t border-[#e6e8ea] dark:border-[#2a2e39] h-14 px-2 flex items-center justify-around shadow-lg">
         <button
           onClick={() => setActiveRightPanel(activeRightPanel === 'watchlist' ? null : 'watchlist')}
-          className={`flex flex-col items-center justify-center flex-1 py-1 rounded transition-colors ${
-            activeRightPanel === 'watchlist'
-              ? 'text-blue-600 dark:text-blue-400 font-semibold'
-              : 'text-[#787b86] hover:text-[#1e2329] dark:hover:text-white'
-          }`}
+          className={`flex flex-col items-center justify-center flex-1 py-1 rounded transition-colors ${activeRightPanel === 'watchlist'
+            ? 'text-blue-600 dark:text-blue-400 font-semibold'
+            : 'text-[#787b86] hover:text-[#1e2329] dark:hover:text-white'
+            }`}
         >
           <List className="w-5 h-5 stroke-[1.8]" />
           <span className="text-[10px] mt-0.5">Theo dõi</span>
@@ -1829,11 +1846,10 @@ export const TradingTerminal = () => {
 
         <button
           onClick={() => setActiveRightPanel(activeRightPanel === 'simulation' ? null : 'simulation')}
-          className={`flex flex-col items-center justify-center flex-1 py-1 rounded transition-colors ${
-            activeRightPanel === 'simulation'
-              ? 'text-[#089981] font-semibold'
-              : 'text-[#787b86] hover:text-[#1e2329] dark:hover:text-white'
-          }`}
+          className={`flex flex-col items-center justify-center flex-1 py-1 rounded transition-colors ${activeRightPanel === 'simulation'
+            ? 'text-[#089981] font-semibold'
+            : 'text-[#787b86] hover:text-[#1e2329] dark:hover:text-white'
+            }`}
         >
           <BarChart2 className="w-5 h-5 stroke-[1.8]" />
           <span className="text-[10px] mt-0.5">Mô phỏng</span>
@@ -1842,17 +1858,15 @@ export const TradingTerminal = () => {
         {/* Primary Action Button: Đặt Lệnh */}
         <button
           onClick={() => setActiveRightPanel(activeRightPanel === 'order' ? null : 'order')}
-          className={`flex flex-col items-center justify-center flex-1 py-1 rounded transition-all ${
-            activeRightPanel === 'order'
-              ? 'text-white'
-              : 'text-[#787b86] hover:text-[#1e2329] dark:hover:text-white'
-          }`}
+          className={`flex flex-col items-center justify-center flex-1 py-1 rounded transition-all ${activeRightPanel === 'order'
+            ? 'text-white'
+            : 'text-[#787b86] hover:text-[#1e2329] dark:hover:text-white'
+            }`}
         >
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center -mt-2 shadow-md transition-transform ${
-            activeRightPanel === 'order'
-              ? 'bg-blue-600 text-white scale-110 ring-2 ring-blue-400'
-              : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
-          }`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center -mt-2 shadow-md transition-transform ${activeRightPanel === 'order'
+            ? 'bg-blue-600 text-white scale-110 ring-2 ring-blue-400'
+            : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+            }`}>
             <ArrowLeftRight className="w-4 h-4 stroke-[2]" />
           </div>
           <span className="text-[10px] mt-0.5 font-bold">Đặt lệnh</span>
@@ -1860,11 +1874,10 @@ export const TradingTerminal = () => {
 
         <button
           onClick={() => setActiveRightPanel(activeRightPanel === 'journal' ? null : 'journal')}
-          className={`flex flex-col items-center justify-center flex-1 py-1 rounded transition-colors ${
-            activeRightPanel === 'journal'
-              ? 'text-blue-600 dark:text-blue-400 font-semibold'
-              : 'text-[#787b86] hover:text-[#1e2329] dark:hover:text-white'
-          }`}
+          className={`flex flex-col items-center justify-center flex-1 py-1 rounded transition-colors ${activeRightPanel === 'journal'
+            ? 'text-blue-600 dark:text-blue-400 font-semibold'
+            : 'text-[#787b86] hover:text-[#1e2329] dark:hover:text-white'
+            }`}
         >
           <BookOpen className="w-5 h-5 stroke-[1.8]" />
           <span className="text-[10px] mt-0.5">Nhật ký</span>
@@ -1872,11 +1885,10 @@ export const TradingTerminal = () => {
 
         <button
           onClick={() => setActiveRightPanel(activeRightPanel === 'calculator' ? null : 'calculator')}
-          className={`flex flex-col items-center justify-center flex-1 py-1 rounded transition-colors ${
-            activeRightPanel === 'calculator'
-              ? 'text-[#089981] font-semibold'
-              : 'text-[#787b86] hover:text-[#1e2329] dark:hover:text-white'
-          }`}
+          className={`flex flex-col items-center justify-center flex-1 py-1 rounded transition-colors ${activeRightPanel === 'calculator'
+            ? 'text-[#089981] font-semibold'
+            : 'text-[#787b86] hover:text-[#1e2329] dark:hover:text-white'
+            }`}
         >
           <Calculator className="w-5 h-5 stroke-[1.8]" />
           <span className="text-[10px] mt-0.5">Máy tính</span>
