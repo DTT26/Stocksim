@@ -752,6 +752,52 @@ const TradeReviewModalInner = ({
 
                   {/* 5 Core Parts Detailed Breakdown */}
                   {(() => {
+                    const getSubItem = (items: any[] | undefined, id: string, defaultMax: number) => {
+                      const item = items?.find((it: any) => it.id === id);
+                      return {
+                        score: item?.score ?? 0,
+                        max: item?.max ?? defaultMax,
+                        status: item?.status ?? (item?.score && item.score > 0 ? 'PASS' : 'FAIL'),
+                        detail: item?.detail || '',
+                      };
+                    };
+
+                    const renderSubBadge = (sub: { score: number; max: number; status: string }) => {
+                      const isFull = sub.score >= sub.max && sub.max > 0;
+                      return (
+                        <span
+                          className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${
+                            isFull
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          }`}
+                        >
+                          {sub.score}/{sub.max}đ
+                        </span>
+                      );
+                    };
+
+                    const renderSubDetail = (sub: { score: number; max: number; status: string; detail: string }, fallback: string) => {
+                      const isFull = sub.score >= sub.max && sub.max > 0;
+                      return (
+                        <div className="space-y-1">
+                          <div className="text-[10px] text-slate-400 leading-normal">
+                            {fallback}
+                          </div>
+                          <div
+                            className={`p-1.5 rounded text-[10px] leading-tight border ${
+                              isFull
+                                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300/90'
+                                : 'bg-rose-950/40 border-rose-500/30 text-rose-300/90'
+                            }`}
+                          >
+                            <strong className="block mb-0.5">{isFull ? '✓ Đạt chuẩn:' : '⚠️ Đang sai ở đâu:'}</strong>
+                            {sub.detail || (isFull ? 'Đáp ứng chuẩn điều kiện kỹ thuật.' : 'Chưa thỏa mãn tiêu chí của phần này.')}
+                          </div>
+                        </div>
+                      );
+                    };
+
                     const p1_1 = getSubItem(review.rubricScore?.htfContext?.items, '1.1', 10);
                     const p1_2 = getSubItem(review.rubricScore?.htfContext?.items, '1.2', 10);
                     const p1_3 = getSubItem(review.rubricScore?.htfContext?.items, '1.3', 5);

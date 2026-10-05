@@ -1740,9 +1740,15 @@ export const AiTutorDrawer = ({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{isEn ? 'Score:' : 'Điểm:'}</span>
-                    <span className="text-sm font-black font-mono text-amber-600 dark:text-amber-400">
+                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border ${
+                    inspectResult.verdict === 'CORRECT' || inspectResult.score >= 85
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                      : inspectResult.verdict === 'PARTIALLY_CORRECT' || inspectResult.score >= 55
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                      : 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400'
+                  }`}>
+                    <span className="text-[10px] opacity-80 font-medium">{isEn ? 'Score:' : 'Điểm:'}</span>
+                    <span className="text-sm font-black font-mono">
                       {inspectResult.score}/100
                     </span>
                   </div>

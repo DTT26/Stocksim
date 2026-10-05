@@ -2010,15 +2010,18 @@ class AiTutorService:
                     ref_price = matched_cisd.get("price") or matched_cisd.get("priceHigh") or 1.0
                     ref_high = matched_cisd.get("priceHigh") or ref_price
                     ref_low = matched_cisd.get("priceLow") or ref_price
-                    err_high = abs(user_p_high - ref_high) / max(1.0, ref_high)
-                    err_low = abs(user_p_low - ref_low) / max(1.0, ref_low)
-                    err_mid = abs(user_mid - ref_price) / max(1.0, ref_price)
-                    min_err = min(err_high, err_low, err_mid)
-                    # Đường kẻ CISD nằm quanh đỉnh nến đỏ hoặc thân nến đỏ (sai số <= 2.5%)
-                    is_in_range = (min(ref_low, ref_high) * 0.985 <= user_mid <= max(ref_low, ref_high) * 1.015)
-                    if is_in_range or min_err <= 0.025:
+                    
+                    # Tight tolerance for CISD based on candle height and price
+                    candle_tol = max(avg_candle_h * 0.6, ref_price * 0.003)
+                    price_diff = min(abs(user_mid - ref_price), abs(user_p_high - ref_price), abs(user_p_low - ref_price))
+                    is_in_range = (min(ref_low, ref_high) * 0.995 <= user_mid <= max(ref_low, ref_high) * 1.005)
+
+                    if not has_fail_signal and (is_in_range or price_diff <= candle_tol):
                         score = max(score, 95)
                         verdict = "CORRECT"
+                    elif price_diff <= candle_tol * 2.0 or is_in_range:
+                        score = max(60, min(score, 75))
+                        verdict = "PARTIALLY_CORRECT"
                     else:
                         score = min(score, 45)
                         verdict = "INCORRECT"
@@ -2060,9 +2063,12 @@ class AiTutorService:
                     l_err = abs(user_p_low - matched_ifvg["priceLow"]) / max(1.0, matched_ifvg["priceLow"])
                     user_h = abs(user_p_high - user_p_low)
                     ifvg_h = abs(matched_ifvg["priceHigh"] - matched_ifvg["priceLow"])
-                    if user_h <= max(ifvg_h * 2.5, avg_candle_h * 2.5) and (h_err < 0.12 or l_err < 0.12):
+                    if not has_fail_signal and user_h <= max(ifvg_h * 2.5, avg_candle_h * 2.5) and (h_err < 0.10 or l_err < 0.10):
                         score = max(score, 95)
                         verdict = "CORRECT"
+                    elif user_h <= max(ifvg_h * 3.5, avg_candle_h * 3.5) and (h_err < 0.15 or l_err < 0.15):
+                        score = max(60, min(score, 75))
+                        verdict = "PARTIALLY_CORRECT"
             elif not suggested_zone:
                 suggested_zone = {
                     "type": "Inversion FVG (IFVG)",
@@ -2158,9 +2164,12 @@ class AiTutorService:
                         cl_l_err = abs(user_p_low - cl_l) / max(1.0, cl_l)
                         is_cluster_match = (cl_h_err < 0.08 or cl_l_err < 0.08) or (user_p_high <= cl_h * 1.05 and user_p_low >= cl_l * 0.95)
 
-                    if is_single_match or is_cluster_match or (user_h <= max(ob_h * 3.5, avg_candle_h * 3.0) and (h_err < 0.12 or l_err < 0.12)):
+                    if not has_fail_signal and (is_single_match or is_cluster_match or (user_h <= max(ob_h * 3.5, avg_candle_h * 3.0) and (h_err < 0.10 or l_err < 0.10))):
                         score = max(score, 95)
                         verdict = "CORRECT"
+                    elif is_single_match or is_cluster_match or (h_err < 0.15 or l_err < 0.15):
+                        score = max(60, min(score, 75))
+                        verdict = "PARTIALLY_CORRECT"
             elif not suggested_zone:
                 suggested_zone = {
                     "type": "Order Block (OB)",
@@ -2199,9 +2208,12 @@ class AiTutorService:
                     l_err = abs(user_p_low - matched_bb["priceLow"]) / max(1.0, matched_bb["priceLow"])
                     user_h = abs(user_p_high - user_p_low)
                     bb_h = abs(matched_bb["priceHigh"] - matched_bb["priceLow"])
-                    if user_h <= max(bb_h * 3.0, avg_candle_h * 2.5) and (h_err < 0.12 or l_err < 0.12):
+                    if not has_fail_signal and user_h <= max(bb_h * 3.0, avg_candle_h * 2.5) and (h_err < 0.10 or l_err < 0.10):
                         score = max(score, 95)
                         verdict = "CORRECT"
+                    elif user_h <= max(bb_h * 3.5, avg_candle_h * 3.0) and (h_err < 0.15 or l_err < 0.15):
+                        score = max(60, min(score, 75))
+                        verdict = "PARTIALLY_CORRECT"
             elif not suggested_zone:
                 suggested_zone = {
                     "type": "Breaker Block",
@@ -2374,12 +2386,26 @@ class AiTutorService:
             suggested_zone["name"] = matched_cisd["name"]
             suggested_zone["label"] = matched_cisd["label"]
 
-        # SYNCHRONIZATION GUARANTEE:
+        # SYNCHRONIZATION GUARANTEE (100% Consistency between verdict, score, and text):
         if verdict == "CORRECT":
             score = max(score, 90)
+            # 1. Synchronize Conclusion header
             analysis = re.sub(
-                r'([•\-\*]\s*(?:\*\*)?Kết luận tổng quan:(?:\*\*)?\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:CHƯA ĐÚNG|SAI|ĐÚNG MỘT PHẦN)[^\r\n]*',
+                r'([•\-\*]\s*(?:\*\*)?Kết luận tổng quan:(?:\*\*)?\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:\*\*)?(?:CHƯA ĐÚNG|SAI|ĐÚNG MỘT PHẦN|KHÔNG ĐÚNG)(?:\*\*)?[^\r\n]*',
                 r'\1Bài vẽ của học viên **ĐÚNG** chuẩn xác theo định nghĩa Smart Money Concepts (SMC/ICT).',
+                analysis,
+                flags=re.IGNORECASE
+            )
+            # 2. Replace negative diagnosis lines with positive verification
+            analysis = re.sub(
+                r'([•\-\*]\s*(?:\*\*)?Hình #\d+[^\r\n]*)(?:sai lệch|không khớp|vẽ sai|quá rộng|không bao trùm|tích lũy cũ)[^\r\n]*',
+                r'• Hình #1: Học viên đã xác định chuẩn xác vị trí và tọa độ kỹ thuật của vùng giá trên biểu đồ.',
+                analysis,
+                flags=re.IGNORECASE
+            )
+            analysis = re.sub(
+                r'([•\-\*]\s*(?:\*\*)?Hậu quả nếu giao dịch:[^\r\n]*)(?:vẽ sai|thua lỗ|quét stop loss|nguy cơ|kháng cự/hỗ trợ sai)[^\r\n]*',
+                r'• Đánh giá thực chiến: Tín hiệu giao dịch có xác suất thành công cao khi bám sát vùng vẽ chuẩn xác này.',
                 analysis,
                 flags=re.IGNORECASE
             )
@@ -2389,21 +2415,21 @@ class AiTutorService:
             analysis = re.sub(r'giá đã đâm thủng.*?nên không còn hợp lệ[^\r\n]*', '', analysis, flags=re.IGNORECASE)
         elif verdict == "INCORRECT":
             score = min(score, 45)
+            # Synchronize Conclusion header to INCORRECT
             analysis = re.sub(
-                r'([•\-\*]\s*(?:\*\*)?Kết luận tổng quan:(?:\*\*)?\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:ĐÚNG|CHÍNH XÁC|ĐÚNG MỘT PHẦN)[^\r\n]*',
+                r'([•\-\*]\s*(?:\*\*)?Kết luận tổng quan:(?:\*\*)?\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:\*\*)?(?:ĐÚNG|CHÍNH XÁC|ĐÚNG MỘT PHẦN)(?:\*\*)?[^\r\n]*',
                 r'\1Bài vẽ của học viên **CHƯA ĐÚNG** theo tiêu chuẩn kỹ thuật.',
                 analysis,
                 flags=re.IGNORECASE
             )
         elif verdict == "PARTIALLY_CORRECT":
             score = max(55, min(score, 75))
-            if "ĐÚNG MỘT PHẦN" not in analysis[:350].upper():
-                analysis = re.sub(
-                    r'([•\-\*]\s*(?:\*\*)?Kết luận tổng quan:(?:\*\*)?\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:ĐÚNG|CHÍNH XÁC|CHƯA ĐÚNG|SAI)[^\r\n]*',
-                    r'\1Bài vẽ của học viên **ĐÚNG MỘT PHẦN** (cần lưu ý hoàn thiện thêm).',
-                    analysis,
-                    flags=re.IGNORECASE
-                )
+            analysis = re.sub(
+                r'([•\-\*]\s*(?:\*\*)?Kết luận tổng quan:(?:\*\*)?\s*(?:Nêu rõ\s*)?)(?:Bài vẽ của học viên\s*)?(?:\*\*)?(?:ĐÚNG|CHÍNH XÁC|CHƯA ĐÚNG|SAI)(?:\*\*)?[^\r\n]*',
+                r'\1Bài vẽ của học viên **ĐÚNG MỘT PHẦN** (gần đúng tọa độ nhưng cần tinh chỉnh thêm).',
+                analysis,
+                flags=re.IGNORECASE
+            )
 
         # CRITICAL: Always keep Section 5 score synchronized with final score (handles brackets like [35]/100)
         analysis = re.sub(
