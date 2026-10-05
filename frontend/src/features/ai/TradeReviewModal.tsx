@@ -1,4 +1,10 @@
-import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect } from 'react';
+import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect, useRef } from 'react';
+import { getChartDrawingsData } from '../market/components/ChartArea';
+import './TradeReviewModal.css';
+
+// Bỏ emoji khỏi nhãn trả về từ backend cho giao diện gọn, đỡ "AI"
+const stripEmoji = (s?: string): string =>
+  (s || '').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '').replace(/\s{2,}/g, ' ').trim();
 
 // Safe formatting helpers to prevent any runtime exceptions (e.g. undefined.toLocaleString)
 const safeMoney = (val?: number | string | null, decimals: number = 2): string => {
@@ -138,46 +144,44 @@ const TradeReviewModalInner = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'ALL' | 'ICT_RUBRIC' | 'CONTEXT' | 'RISK' | 'IMPROVEMENTS'>('ALL');
+  const drawingsRef = useRef<any[]>([]);
 
   useEffect(() => {
     if (!isOpen) return;
     setLoading(true);
     setError(null);
 
-    // Auto-extract chart overlays/drawings if not present in tradeData
+    // Lấy hình vẽ của user: ưu tiên chart đang mở (có nhận diện nhãn SMC), fallback localStorage
     let drawings = (tradeData as any).drawings || [];
     if (drawings.length === 0 && typeof window !== 'undefined') {
       try {
-        const chart = (window as any).__STOCKSIM_CHART__ || (window as any).__currentKlineChart;
-        if (chart && typeof chart.getOverlays === 'function') {
-          const allOverlays = chart.getOverlays() || [];
-          drawings = allOverlays.filter((o: any) => {
-            if (!o) return false;
-            const id = String(o.id || '');
-            const name = String(o.name || '');
-            return (
-              !id.startsWith('__sys_') && 
-              !id.startsWith('pending_') && 
-              !id.startsWith('preview_') &&
-              !id.startsWith('active_') &&
-              !id.startsWith('tpsl_') &&
-              !id.startsWith('pos_') &&
-              !id.startsWith('order_') &&
-              !id.startsWith('drag_') &&
-              name !== 'shift_measure' &&
-              name !== 'tpslZone' &&
-              name !== 'orderTpslLine' &&
-              name !== 'aiCorrectionZone' &&
-              name !== 'aiCorrectionBox' &&
-              name !== 'zoomInBox'
-            );
-          });
-        }
-      } catch (e) {
+        drawings = getChartDrawingsData().drawings || [];
+      } catch {
         drawings = [];
+      }
+
+      if (drawings.length === 0) {
+        try {
+          const sym = String(tradeData?.symbol || '').toUpperCase();
+          const keys = Object.keys(localStorage).filter(k => k.startsWith('saved-overlays-') && k.toUpperCase().endsWith(`-${sym}`));
+          const sysPrefixes = ['__sys_', 'pending_', 'preview_', 'active_', 'tpsl_', 'pos_', 'order_', 'drag_'];
+          const sysNames = ['shift_measure', 'tpslZone', 'orderTpslLine', 'aiCorrectionZone', 'aiCorrectionBox', 'zoomInBox'];
+          for (const k of keys) {
+            const parsed = JSON.parse(localStorage.getItem(k) || '[]');
+            if (Array.isArray(parsed)) {
+              drawings.push(...parsed.filter((o: any) => {
+                const id = String(o?.id || '');
+                return o && !sysPrefixes.some(p => id.startsWith(p)) && !sysNames.includes(String(o.name || ''));
+              }).map((o: any) => ({ id: o.id, name: o.name, points: o.points, extendData: o.extendData })));
+            }
+          }
+        } catch {
+          /* ignore */
+        }
       }
     }
 
+    drawingsRef.current = drawings;
     aiService.analyzeTrade({ ...tradeData, drawings, lang })
       .then(res => {
         if (!res) throw new Error(isEn ? 'Empty response from AI service' : 'Hệ thống AI không phản hồi');
@@ -280,20 +284,20 @@ const TradeReviewModalInner = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-      <div className="bg-[#10141d] border border-[#232838] text-slate-200 rounded-2xl w-full max-w-5xl max-h-[94vh] flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.85)] overflow-hidden">
+      <div className="trade-review-root bg-[#10141d] border border-[#232838] text-slate-200 rounded-2xl w-full max-w-5xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden">
         
         {/* ================================================================ */}
         {/* 1. Header: AI Trade Review & Trading Coach                       */}
         {/* ================================================================ */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-[#232838] bg-[#161a25]">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/25 shadow-[0_0_12px_rgba(245,158,11,0.2)]">
-              <Sparkles className="w-5 h-5 animate-pulse" />
+            <div className="p-2 rounded-lg bg-[#202533] text-slate-300 border border-[#2e3448]">
+              <BookOpen className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-sm sm:text-base font-bold text-white tracking-wide">
-                  AI Trade Review &amp; Trading Coach
+                <h2 className="text-sm sm:text-base font-semibold text-white">
+                  {isEn ? 'Trade Review' : 'Đánh giá lệnh'}
                 </h2>
                 <div className="flex items-center gap-1.5">
                   <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-[#202533] text-slate-200 border border-[#2e3448]">
@@ -310,15 +314,13 @@ const TradeReviewModalInner = ({
                       ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30' 
                       : 'bg-slate-700/40 text-slate-300 border border-slate-600/40'
                   }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${isOpenTrade ? 'bg-cyan-400 animate-ping' : 'bg-slate-400'}`}></span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isOpenTrade ? 'bg-cyan-400' : 'bg-slate-400'}`}></span>
                     {isOpenTrade ? (isEn ? 'OPEN POSITION' : 'VỊ THẾ ĐANG MỞ') : (isEn ? 'CLOSED TRADE' : 'LỆNH ĐÃ ĐÓNG')}
                   </span>
                 </div>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
-                <span>{isEn ? 'Process-oriented Review & Trading Coach (Process > Outcome)' : 'Hệ thống Huấn luyện & Đánh giá Quy trình (Process > Outcome)'}</span>
-                <span className="text-slate-600">•</span>
-                <span className="text-amber-400/90 font-medium">Winning Trade ≠ Good Trade</span>
+                <span>{isEn ? 'Scored on process, not on P&L' : 'Chấm theo quy trình, không theo lãi/lỗ'}</span>
               </p>
             </div>
           </div>
@@ -439,14 +441,12 @@ const TradeReviewModalInner = ({
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs custom-scrollbar">
           {loading ? (
             <div className="py-24 text-center space-y-3">
-              <div className="relative w-12 h-12 mx-auto">
-                <Sparkles className="w-12 h-12 text-amber-400 animate-spin" />
-              </div>
-              <p className="text-slate-200 font-semibold text-sm">
-                {isEn ? 'Auditing execution process & trade context...' : 'Đang kiểm toán quy trình & bối cảnh lệnh...'}
+              <div className="w-8 h-8 mx-auto rounded-full border-2 border-slate-600 border-t-slate-200 animate-spin" />
+              <p className="text-slate-200 font-medium text-sm">
+                {isEn ? 'Reviewing your trade...' : 'Đang chấm lệnh...'}
               </p>
               <p className="text-xs text-slate-500">
-                {isEn ? 'Evaluating compliance rubric, computing MFE/MAE and market context' : 'Đối chiếu Rubric tuân thủ, tính toán MFE/MAE và bối cảnh Market Context'}
+                {isEn ? 'Checking rubric, MFE/MAE and chart drawings' : 'Đối chiếu thang điểm, MFE/MAE và hình vẽ trên chart'}
               </p>
             </div>
           ) : error || !review ? (
@@ -467,7 +467,7 @@ const TradeReviewModalInner = ({
                   onClick={() => {
                     setLoading(true);
                     setError(null);
-                    aiService.analyzeTrade({ ...tradeData, lang })
+                    aiService.analyzeTrade({ ...tradeData, drawings: drawingsRef.current, lang })
                       .then(res => setReview(res))
                       .catch(err => setError(err.message || 'Lỗi kết nối'))
                       .finally(() => setLoading(false));
@@ -525,7 +525,7 @@ const TradeReviewModalInner = ({
                     {/* ICT Tier Recommendation Action Callout */}
                     {(() => {
                       const tier = review.summary.tier || rubric?.tier || (review.summary.processScore >= 90 ? 'A+' : review.summary.processScore >= 75 ? 'B' : review.summary.processScore >= 60 ? 'C' : 'F');
-                      const tierLabel = review.summary.tierLabel || rubric?.tierLabel || (tier === 'A+' ? '🌟 Hạng A+ (Unicorn Setup)' : tier === 'B' ? '🟢 Hạng B (Standard Setup)' : tier === 'C' ? '🟡 Hạng C (Marginal Setup)' : '🔴 Hạng F (Invalid / Retail Trap)');
+                      const tierLabel = stripEmoji(review.summary.tierLabel || rubric?.tierLabel || (tier === 'A+' ? 'Hạng A+ (Unicorn Setup)' : tier === 'B' ? 'Hạng B (Standard Setup)' : tier === 'C' ? 'Hạng C (Marginal Setup)' : 'Hạng F (Invalid / Retail Trap)'));
                       const tierAction = review.summary.tierAction || rubric?.tierAction || (
                         tier === 'A+' ? 'Bấm lệnh ngay (Execution). Lệnh đạt độ hợp lưu hoàn hảo, cho phép đi tối đa 100% Risk tiêu chuẩn (ví dụ: 1% tài khoản).' :
                         tier === 'B' ? 'Thực thi bình thường. Lệnh đạt chuẩn ICT, đi Risk tiêu chuẩn (0.5%–1%).' :
@@ -553,7 +553,7 @@ const TradeReviewModalInner = ({
                             </span>
                           </div>
                           <div className="text-xs text-slate-200 font-medium sm:text-right max-w-xl">
-                            <span className="text-amber-300 font-bold mr-1">Khuyến nghị AI:</span>
+                            <span className="text-amber-300 font-semibold mr-1">{isEn ? 'Recommendation:' : 'Khuyến nghị:'}</span>
                             {tierAction}
                           </div>
                         </div>
@@ -566,7 +566,7 @@ const TradeReviewModalInner = ({
                         <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
                           <span className="flex items-center gap-1.5 font-semibold text-slate-200">
                             <Layers className="w-3.5 h-3.5 text-cyan-400" />
-                            {isEn ? 'ICT 100-Point Rubric Evaluation (5 Core Parts):' : 'Bảng Điểm ICT 100 Điểm Trọn Vẹn (5 Phần Cốt Lõi):'}
+                            {isEn ? 'Score breakdown (100 pts)' : 'Điểm theo từng phần (100đ)'}
                           </span>
                           <span className="text-[10px] text-slate-400 italic">
                             Level → Profile → Draw → SMT → Execute
@@ -683,29 +683,14 @@ const TradeReviewModalInner = ({
               {/* Senior Prop Firm Risk Manager & Execution Audit Card         */}
               {/* ============================================================ */}
               <div className="relative overflow-hidden rounded-xl border border-slate-700/60 bg-[#121622]/90 backdrop-blur p-4 shadow-lg space-y-3">
-                <div className="flex items-center justify-between gap-2 border-b border-slate-700/40 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                      <Target className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-white tracking-wide uppercase">
-                        {isEn ? 'EXECUTIVE TRADE AUDIT & RISK REVIEW' : 'NHẬN ĐỊNH CHUYÊN MÔN & KIỂM TOÁN QUY TRÌNH'}
-                      </span>
-                      <p className="text-[10px] text-slate-400">
-                        {isEn ? 'Prop Firm Risk Desk Evaluation • Objective Process Audit' : 'Bàn Quản Trị Rủi Ro Quỹ • Đánh giá kỷ luật & bảo vệ vốn'}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
-                    {isEn ? 'Independent Audit' : 'Đánh giá độc lập'}
+                <div className="flex items-center gap-2 border-b border-slate-700/40 pb-2.5">
+                  <Target className="w-4 h-4 text-slate-400" />
+                  <span className="text-sm font-semibold text-white">
+                    {isEn ? 'Reviewer notes' : 'Nhận xét'}
                   </span>
                 </div>
 
                 <div className="text-slate-200 text-xs sm:text-[13px] leading-relaxed space-y-1 bg-[#0b0e15] p-3 rounded-lg border border-slate-800">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                    {isEn ? 'Process Assessment:' : 'Đánh giá chi tiết:'}
-                  </div>
                   <p>{review.aiCoach?.explanation || review.summary.coachingAdvice || review.summary.verdictDescription}</p>
                 </div>
 
@@ -714,8 +699,8 @@ const TradeReviewModalInner = ({
                     <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-start gap-2.5 text-xs text-amber-200">
                       <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                       <div>
-                        <span className="font-bold text-amber-300 block text-[11px] uppercase tracking-wider mb-0.5">
-                          {isEn ? 'Priority Action:' : 'Hành động ưu tiên:'}
+                        <span className="font-semibold text-amber-300 block text-xs mb-0.5">
+                          {isEn ? 'Do next' : 'Việc cần làm'}
                         </span>
                         {review.aiCoach?.actionItem}
                       </div>
@@ -725,8 +710,8 @@ const TradeReviewModalInner = ({
                     <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-start gap-2.5 text-xs text-cyan-200">
                       <Scale className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
                       <div>
-                        <span className="font-bold text-cyan-300 block text-[11px] uppercase tracking-wider mb-0.5">
-                          {isEn ? 'Mental & Risk Check:' : 'Kiểm soát rủi ro & tâm lý:'}
+                        <span className="font-semibold text-cyan-300 block text-xs mb-0.5">
+                          {isEn ? 'Ask yourself' : 'Tự hỏi lại'}
                         </span>
                         {review.aiCoach?.reflectionQuestion}
                       </div>
@@ -761,7 +746,7 @@ const TradeReviewModalInner = ({
                       </div>
                     </div>
                     <span className="text-[11px] font-mono px-2.5 py-1 rounded-md bg-[#181d29] text-amber-300 border border-amber-500/20 font-semibold self-start sm:self-auto">
-                      {review.summary.tierLabel || '🌟 Phân Hạng Lệnh'}
+                      {stripEmoji(review.summary.tierLabel) || (isEn ? 'Trade tier' : 'Phân hạng lệnh')}
                     </span>
                   </div>
 

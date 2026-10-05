@@ -196,7 +196,8 @@ class TradeAnalyzer:
             for d in valid_drawings:
                 d_name = str(d.get('name', '')).lower()
                 d_data = str(d.get('extendData', '')).lower()
-                text_content = f"{d_name} {d_data}"
+                d_labels = " ".join(str(d.get(k, '') or '') for k in ('label', 'userLabel', 'tag', 'detectedConcept')).lower()
+                text_content = f"{d_name} {d_data} {d_labels}"
                 if any(k in text_content for k in ['sweep', 'liquidity', 'ssl', 'bsl', 'thanh khoản']):
                     has_drawn_sweep = True
                 if any(k in text_content for k in ['cisd', 'mss', 'choch', 'bos', 'horizontalstraightline', 'horizontalray', 'segment', 'trendline']):

@@ -1,0 +1,85 @@
+/*
+ * Light-mode cho TradeReviewModal.
+ * Modal được thiết kế dark-first với nhiều màu hex cố định, nên ở chế độ sáng
+ * (html không có class .dark) ta ghi đè lại bảng màu trong phạm vi .trade-review-root.
+ */
+
+html:not(.dark) .trade-review-root {
+  --tr-surface: #ffffff;
+  --tr-surface-2: #f8fafc;
+  --tr-surface-3: #f1f5f9;
+  --tr-border: #e2e8f0;
+  --tr-border-strong: #cbd5e1;
+  background-color: var(--tr-surface) !important;
+  border-color: var(--tr-border) !important;
+  color: #334155 !important;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18) !important;
+}
+
+/* ---------- Nền tối cố định -> nền sáng ---------- */
+html:not(.dark) .trade-review-root :is(
+  .bg-\[\#10141d\], .bg-\[\#121622\], .bg-\[\#121622\]\/90, .bg-\[\#141822\],
+  .bg-\[\#0d121c\]\/80, .bg-\[\#0f131d\]\/90, .bg-\[\#11141d\]\/90,
+  .bg-\[\#0b0e15\], .bg-\[\#0c1017\], .bg-\[\#0d111a\], .bg-\[\#131620\]
+) {
+  background-color: var(--tr-surface) !important;
+}
+
+html:not(.dark) .trade-review-root :is(
+  .bg-\[\#161a25\], .bg-\[\#161c28\], .bg-\[\#161b26\], .bg-\[\#181d29\],
+  .bg-\[\#181d2a\], .bg-\[\#181d28\], .bg-\[\#191e2b\], .bg-\[\#191f2d\],
+  .bg-\[\#1a202e\], .bg-\[\#202533\], .bg-\[\#101724\]\/90, .bg-\[\#171622\]\/90
+) {
+  background-color: var(--tr-surface-2) !important;
+}
+
+/* Nền có ánh màu (đỏ/xanh/cam) */
+html:not(.dark) .trade-review-root :is(.bg-\[\#291118\], .bg-\[\#191418\]) { background-color: #fff1f2 !important; }
+html:not(.dark) .trade-review-root :is(.bg-\[\#0f241a\], .bg-\[\#0f1d18\]) { background-color: #ecfdf5 !important; }
+html:not(.dark) .trade-review-root .bg-\[\#211612\] { background-color: #fffbeb !important; }
+html:not(.dark) .trade-review-root .bg-\[\#0e1f29\] { background-color: #ecfeff !important; }
+
+/* Gradient tối -> nền phẳng sáng */
+html:not(.dark) .trade-review-root :is(.from-\[\#192233\], .from-\[\#141a27\], .via-\[\#161a25\]) {
+  background-image: none !important;
+  background-color: var(--tr-surface-2) !important;
+}
+
+html:not(.dark) .trade-review-root :is(.bg-black\/30, .bg-black\/40, .bg-slate-800, .bg-slate-700\/40) {
+  background-color: var(--tr-surface-3) !important;
+}
+html:not(.dark) .trade-review-root .bg-white\/10 { background-color: rgba(15, 23, 42, 0.05) !important; }
+
+html:not(.dark) .trade-review-root :is(.hover\:bg-\[\#202533\], .hover\:bg-\[\#1c2130\], .hover\:bg-\[\#2c3345\]):hover {
+  background-color: var(--tr-surface-3) !important;
+}
+
+/* ---------- Viền ---------- */
+html:not(.dark) .trade-review-root :is(
+  .border-\[\#232838\], .border-\[\#232838\]\/60, .border-\[\#282f42\], .border-\[\#262f44\],
+  .border-\[\#2d3448\], .border-\[\#2e3448\], .border-\[\#262e42\], .border-\[\#2b354c\],
+  .border-\[\#2f364a\], .border-\[\#202738\], .border-\[\#212738\],
+  .border-slate-700, .border-slate-700\/40, .border-slate-700\/60, .border-slate-800,
+  .border-slate-600\/40, .border-white\/5, .border-white\/10, .border-white\/20
+) {
+  border-color: var(--tr-border) !important;
+}
+
+/* ---------- Chữ ---------- */
+html:not(.dark) .trade-review-root :is(.text-white, .text-slate-100) { color: #0f172a !important; }
+html:not(.dark) .trade-review-root .text-slate-200 { color: #1e293b !important; }
+html:not(.dark) .trade-review-root .text-slate-300 { color: #334155 !important; }
+html:not(.dark) .trade-review-root :is(.text-slate-400, .text-slate-400\/90) { color: #64748b !important; }
+html:not(.dark) .trade-review-root :is(.text-slate-500, .text-slate-600) { color: #94a3b8 !important; }
+
+/* Chữ màu nhạt (thiết kế cho nền tối) -> tông đậm hơn để đủ tương phản */
+html:not(.dark) .trade-review-root :is(.text-emerald-200, .text-emerald-300, .text-emerald-300\/90, .text-emerald-400) { color: #047857 !important; }
+html:not(.dark) .trade-review-root :is(.text-rose-200, .text-rose-300, .text-rose-300\/90, .text-rose-400, .text-rose-400\/80) { color: #be123c !important; }
+html:not(.dark) .trade-review-root :is(.text-amber-200, .text-amber-300, .text-amber-400, .text-amber-400\/90) { color: #b45309 !important; }
+html:not(.dark) .trade-review-root :is(.text-cyan-200, .text-cyan-300, .text-cyan-400) { color: #0e7490 !important; }
+html:not(.dark) .trade-review-root :is(.text-blue-300, .text-blue-400) { color: #1d4ed8 !important; }
+html:not(.dark) .trade-review-root :is(.text-indigo-300, .text-indigo-400) { color: #4338ca !important; }
+html:not(.dark) .trade-review-root :is(.text-purple-300, .text-purple-400) { color: #7e22ce !important; }
+
+/* Bỏ glow — trên nền sáng trông rất "AI" */
+html:not(.dark) .trade-review-root [class*="shadow-[0_0"] { box-shadow: none !important; }
