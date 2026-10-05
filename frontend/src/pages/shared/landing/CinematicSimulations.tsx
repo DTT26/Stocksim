@@ -17,7 +17,11 @@ export const CinematicSimulations: React.FC = () => {
     let isMounted = true;
     const fetchSimulations = async () => {
       try {
-        const res = await fetch('/api/simulations');
+        const token = localStorage.getItem('token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/simulations', { headers });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0 && isMounted) {
@@ -26,7 +30,7 @@ export const CinematicSimulations: React.FC = () => {
 
             // Tải danh sách người tham gia thực tế nếu có
             if (active._id) {
-              const pRes = await fetch(`/api/simulations/${active._id}/participants`).catch(() => null);
+              const pRes = await fetch(`/api/simulations/${active._id}/participants`, { headers }).catch(() => null);
               if (pRes && pRes.ok) {
                 const pList = await pRes.json();
                 if (Array.isArray(pList) && pList.length > 0 && isMounted) {

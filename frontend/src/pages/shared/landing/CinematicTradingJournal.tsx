@@ -130,7 +130,11 @@ export const CinematicTradingJournal: React.FC = () => {
     let isMounted = true;
     const fetchUserTrades = async () => {
       try {
-        const res = await fetch('/api/trade/transactions');
+        const token = localStorage.getItem('token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/trade/transactions', { headers });
         if (res.ok) {
           const json = await res.json();
           const list = Array.isArray(json) ? json : json.data || json.transactions;

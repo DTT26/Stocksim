@@ -35,7 +35,7 @@ router.get('/students/overview', protect, lecturer, getLecturerStudentsOverview 
 router.get('/participations/me', protect, getMyParticipationsList as any);
 
 router.route('/:id')
-  .get(protect, getSimulationById as any)
+  .get(optionalProtect, getSimulationById as any)
   .put(protect, lecturer, editSimulation as any)
   .delete(protect, lecturer, deleteSimulation as any);
 
@@ -49,11 +49,11 @@ router.patch('/:id/participants/:participantId/approve', protect, lecturer, appr
 router.patch('/:id/participants/:participantId/reject', protect, lecturer, rejectParticipant as any);
 router.delete('/:id/leave', protect, leaveSimulation as any);
 
-router.get('/:id/participants', protect, getSimulationParticipants as any);
+router.get('/:id/participants', optionalProtect, getSimulationParticipants as any);
 router.get('/:id/participants/:participantId/performance', protect, lecturer, getStudentSimulationPerformance as any);
 router.get('/:id/participants/me', protect, getMyParticipation as any);
 
-router.get('/:id/leaderboard', protect, getLeaderboard as any);
+router.get('/:id/leaderboard', optionalProtect, getLeaderboard as any);
 
 router.delete('/:id/participants/:studentId', protect, lecturer, removeStudentFromSimulation as any);
 
