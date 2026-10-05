@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { init, dispose, registerOverlay } from 'klinecharts';
 import type { Chart, KLineData, DataLoaderGetBarsParams, DataLoaderSubscribeBarParams } from 'klinecharts';
-import { Settings2, Trash2, Edit2, Type, Minus, MoreHorizontal, Lock, Unlock, GripVertical, LayoutGrid, Pencil, Plus, ChevronRight, Copy, Settings, X, Layers, RotateCcw, Clipboard, Edit3 } from 'lucide-react';
+import { Settings2, Trash2, Edit2, Type, Minus, MoreHorizontal, Lock, Unlock, GripVertical, LayoutGrid, Pencil, Plus, ChevronRight, Copy, Settings, X, Layers, RotateCcw, Clipboard, Edit3, Scissors } from 'lucide-react';
 import { generateOHLCV, getPricePrecision, timeframeToMs, getContractMultiplier, type Stock } from '../data';
 import { fetchBinanceKlines, mapTimeframeToBinance, subscribeBinanceKline } from '../../../services/binanceApi';
 import { fetchUnifiedKlines, subscribeUnifiedBar } from '../../../services/marketDataService';
@@ -526,7 +526,7 @@ export const clearAllChartDrawings = () => {
     }
     try {
       chart.removeOverlay({ name: 'aiCorrectionZone' });
-    } catch (_) {}
+    } catch (_) { }
 
     if (globalTriggerAutoSave) {
       globalTriggerAutoSave();
@@ -566,7 +566,7 @@ export const drawAiCorrectionOverlay = (suggestedZone: {
     // Clear any previous AI correction zone
     try {
       chart.removeOverlay({ name: 'aiCorrectionZone' });
-    } catch (_) {}
+    } catch (_) { }
 
     const klines: any[] = (chart.getDataList && chart.getDataList()) || [];
     const lastKline = klines[klines.length - 1];
@@ -789,7 +789,7 @@ export const isOverlayInteracting = (overlay: any, chart?: any): boolean => {
       if (hoverInfo?.overlay?.id === overlay.id && hoverInfo?.figureType !== 'none') {
         return true;
       }
-    } catch (e) {}
+    } catch (e) { }
   }
   // 4. Currently selected in floating toolbar
   if ((window as any).__selectedOverlayId === overlay.id) {
@@ -1859,7 +1859,7 @@ registerOverlay({
     return figures;
   }
 });
-// ÄÄƒng kĂ½ ÄÆ°á»ng Sine (sineLine) - Screenshots 2 & 3
+// ÄÄƒng kĂ½ Đường Sine (sineLine) - Screenshots 2 & 3
 registerOverlay({
   name: 'sineLine',
   totalStep: 3,
@@ -2001,7 +2001,7 @@ registerOverlay({
         attrs: {
           x: p2.x,
           y: p2.y + 58,
-          text: isSuccess ? ':) THĂ€NH CĂ”NG' : ':( THáº¤T Báº I',
+          text: isSuccess ? ':) SUCCESS' : ':( FAILED',
           align: 'center',
           baseline: 'top'
         },
@@ -2343,7 +2343,7 @@ registerOverlay({
     return figures;
   }
 });
-// 1. Anchored VWAP (Dá»±a trĂªn khá»‘i lÆ°á»£ng)
+// 1. Anchored VWAP (Dá»±a trĂªn khối lượng)
 registerOverlay({
   name: 'anchoredVWAP',
   totalStep: 1,
@@ -3424,7 +3424,7 @@ registerOverlay({
     return figures;
   }
 });
-// ÄÄƒng kĂ½ ÄÆ°á»ng giao nhau (crossLine)
+// ÄÄƒng kĂ½ Đường giao nhau (crossLine)
 registerOverlay({
   name: 'crossLine',
   totalStep: 2,
@@ -4371,7 +4371,7 @@ registerOverlay({
   createPointFigures: ({ coordinates }) => drawPitchforkFigures(coordinates, 'schiff')
 });
 
-// ÄÄƒng kĂ½ Mô hình Schiff Pitchfork Biáº¿n Ä‘á»•i (Image 3)
+// ÄÄƒng kĂ½ Mô hình Schiff Pitchfork Biến đổi (Image 3)
 registerOverlay({
   name: 'modifiedSchiffPitchfork',
   totalStep: 4,
@@ -4381,7 +4381,7 @@ registerOverlay({
   createPointFigures: ({ coordinates }) => drawPitchforkFigures(coordinates, 'modified')
 });
 
-// ÄÄƒng kĂ½ Mô hình Pitchfork máº·t trong (Image 4)
+// ÄÄƒng kĂ½ Mô hình Pitchfork mặt trong (Image 4)
 registerOverlay({
   name: 'insidePitchfork',
   totalStep: 4,
@@ -4398,7 +4398,9 @@ interface ChartAreaProps {
   replayTime?: number | null;
   replayPrice?: number | null;
   replayStepTrigger?: number;
+  replayPrevStepTrigger?: number;
   replayReloadTrigger?: number;
+  onReplayReload?: () => void;
   onReplayTimeChange?: (time: number) => void;
   onReplayPriceChange?: (price: number) => void;
   tradeOrders: TradeOrder[];
@@ -4447,7 +4449,9 @@ export const ChartArea = ({
   replayTime,
   replayPrice,
   replayStepTrigger,
+  replayPrevStepTrigger,
   replayReloadTrigger,
+  onReplayReload,
   onReplayTimeChange,
   onReplayPriceChange,
   tradeOrders,
@@ -4473,9 +4477,13 @@ export const ChartArea = ({
   const userKey = user?._id || user?.email || 'guest';
   const userKeyRef = useRef(userKey);
   userKeyRef.current = userKey;
+  const isRewindingRef = useRef(false);
 
-  const saveDrawingsRef = useRef<() => void>(() => {});
-  const loadDrawingsRef = useRef<() => void>(() => {});
+  const saveDrawingsRef = useRef<() => void>(() => { });
+  const loadDrawingsRef = useRef<() => void>(() => { });
+
+  const cutOverlayRef = useRef<HTMLDivElement>(null);
+  const scissorsIconRef = useRef<HTMLDivElement>(null);
 
   const debouncedSaveTimerRef = useRef<any>(null);
   const triggerAutoSaveDrawings = () => {
@@ -5232,20 +5240,20 @@ export const ChartArea = ({
       const text = styles.text || {};
       const points = overlay.points || [];
       const titleMap: Record<string, string> = {
-        segment: 'ÄÆ°á»ng Xu hÆ°á»›ng',
+        segment: 'Đường Xu hướng',
         rayLine: 'Tia',
-        infoLine: 'ÄÆ°á»ng ThĂ´ng tin',
-        straightLine: 'ÄÆ°á»ng Má»Ÿ rá»™ng',
+        infoLine: 'Đường Thông tin',
+        straightLine: 'Đường Mở rộng',
         trendAngle: 'Góc Xu hướng',
-        horizontalStraightLine: 'ÄÆ°á»ng náº±m ngang',
+        horizontalStraightLine: 'Đường nằm ngang',
         horizontalRayLine: 'Tia nằm ngang',
-        verticalStraightLine: 'ÄÆ°á»ng tháº³ng Ä‘á»©ng',
-        crossLine: 'ÄÆ°á»ng giao nhau',
+        verticalStraightLine: 'Đường thẳng đứng',
+        crossLine: 'Đường giao nhau',
         priceChannelLine: 'Kênh Song song',
         pitchfork: 'Mô hình Pitchfork',
         schiffPitchfork: 'Mô hình Schiff Pitchfork',
-        modifiedSchiffPitchfork: 'Mô hình Schiff Pitchfork Biáº¿n Ä‘á»•i',
-        insidePitchfork: 'Mô hình Pitchfork máº·t trong',
+        modifiedSchiffPitchfork: 'Mô hình Schiff Pitchfork Biến đổi',
+        insidePitchfork: 'Mô hình Pitchfork mặt trong',
         simpleAnnotation: 'Văn bản',
         callout: 'Chú thích',
         note: 'Ghi chú',
@@ -5265,22 +5273,22 @@ export const ChartArea = ({
         xabcd: 'Mẫu hình XABCD',
         abcd: 'Mẫu hình ABCD',
         elliottImpulse: 'Sóng đẩy Elliott (12345)',
-        elliottTriangle: 'SĂ³ng Ä‘iá»u chá»‰nh Elliott (ABC)',
+        elliottTriangle: 'Sóng điều chỉnh Elliott (ABC)',
         elliottABCDE: 'Sóng Elliott Tam giác (ABCDE)',
         elliottWXY: 'Sóng đôi kết hợp Elliott (WXY)',
         elliottTriple: 'Sóng Elliott kết hợp ba (WXYXZ)',
-        cycleLines: 'CĂ¡c Ä‘Æ°á»ng chu ká»³',
-        timeCycles: 'VĂ²ng thá»i gian',
-        sineLine: 'ÄÆ°á»ng Sine',
+        cycleLines: 'Các đường chu kỳ',
+        timeCycles: 'Vòng thời gian',
+        sineLine: 'Đường Sine',
         longPosition: 'Thế giá lên',
         shortPosition: 'Thế giá xuống',
         forecast: 'Dự đoán',
         barsPattern: 'Mẫu hình Thanh',
         ghostFeed: 'Mô hình Ghost Feed',
-        measure: 'Äo lÆ°á»ng'
+        measure: 'Đo lường'
       };
       setSelectedOverlaySettings({
-        title: titleMap[overlay.name] || overlay.name || 'CĂ i Ä‘áº·t hĂ¬nh váº½',
+        title: titleMap[overlay.name] || overlay.name || 'Cài đặt hình vẽ',
         lineColor: line.color || '#2962ff',
         lineSize: line.size || 1,
         lineStyle: line.style === 'dashed' ? 'dashed' : 'solid',
@@ -5639,7 +5647,7 @@ export const ChartArea = ({
         }
         try {
           activeChart.removeOverlay({ name: 'aiCorrectionZone' });
-        } catch (_) {}
+        } catch (_) { }
       }
       setFloatingToolbar(null);
       setSelectedOverlay(null);
@@ -5861,6 +5869,35 @@ export const ChartArea = ({
       onReplayTimeChangeRef.current?.(nextBar.timestamp);
     }
   }, [replayStepTrigger]);
+
+  // Handle step BACKWARD updates during replay smoothly
+  useEffect(() => {
+    if (!replayPrevStepTrigger || !isReplaying) return;
+    const cacheKey = `${selectedStock.symbol}-${activeTimeframe}`;
+    const fullData = dataCache.get(cacheKey);
+    if (!fullData || fullData.length === 0) return;
+    const currentTime = replayTimeRef.current ?? 0;
+    
+    let prevBar = null;
+    for (let i = fullData.length - 1; i >= 0; i--) {
+        if (fullData[i].timestamp < currentTime) {
+            prevBar = fullData[i];
+            break;
+        }
+    }
+    
+    if (prevBar) {
+      replayTimeRef.current = prevBar.timestamp;
+      replayPriceRef.current = prevBar.close;
+      onReplayPriceChangeRef.current?.(prevBar.close);
+      if (onPriceUpdate) onPriceUpdate(prevBar.close, prevBar.timestamp, prevBar);
+      onReplayTimeChangeRef.current?.(prevBar.timestamp);
+      
+      // Request full reload to correctly wipe future bars, but without UI flicker
+      isRewindingRef.current = true;
+      onReplayReload?.();
+    }
+  }, [replayPrevStepTrigger]);
   // Reload data when stock, timeframe, or replay state changes
   useEffect(() => {
     activeTimeframeRef.current = activeTimeframe;
@@ -5884,32 +5921,39 @@ export const ChartArea = ({
       timespan = 'month';
     }
     const loadData = async () => {
-      setIsLoading(true);
+      if (!isRewindingRef.current) {
+        setIsLoading(true);
+      }
       const cacheKey = `${selectedStock.symbol}-${activeTimeframe}`;
       const intervalMs = timeframeToMs(activeTimeframe);
       const currentReplayTime = replayTimeRef.current;
       let allData: KLineData[] = [];
       // Láº¥y dá»¯ liá»‡u náº¿n tháº­t tá»« táº¥t cáº£ cĂ¡c sĂ n (BingX cho VĂ ng/Forex/HĂ ng hĂ³a/Cá»• phiáº¿u, Binance cho Crypto)
-      try {
-        if (isReplaying && currentReplayTime) {
-          const targetEndTime = Math.min(Date.now(), currentReplayTime + 300 * intervalMs);
-          allData = await fetchUnifiedKlines({
-            symbol: selectedStock.symbol,
-            timeframe: activeTimeframe,
-            limit: 1000,
-            isFutures: selectedStock.isFutures,
-            endTime: targetEndTime,
-          });
-        } else {
-          allData = await fetchUnifiedKlines({
-            symbol: selectedStock.symbol,
-            timeframe: activeTimeframe,
-            limit: 1000,
-            isFutures: selectedStock.isFutures,
-          });
+      if (isRewindingRef.current) {
+        allData = dataCache.get(cacheKey) || [];
+        isRewindingRef.current = false;
+      } else {
+        try {
+          if (isReplaying && currentReplayTime) {
+            const targetEndTime = Math.min(Date.now(), currentReplayTime + 300 * intervalMs);
+            allData = await fetchUnifiedKlines({
+              symbol: selectedStock.symbol,
+              timeframe: activeTimeframe,
+              limit: 1000,
+              isFutures: selectedStock.isFutures,
+              endTime: targetEndTime,
+            });
+          } else {
+            allData = await fetchUnifiedKlines({
+              symbol: selectedStock.symbol,
+              timeframe: activeTimeframe,
+              limit: 1000,
+              isFutures: selectedStock.isFutures,
+            });
+          }
+        } catch (error) {
+          allData = [];
         }
-      } catch (error) {
-        allData = [];
       }
       // Náº¾U allData rá»—ng (hoáº·c thá»‹ trÆ°á»ng khĂ´ng pháº£i Crypto, hoáº·c API lá»—i)
       if (!allData || allData.length === 0) {
@@ -6298,7 +6342,7 @@ export const ChartArea = ({
             const cleanPrice = Number(newPrice.toFixed(p));
             currentTpRef.current = cleanPrice;
             const orderP = currentOrderPriceRef.current || previewTPSL?.orderPrice || selectedStock.price;
-            
+
             const isTpProfit = side === 'LONG' ? cleanPrice >= orderP : cleanPrice <= orderP;
             const newTpColor = isTpProfit ? '#089981' : '#f23645';
             const newTpZoneColor = isTpProfit ? 'rgba(8, 153, 129, 0.1)' : 'rgba(242, 54, 69, 0.1)';
@@ -6692,7 +6736,7 @@ export const ChartArea = ({
         }
         try {
           activeChart.removeOverlay({ name: 'aiCorrectionZone' });
-        } catch (_) {}
+        } catch (_) { }
       } catch (err) {
         console.error('Error clearing drawings from chart:', err);
       }
@@ -6764,7 +6808,7 @@ export const ChartArea = ({
             const currentPrice = selectedStock?.price || 0;
             overlays.forEach((ov: any) => {
               if (!isUserDrawingOverlay(ov)) return;
-              
+
               // Validate overlay points against current symbol price to prevent cross-symbol contamination
               if (currentPrice > 0 && Array.isArray(ov.points) && ov.points.length > 0) {
                 const hasValidPrice = ov.points.some((p: any) => {
@@ -6827,7 +6871,22 @@ export const ChartArea = ({
     <div
       className="flex-1 flex flex-col min-h-0 relative transition-colors"
       style={bgStyle}
-      onMouseMove={(e) => { mousePosRef.current = { x: e.clientX, y: e.clientY }; }}
+      onMouseMove={(e) => { 
+        mousePosRef.current = { x: e.clientX, y: e.clientY }; 
+        if (isSelectingReplayStart && cutOverlayRef.current && scissorsIconRef.current) {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          cutOverlayRef.current.style.display = 'block';
+          cutOverlayRef.current.style.left = `${x}px`;
+          scissorsIconRef.current.style.top = `${y}px`;
+        }
+      }}
+      onMouseLeave={() => {
+        if (isSelectingReplayStart && cutOverlayRef.current) {
+          cutOverlayRef.current.style.display = 'none';
+        }
+      }}
     >
       {/* Watermark overlay */}
       {chartSettings.canvas.watermarkVal !== 'Hidden' && (
@@ -6904,7 +6963,7 @@ export const ChartArea = ({
               handleUpdateOverlayConfig({ lineWidth: nextWidth });
             }}
             className="px-1.5 py-0.5 rounded hover:bg-[#2a2e39] text-[#787b86] hover:text-white font-mono flex items-center gap-1 transition-colors"
-            title="Äá»™ dĂ y Ä‘Æ°á»ng káº»"
+            title="Độ dày đường kẻ"
           >
             <span>—</span>
             <span>{selectedOverlay.extendData?.lineWidth || 1}px</span>
@@ -6918,7 +6977,7 @@ export const ChartArea = ({
               ? 'text-blue-400 bg-blue-500/10'
               : 'text-[#787b86] hover:text-white hover:bg-[#2a2e39]'
               }`}
-            title="Báº­t/Táº¯t tĂ´ mĂ u ná»n"
+            title="Bật/Tắt tô màu nền"
           >
             <Layers className="w-4 h-4" />
           </button>
@@ -6927,10 +6986,10 @@ export const ChartArea = ({
           <button
             onClick={() => setIsFibModalOpen(true)}
             className="p-1.5 rounded hover:bg-blue-600/20 text-blue-400 hover:text-blue-300 transition-colors font-medium flex items-center gap-1.5"
-            title="CĂ i Ä‘áº·t thĂ´ng sá»‘ sá»‘ liá»‡u Fibonacci"
+            title="Cài đặt thông số số liệu Fibonacci"
           >
             <Settings className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold">Chá»‰nh sá»‘ liá»‡u</span>
+            <span className="text-[11px] font-semibold">Chỉnh số liệu</span>
           </button>
           <div className="w-px h-4 bg-[#2a2e39]" />
           {/* Lock button */}
@@ -6943,7 +7002,7 @@ export const ChartArea = ({
             }}
             className={`p-1.5 rounded transition-colors ${selectedOverlay.lock ? 'text-amber-400 bg-amber-500/10' : 'text-[#787b86] hover:text-white hover:bg-[#2a2e39]'
               }`}
-            title={selectedOverlay.lock ? 'Mở khóa' : 'Khóa vá»‹ trĂ­'}
+            title={selectedOverlay.lock ? 'Mở khóa' : 'Khóa vị trí'}
           >
             {selectedOverlay.lock ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
           </button>
@@ -6987,7 +7046,22 @@ export const ChartArea = ({
       />
       {/* Selection Mode Overlay / Indicator */}
       {isSelectingReplayStart && (
-        <div className="absolute inset-0 border-4 border-blue-500/30 pointer-events-none rounded transition-all animate-pulse z-10" />
+        <>
+          <div className="absolute inset-0 border-4 border-blue-500/30 pointer-events-none rounded transition-all animate-pulse z-10" />
+          <div 
+            ref={cutOverlayRef}
+            className="absolute top-0 bottom-0 right-0 pointer-events-none z-20 bg-[#2962ff]/20 border-l-2 border-dashed border-[#2962ff]"
+            style={{ display: 'none' }}
+          >
+            <div 
+              ref={scissorsIconRef}
+              className="absolute left-0 -translate-x-1/2 bg-[#2962ff] text-white p-1 rounded-full shadow-lg"
+              style={{ top: '50%', transform: 'translate(-50%, -50%)' }}
+            >
+              <Scissors className="w-4 h-4" />
+            </div>
+          </div>
+        </>
       )}
       {/* Floating Toolbar for Overlays */}
       {floatingToolbar && (
@@ -7032,7 +7106,7 @@ export const ChartArea = ({
             </button>
             {/* Color Picker button (pencil with color underline) */}
             <button
-              title="MĂ u sáº¯c vĂ  Äá»™ má»"
+              title="Màu sắc và Độ mờ"
               onClick={() => setOverlayPopup(prev => prev === 'color' ? null : 'color')}
               className={`p-1.5 rounded transition-colors relative flex flex-col items-center justify-center ${overlayPopup === 'color' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500' : 'text-[#787b86] hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] hover:text-[#1e2329] dark:hover:text-[#d1d4dc]'}`}
             >
@@ -7041,7 +7115,7 @@ export const ChartArea = ({
             </button>
             {/* Text button / Ghi tĂªn (T icon) */}
             <button
-              title="CĂ i Ä‘áº·t vÄƒn báº£n / Ghi tĂªn"
+              title="Cài đặt văn bản / Ghi tên"
               onClick={() => {
                 if (floatingToolbar?.overlay) {
                   onOverlayDoubleClickRef.current?.(floatingToolbar.overlay, 'text');
@@ -7054,7 +7128,7 @@ export const ChartArea = ({
             </button>
             {/* Line Width button (e.g. 2px) */}
             <button
-              title="Äá»™ dĂ y nĂ©t"
+              title="Độ dày nét"
               onClick={() => setOverlayPopup(prev => prev === 'width' ? null : 'width')}
               className={`px-2 py-1 text-xs font-mono font-semibold rounded transition-colors ${overlayPopup === 'width' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500' : 'text-[#787b86] hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] hover:text-[#1e2329] dark:hover:text-[#d1d4dc]'}`}
             >
@@ -7062,7 +7136,7 @@ export const ChartArea = ({
             </button>
             {/* Line Style button */}
             <button
-              title="Kiá»ƒu nĂ©t"
+              title="Kiểu nét"
               onClick={() => setOverlayPopup(prev => prev === 'style' ? null : 'style')}
               className={`p-1.5 rounded transition-colors font-mono font-bold text-xs ${overlayPopup === 'style' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500' : 'text-[#787b86] hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] hover:text-[#1e2329] dark:hover:text-[#d1d4dc]'}`}
             >
@@ -7096,7 +7170,7 @@ export const ChartArea = ({
             </button>
             {/* More options (...) */}
             <button
-              title="TĂ¹y chá»n khĂ¡c"
+              title="Tùy chọn khác"
               onClick={() => setOverlayPopup(prev => prev === 'context' ? null : 'context')}
               className={`p-1.5 rounded transition-colors ${overlayPopup === 'context' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500' : 'text-[#787b86] hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] hover:text-[#1e2329] dark:hover:text-[#d1d4dc]'}`}
             >
@@ -7316,7 +7390,7 @@ export const ChartArea = ({
                       }}
                       className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc] border-t border-[#e6e8ea] dark:border-[#2a2e39]"
                     >
-                      {t('ctx.applyDefault', 'Ăp dá»¥ng Máº·c Ä‘á»‹nh')}
+                      {t('ctx.applyDefault', 'Áp dụng Mặc định')}
                     </button>
                   </div>
                 )}
@@ -7343,7 +7417,7 @@ export const ChartArea = ({
                       }}
                       className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc]"
                     >
-                      {t('ctx.bringToFront', 'ÄÆ°a lĂªn phĂ­a trÆ°á»›c')}
+                      {t('ctx.bringToFront', 'Đưa lên phía trước')}
                     </button>
                     <button
                       onClick={() => {
@@ -7352,7 +7426,7 @@ export const ChartArea = ({
                       }}
                       className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc]"
                     >
-                      {t('ctx.sendToBack', 'Gá»­i vá» sau')}
+                      {t('ctx.sendToBack', 'Gửi về sau')}
                     </button>
                     <button
                       onClick={() => {
@@ -7361,7 +7435,7 @@ export const ChartArea = ({
                       }}
                       className="w-full text-left px-4 py-2 hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] text-[#1e2329] dark:text-[#d1d4dc]"
                     >
-                      {t('ctx.bringForward', 'ÄÆ°a lĂªn trĂªn')}
+                      {t('ctx.bringForward', 'Đưa lên trên')}
                     </button>
                     <button
                       onClick={() => {
