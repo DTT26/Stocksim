@@ -1769,7 +1769,11 @@ export const AiTutorDrawer = ({
                           {inspectResult.suggestedZone.name || (isEn ? 'Optimal Swing Order Block' : 'Vùng Order Block Chuẩn Xác')}
                         </span>
                         <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
-                          ${inspectResult.suggestedZone.priceLow?.toLocaleString('en-US')} — ${inspectResult.suggestedZone.priceHigh?.toLocaleString('en-US')}
+                          {inspectResult.suggestedZone.isLine || 
+                           inspectResult.suggestedZone.type?.toUpperCase().includes('CISD') || 
+                           inspectResult.suggestedZone.priceLow === inspectResult.suggestedZone.priceHigh
+                            ? `$${(inspectResult.suggestedZone.price ?? inspectResult.suggestedZone.priceHigh)?.toLocaleString('en-US')}`
+                            : `$${inspectResult.suggestedZone.priceLow?.toLocaleString('en-US')} — ${inspectResult.suggestedZone.priceHigh?.toLocaleString('en-US')}`}
                         </span>
                       </div>
                       {inspectResult.suggestedZone.explanation && (

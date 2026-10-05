@@ -693,6 +693,14 @@ router.post('/explain-concept', async (req: Request, res: Response) => {
 router.post('/analyze-trade', async (req: Request, res: Response) => {
   try {
     let payload = { ...req.body };
+    if (!payload.accountBalance && (req as any).user?._id) {
+      try {
+        const wallet = await Wallet.findOne({ userId: (req as any).user._id });
+        if (wallet && wallet.availableBalance) {
+          payload.accountBalance = wallet.availableBalance;
+        }
+      } catch (err) {}
+    }
     if (payload.orderId) {
       const order = await Order.findById(payload.orderId);
       if (order) {

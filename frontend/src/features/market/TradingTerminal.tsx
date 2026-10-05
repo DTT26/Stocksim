@@ -1587,6 +1587,8 @@ export const TradingTerminal = () => {
                 <PositionsManager currentPrice={selectedStock.price} />
               ) : (
                 <BottomPanel
+                  balance={balance}
+                  totalEquity={totalEquity}
                   positions={positions as any}
                   pendingOrders={pendingOrders}
                   selectedSymbol={selectedStock.symbol}

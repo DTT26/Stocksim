@@ -32,6 +32,7 @@ export interface TradeAnalysisSummary {
   stopLoss?: number;
   takeProfit?: number;
   quantity: number;
+  accountBalance?: number;
   pnl: number;
   returnPct: number;
   plannedRR: string;
@@ -50,21 +51,67 @@ export interface TradeAnalysisSummary {
   timeframe?: string;
   strategy?: string;
   duration?: string;
+  tier?: string;
+  tierLabel?: string;
+  tierAction?: string;
+  recommendationBadge?: string;
+}
+
+export interface RubricSubItem {
+  id: string;
+  name: string;
+  score: number;
+  max: number;
+  status: 'PASS' | 'WARN' | 'FAIL';
+  detail: string;
 }
 
 export interface RubricItem {
   score: number;
   max: number;
   label: string;
+  items?: RubricSubItem[];
+}
+
+export interface TimeframeHierarchyItem {
+  timeframe: string;
+  title: string;
+  role: string;
+  bias?: string;
+  zone?: string;
+  poi?: string;
+  dol?: string;
+  sweep?: string;
+  structure?: string;
+  pdArray?: string;
+  slRefinement?: string;
+  smtStatus?: string;
+  macroWindow?: string;
+}
+
+export interface TimeframeHierarchy {
+  htfD1W1: TimeframeHierarchyItem;
+  mtfH4H1: TimeframeHierarchyItem;
+  ltfM15M5: TimeframeHierarchyItem;
+  microM1M3: TimeframeHierarchyItem;
 }
 
 export interface RubricBreakdown {
+  htfContext?: RubricItem;
+  timeAndSmt?: RubricItem;
+  sweepAndDisplacement?: RubricItem;
+  entryAndRisk?: RubricItem;
+  planAndDiscipline?: RubricItem;
+  // Legacy aliases
   setupValidation: RubricItem;
   riskManagement: RubricItem;
   entryDiscipline: RubricItem;
   exitPlanning: RubricItem;
   tradeReasoning: RubricItem;
   total: number;
+  tier?: 'A+' | 'B' | 'C' | 'F';
+  tierLabel?: string;
+  tierAction?: string;
   disclaimer: string;
 }
 
@@ -80,6 +127,7 @@ export interface ExcursionFlow {
   maePts: number;
   maeR: string;
   currentOrExit: number;
+  exitPrice?: number;
   mfePrice: number;
   mfePts: number;
   mfeR: string;
@@ -89,6 +137,7 @@ export interface ExcursionFlow {
 export interface TradeReviewData {
   summary: TradeAnalysisSummary;
   rubricScore?: RubricBreakdown;
+  timeframeHierarchy?: TimeframeHierarchy;
   marketContext: {
     timeframe: string;
     higherTimeframeTrend?: string;
