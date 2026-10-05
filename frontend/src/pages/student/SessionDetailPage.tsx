@@ -10,10 +10,12 @@ import { BreakdownTab } from '../../features/journal/components/BreakdownTab';
 import { TradesTab } from '../../features/journal/components/TradesTab';
 import { JournalSkeleton } from '../../features/journal/components/JournalSkeleton';
 import { JournalErrorState } from '../../features/journal/components/JournalErrorState';
+import { useI18n } from '../../contexts/I18nContext';
 
 export const SessionDetailPage: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const { lang } = useI18n();
 
   const [session, setSession] = useState<JournalSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,8 +63,8 @@ export const SessionDetailPage: React.FC = () => {
   if (error || !session) {
     return (
       <JournalErrorState
-        title="Không tìm thấy phiên giao dịch"
-        message="Phiên giao dịch được yêu cầu không thể tải hoặc không tồn tại."
+        title={lang === 'vi' ? 'Không tìm thấy phiên giao dịch' : 'Trading session not found'}
+        message={lang === 'vi' ? 'Phiên giao dịch được yêu cầu không thể tải hoặc không tồn tại.' : 'The requested trading session could not be loaded or does not exist.'}
         onRetry={() => navigate('/student/journal')}
       />
     );

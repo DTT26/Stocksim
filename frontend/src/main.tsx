@@ -17,15 +17,15 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
         <ThemeProvider>
-          <AuthProvider>
-            <AlertProvider>
-              <ModalProvider>
-                <I18nProvider>
+          <I18nProvider>
+            <AuthProvider>
+              <AlertProvider>
+                <ModalProvider>
                   <App />
-                </I18nProvider>
-              </ModalProvider>
-            </AlertProvider>
-          </AuthProvider>
+                </ModalProvider>
+              </AlertProvider>
+            </AuthProvider>
+          </I18nProvider>
         </ThemeProvider>
       </GoogleOAuthProvider>
     </BrowserRouter>

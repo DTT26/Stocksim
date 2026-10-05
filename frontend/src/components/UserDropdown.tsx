@@ -3,6 +3,7 @@ import { LogOut, LayoutDashboard, Trophy } from 'lucide-react';
 import { googleLogout } from '@react-oauth/google';
 import { Link } from 'react-router-dom';
 import { UserAvatar } from './UserAvatar';
+import { useI18n } from '../contexts/I18nContext';
 
 interface User {
   name: string;
@@ -31,6 +32,7 @@ export const UserDropdown = ({
 }: UserDropdownProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { lang } = useI18n();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -81,15 +83,15 @@ export const UserDropdown = ({
                 <Trophy className="w-3.5 h-3.5" />
               </div>
               <div>
-                <span className="text-[10px] text-gray-500 dark:text-[#787b86] block font-medium">Hạng tài khoản đạt được</span>
+                <span className="text-[10px] text-gray-500 dark:text-[#787b86] block font-medium">{lang === 'vi' ? 'Hạng tài khoản đạt được' : 'Account rank achieved'}</span>
                 <span className="font-bold text-xs text-amber-600 dark:text-amber-300">
-                  {accountRankName || 'Cấp 1 - Tập Sự'}
+                  {accountRankName || (lang === 'vi' ? 'Cấp 1 - Tập Sự' : 'Level 1 - Beginner')}
                 </span>
               </div>
             </div>
             {certCount !== undefined && certCount > 0 && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/20 dark:border-amber-500/30 text-amber-700 dark:text-amber-300 font-bold">
-                {certCount}/6 Bằng
+                {certCount}/6 {lang === 'vi' ? 'Bằng' : 'Certs'}
               </span>
             )}
           </div>
@@ -98,7 +100,7 @@ export const UserDropdown = ({
           <div className="py-1 border-b border-gray-100 dark:border-[#2a2e39]">
             <Link to={dashboardRoute} className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#2a2e39] flex items-center gap-3 transition-colors text-blue-600 dark:text-blue-400 font-medium">
               <LayoutDashboard className="w-4 h-4" />
-              <span>Trang tổng quan</span>
+              <span>{lang === 'vi' ? 'Trang tổng quan' : 'Dashboard'}</span>
             </Link>
           </div>
 
@@ -108,7 +110,7 @@ export const UserDropdown = ({
               className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#2a2e39] flex items-center gap-3 transition-colors text-red-600 dark:text-red-400"
             >
               <LogOut className="w-4 h-4" />
-              <span>Đăng xuất</span>
+              <span>{lang === 'vi' ? 'Đăng xuất' : 'Log out'}</span>
             </button>
           </div>
         </div>

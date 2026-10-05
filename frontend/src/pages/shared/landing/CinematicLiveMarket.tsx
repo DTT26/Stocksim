@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, TrendingDown, Activity, ArrowUpRight, ArrowDownRight, Layers, BarChart3, Clock, DollarSign } from 'lucide-react';
 import { FEATURED_STOCKS, type FeaturedStockData } from './mockData';
+import { useI18n } from '../../../contexts/I18nContext';
 
 export const CinematicLiveMarket: React.FC = () => {
+  const { lang, t } = useI18n();
   const [selectedStock, setSelectedStock] = useState<FeaturedStockData>(FEATURED_STOCKS[0]);
   const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
 
@@ -91,7 +93,7 @@ export const CinematicLiveMarket: React.FC = () => {
                         {selectedStock.name}
                       </span>
                       <span className="text-[10px] font-mono text-blue-400 uppercase tracking-widest px-2 py-0.5 rounded bg-blue-950/40 border border-blue-800/40">
-                        NASDAQ • CỔ PHIẾU MỸ
+                        NASDAQ • {lang === 'vi' ? 'CỔ PHIẾU MỸ' : 'US STOCKS'}
                       </span>
                     </div>
 
@@ -115,19 +117,19 @@ export const CinematicLiveMarket: React.FC = () => {
                   {/* Telemetry quick glance */}
                   <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-right font-mono text-xs">
                     <div>
-                      <div className="text-[10px] text-slate-500 uppercase">Khối lượng 24h</div>
+                      <div className="text-[10px] text-slate-500 uppercase">{t('home.volume24h', 'KHỐI LƯỢNG 24H')}</div>
                       <div className="font-semibold text-slate-200">{selectedStock.volume}</div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-slate-500 uppercase">Vốn hóa TT</div>
+                      <div className="text-[10px] text-slate-500 uppercase">{t('home.marketCap', 'VỐN HÓA TT')}</div>
                       <div className="font-semibold text-slate-200">{selectedStock.marketCap}</div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-slate-500 uppercase">Chỉ số P/E</div>
+                      <div className="text-[10px] text-slate-500 uppercase">{t('home.peRatio', 'CHỈ SỐ P/E')}</div>
                       <div className="font-semibold text-slate-200">{selectedStock.peRatio}</div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-slate-500 uppercase">Đỉnh trong ngày</div>
+                      <div className="text-[10px] text-slate-500 uppercase">{t('home.dayHigh', 'ĐỈNH TRONG NGÀY')}</div>
                       <div className="font-semibold text-slate-200">${maxPrice.toFixed(2)}</div>
                     </div>
                   </div>
@@ -139,17 +141,17 @@ export const CinematicLiveMarket: React.FC = () => {
                   {hoveredPointIndex !== null && (
                     <div className="absolute top-4 left-6 z-20 font-mono text-xs bg-[#0F172A]/90 border border-blue-500/40 rounded px-3 py-1.5 flex items-center gap-4 text-slate-200 shadow-lg">
                       <div>
-                        <span className="text-slate-400 text-[10px]">GIỜ: </span>
+                        <span className="text-slate-400 text-[10px]">{t('home.time', 'GIỜ:')} </span>
                         <span className="font-bold text-white">{activePoint.time}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 text-[10px]">GIÁ: </span>
+                        <span className="text-slate-400 text-[10px]">{lang === 'vi' ? 'GIÁ:' : 'PRICE:'} </span>
                         <span className={`font-bold ${isUp ? 'text-emerald-400' : 'text-rose-400'}`}>
                           ${activePoint.price.toFixed(2)}
                         </span>
                       </div>
                       <div>
-                        <span className="text-slate-400 text-[10px]">KL: </span>
+                        <span className="text-slate-400 text-[10px]">{lang === 'vi' ? 'KL:' : 'VOL:'} </span>
                         <span className="text-blue-400 font-bold">{activePoint.volume}K</span>
                       </div>
                     </div>
@@ -240,8 +242,8 @@ export const CinematicLiveMarket: React.FC = () => {
           {/* RIGHT: COMPACT INTERACTIVE STOCK WATCHLIST ROWS */}
           <div className="lg:col-span-4 space-y-2">
             <div className="flex items-center justify-between text-xs font-mono text-slate-400 px-2 pb-1">
-              <span>DANH MỤC CỔ PHIẾU HÀNG ĐẦU</span>
-              <span className="text-[10px] text-blue-400">RÊ CHUỘT ĐỂ XEM CHI TIẾT</span>
+              <span>{t('home.topStocks', 'DANH MỤC CỔ PHIẾU HÀNG ĐẦU')}</span>
+              <span className="text-[10px] text-blue-400">{t('home.hoverDetail', 'RÊ CHUỘT ĐỂ XEM CHI TIẾT')}</span>
             </div>
 
             <div className="space-y-2">

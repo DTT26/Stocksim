@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useI18n } from '../../contexts/I18nContext';
 import { journalService } from '../../services/journalService';
 import type { JournalSession, JournalFilterState, JournalSummaryStats } from '../../features/journal/types/journalTypes';
 import { JournalHeader } from '../../features/journal/components/JournalHeader';
@@ -13,6 +14,7 @@ import { JournalErrorState } from '../../features/journal/components/JournalErro
 
 export const StudentJournal: React.FC = () => {
   const { user } = useAuth();
+  const { lang } = useI18n();
   const navigate = useNavigate();
 
   const [sessions, setSessions] = useState<JournalSession[]>([]);
@@ -186,16 +188,16 @@ export const StudentJournal: React.FC = () => {
         ) : (
           <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-10 text-center">
             <h4 className="text-base font-bold text-slate-800 dark:text-white">
-              No sessions match the selected filters
+              {lang === 'vi' ? 'Không có phiên nào phù hợp với bộ lọc' : 'No sessions match the selected filters'}
             </h4>
             <p className="text-xs text-slate-400 mt-1 mb-4">
-              Try choosing "All Simulations" or resetting your search filters.
+              {lang === 'vi' ? 'Thử chọn "Tất cả kỳ thi" hoặc đặt lại bộ lọc tìm kiếm.' : 'Try choosing "All Simulations" or resetting your search filters.'}
             </p>
             <button
               onClick={handleResetFilters}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
             >
-              Reset Filters
+              {lang === 'vi' ? 'Đặt lại bộ lọc' : 'Reset Filters'}
             </button>
           </div>
         )

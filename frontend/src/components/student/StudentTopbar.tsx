@@ -3,10 +3,12 @@ import {
   Search, Bell, Menu, X, ChevronDown, Sun, Moon, 
   CheckCircle2, AlertCircle, AlertTriangle, BookOpen, 
   Award, UserPlus, UserMinus, CheckCheck, Clock, Check,
-  Crown, Sparkles
+  Crown, Sparkles, Globe
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useI18n } from '../../contexts/I18nContext';
+import { LanguageModal } from '../LanguageModal';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserAvatar } from '../UserAvatar';
 import { useNotificationStore, type AppNotification } from '../../stores/useNotificationStore';
@@ -21,11 +23,13 @@ interface StudentTopbarProps {
 export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { lang, setLang, t } = useI18n();
   const navigate = useNavigate();
   const isDarkMode = theme === 'dark';
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -90,15 +94,15 @@ export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps)
     const date = new Date(timeStr);
     const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
 
-    if (diffSec < 60) return 'Vừa xong';
+    if (diffSec < 60) return lang === 'vi' ? 'Vừa xong' : 'Just now';
     const diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) return `${diffMin} phút trước`;
+    if (diffMin < 60) return lang === 'vi' ? `${diffMin} phút trước` : `${diffMin}m ago`;
     const diffHour = Math.floor(diffMin / 60);
-    if (diffHour < 24) return `${diffHour} giờ trước`;
+    if (diffHour < 24) return lang === 'vi' ? `${diffHour} giờ trước` : `${diffHour}h ago`;
     const diffDay = Math.floor(diffHour / 24);
-    if (diffDay === 1) return 'Hôm qua';
-    if (diffDay < 7) return `${diffDay} ngày trước`;
-    return date.toLocaleDateString('vi-VN');
+    if (diffDay === 1) return lang === 'vi' ? 'Hôm qua' : 'Yesterday';
+    if (diffDay < 7) return lang === 'vi' ? `${diffDay} ngày trước` : `${diffDay}d ago`;
+    return date.toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US');
   };
 
   const getNotificationIcon = (type: string) => {
@@ -177,7 +181,7 @@ export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps)
           </div>
           <input 
             type="text" 
-            placeholder="Tìm kiếm kỳ thi, bài tập..." 
+            placeholder={t('dash.searchPlaceholder', 'Tìm kiếm kỳ thi, bài tập...')}
             className="w-full bg-slate-100 dark:bg-[#172033] border border-slate-200 dark:border-[#253047] text-slate-900 dark:text-white text-sm rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-[#172033] focus:ring-1 focus:ring-indigo-500 transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
         </div>
@@ -197,7 +201,7 @@ export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps)
             title="Nâng cấp lên gói AI Tutor PRO để nhận 500 lượt hỏi/ngày qua PayOS"
           >
             <Crown className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Nâng cấp PRO</span>
+            <span className="hidden sm:inline">{t('dash.proUpgrade', 'Nâng cấp PRO')}</span>
             <span className="sm:hidden">PRO</span>
           </button>
         )}
@@ -206,9 +210,19 @@ export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps)
         <button 
           onClick={toggleTheme}
           className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#172033] rounded-lg transition-colors cursor-pointer"
-          title={isDarkMode ? "Chuyển sang giao diện Sáng" : "Chuyển sang giao diện Tối"}
+          title={isDarkMode ? (lang === 'vi' ? "Chuyển sang giao diện Sáng" : "Switch to Light Mode") : (lang === 'vi' ? "Chuyển sang giao diện Tối" : "Switch to Dark Mode")}
         >
           {isDarkMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+        </button>
+
+        {/* Language Switcher Button */}
+        <button
+          onClick={() => setIsLanguageModalOpen(true)}
+          className="flex items-center gap-1 p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#172033] rounded-lg transition-colors cursor-pointer"
+          title={lang === 'vi' ? 'Đổi ngôn ngữ' : 'Change language'}
+        >
+          <Globe className="w-5 h-5 text-indigo-500" />
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{lang.toUpperCase()}</span>
         </button>
 
         {/* Notifications */}
@@ -221,7 +235,7 @@ export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps)
               if (nextState) fetchNotifications();
             }}
             className="relative p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#172033] rounded-lg transition-colors cursor-pointer"
-            title="Thông báo"
+            title={lang === 'vi' ? 'Thông báo' : 'Notifications'}
           >
             <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
@@ -235,10 +249,12 @@ export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps)
             <div className="absolute right-0 mt-2 w-84 sm:w-96 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-[#172033] rounded-2xl shadow-2xl border border-slate-200 dark:border-[#253047] overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
               <div className="p-3.5 px-4 border-b border-slate-200 dark:border-[#253047] flex justify-between items-center bg-slate-50/80 dark:bg-[#111827]/80 backdrop-blur-xs">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-sm text-slate-900 dark:text-white">Thông báo</h3>
+                  <h3 className="font-semibold text-sm text-slate-900 dark:text-white">
+                    {lang === 'vi' ? 'Thông báo' : 'Notifications'}
+                  </h3>
                   {unreadCount > 0 && (
                     <span className="px-2 py-0.5 text-[11px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300 rounded-full">
-                      {unreadCount} mới
+                      {lang === 'vi' ? `${unreadCount} mới` : `${unreadCount} new`}
                     </span>
                   )}
                 </div>
@@ -248,7 +264,7 @@ export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps)
                     className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium cursor-pointer flex items-center gap-1 transition-colors"
                   >
                     <Check className="w-3.5 h-3.5" />
-                    Đánh dấu đã đọc
+                    {lang === 'vi' ? 'Đánh dấu đã đọc' : 'Mark all as read'}
                   </button>
                 )}
               </div>
@@ -287,7 +303,7 @@ export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps)
                           </span>
                           {notification.link && (
                             <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                              Xem chi tiết &rarr;
+                              {lang === 'vi' ? 'Xem chi tiết →' : 'View details →'}
                             </span>
                           )}
                         </div>
@@ -299,9 +315,11 @@ export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps)
                     <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center mb-2.5 text-slate-400">
                       <Bell className="w-6 h-6 stroke-[1.5]" />
                     </div>
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Không có thông báo mới</p>
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      {lang === 'vi' ? 'Không có thông báo mới' : 'No new notifications'}
+                    </p>
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[200px]">
-                      Mọi thông báo về mô phỏng và bài tập sẽ xuất hiện tại đây.
+                      {lang === 'vi' ? 'Mọi thông báo về mô phỏng và bài tập sẽ xuất hiện tại đây.' : 'All simulation and assignment notifications will appear here.'}
                     </p>
                   </div>
                 )}
@@ -316,7 +334,7 @@ export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps)
                     }}
                     className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer transition-colors"
                   >
-                    Xem tất cả bài tập &rarr;
+                    {lang === 'vi' ? 'Xem tất cả bài tập →' : 'View all assignments →'}
                   </button>
                 </div>
               )}
@@ -334,13 +352,13 @@ export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps)
           >
             <UserAvatar 
               src={user?.picture} 
-              name={user?.name || 'Học viên'} 
+              name={user?.name || (lang === 'vi' ? 'Học viên' : 'Student')} 
               size="w-8 h-8" 
               className="border border-slate-200 dark:border-[#253047]" 
             />
             <div className="hidden sm:block text-left">
-              <p className="text-sm font-medium text-slate-900 dark:text-white line-clamp-1">{user?.name || 'Học viên'}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Học viên</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-white line-clamp-1">{user?.name || (lang === 'vi' ? 'Học viên' : 'Student')}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{lang === 'vi' ? 'Học viên' : 'Student'}</p>
             </div>
             <ChevronDown className="w-4 h-4 text-slate-400 hidden sm:block" />
           </button>
@@ -353,12 +371,12 @@ export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps)
               </div>
               <div className="p-2">
                 <Link to="/student/profile" onClick={() => setShowProfileMenu(false)} className="block px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors">
-                  Hồ sơ cá nhân
+                  {lang === 'vi' ? 'Hồ sơ cá nhân' : 'My Profile'}
                 </Link>
               </div>
               <div className="p-2 border-t border-slate-200 dark:border-[#253047]">
                 <button onClick={() => logout()} className="w-full text-left px-3 py-2 text-sm text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer">
-                  Đăng xuất
+                  {lang === 'vi' ? 'Đăng xuất' : 'Log out'}
                 </button>
               </div>
             </div>
@@ -366,6 +384,13 @@ export const StudentTopbar = ({ mobileOpen, setMobileOpen }: StudentTopbarProps)
         </div>
       </div>
     </header>
+
+    <LanguageModal
+      isOpen={isLanguageModalOpen}
+      onClose={() => setIsLanguageModalOpen(false)}
+      currentLanguage={lang.toUpperCase()}
+      onSelectLanguage={(val: string) => setLang(val.toLowerCase() as any)}
+    />
 
     <UpgradeProModal
       isOpen={isUpgradeModalOpen}

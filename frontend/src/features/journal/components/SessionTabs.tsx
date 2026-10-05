@@ -1,5 +1,6 @@
 import React from 'react';
 import { LayoutDashboard, LineChart, PieChart, ListFilter } from 'lucide-react';
+import { useI18n } from '../../../contexts/I18nContext';
 
 export type JournalTabId = 'overview' | 'analysis' | 'breakdown' | 'trades';
 
@@ -14,25 +15,27 @@ export const SessionTabs: React.FC<SessionTabsProps> = ({
   onChangeTab,
   tradesCount
 }) => {
+  const { t } = useI18n();
+
   const tabs: { id: JournalTabId; label: string; icon: React.ReactNode; count?: number }[] = [
     {
       id: 'overview',
-      label: 'Tổng quan',
+      label: t('journal.tabOverview', 'Tổng quan'),
       icon: <LayoutDashboard className="w-4 h-4" />
     },
     {
       id: 'analysis',
-      label: 'Phân tích',
+      label: t('journal.tabAnalysis', 'Phân tích'),
       icon: <LineChart className="w-4 h-4" />
     },
     {
       id: 'breakdown',
-      label: 'Chi tiết',
+      label: t('journal.tabBreakdown', 'Chi tiết'),
       icon: <PieChart className="w-4 h-4" />
     },
     {
       id: 'trades',
-      label: 'Lịch sử lệnh',
+      label: t('journal.tabTrades', 'Lịch sử lệnh'),
       icon: <ListFilter className="w-4 h-4" />,
       count: tradesCount
     }
