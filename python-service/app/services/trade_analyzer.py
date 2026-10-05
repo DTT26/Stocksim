@@ -530,7 +530,7 @@ class TradeAnalyzer:
             "htfD1W1": {
                 "timeframe": "D1 / W1",
                 "title": "Khung Cao - HTF Context & Daily Bias",
-                "role": "Xác định xu hướng chính (Bias: Bullish hay Bearish), khung giá đang giao dịch (Dealing Range), phân vùng Premium/Discount (50% Equilibrium) và các trạm cản HTF POI.",
+                "role": "Định hướng Daily Bias, Dealing Range & trạm cản HTF POI.",
                 "bias": "Bullish Bias" if is_buy else "Bearish Bias",
                 "zone": "Discount (Nửa dưới 50% Dealing Range)" if is_buy else "Premium (Nửa trên 50% Dealing Range)",
                 "poi": "HTF Key POI Active" if has_htf_poi else "Cần đối chiếu trạm cản D1/H4"
@@ -538,21 +538,21 @@ class TradeAnalyzer:
             "mtfH4H1": {
                 "timeframe": "H4 / H1",
                 "title": "Khung Trung gian - Liquidity & Draw on Liquidity",
-                "role": "Xác định mục tiêu thanh khoản chính (Draw on Liquidity - DOL) mà giá đang hướng tới (Old Highs/Lows, ERL), các bể thanh khoản chưa bị càn quét (Open Draw) và theo dõi cú quét thanh khoản (Sweep).",
+                "role": "Xác định mục tiêu Draw on Liquidity (DOL) & nhịp Liquidity Sweep.",
                 "dol": f"DOL: {'Old High / BSL' if is_buy else 'Old Low / SSL'} (${tp:,.2f})" if has_tp else "Chưa xác định mục tiêu DOL",
                 "sweep": "Đã quét sạch bể thanh khoản SSL/BSL" if has_sweep else "Chưa xuất hiện Sweep rõ ràng"
             },
             "ltfM15M5": {
                 "timeframe": "M15 / M5",
                 "title": "Khung Cấu Trúc - Structure & Execution",
-                "role": "Tìm tín hiệu dịch chuyển giá mạnh mẽ (Displacement), xác nhận sự thay đổi cấu trúc (MSS / CHoCH / CISD) và định vị trạm đón PD Array (FVG, Order Block, Breaker, iFVG).",
+                "role": "Bắt nhịp Displacement, xác nhận MSS/CISD & đón tại PD Array.",
                 "structure": "MSS Shift to Bullish" if is_buy else "MSS Shift to Bearish",
                 "pdArray": "PD Array FVG/OB M15 hợp lệ" if has_pd_array else "Chưa đón tại PD Array chuẩn"
             },
             "microM1M3": {
                 "timeframe": "M1 / M3",
                 "title": "Khung Tinh Chỉnh - LTF Entry Refinement",
-                "role": "Tinh chỉnh điểm cắt lỗ (SL) thắt chặt, kiểm tra tín hiệu phân kỳ SMT Divergence và bắt điểm vào lệnh chính xác trong các cửa sổ giờ Macro / Silver Bullet.",
+                "role": "Tinh chỉnh SL thắt chặt, kiểm tra SMT Divergence & khung giờ Kill Zone.",
                 "slRefinement": f"Protected SL tại ${sl:,.2f}" if has_sl else "Thiếu Protected SL",
                 "smtStatus": "SMT Divergence Confirmed" if has_smt else "No SMT",
                 "macroWindow": f"{detected_session}" if timing_hit else "Ngoài khung giờ Kill Zone"
@@ -560,7 +560,7 @@ class TradeAnalyzer:
         }
 
         # ---------------------------------------------------------------------
-        # MARKET STRUCTURE & LIQUIDITY CONTEXT (CỰC KỲ CHI TIẾT VÀ RÕ RÀNG)
+        # MARKET STRUCTURE & LIQUIDITY CONTEXT (SÚC TÍCH, CÔ ĐỌNG, DỄ ĐỌC)
         # ---------------------------------------------------------------------
         swing_ref = round(entry * 1.004 if is_buy else entry * 0.996, 2)
         old_pool_ref = round(sl if has_sl else (entry * 0.992 if is_buy else entry * 1.008), 2)
@@ -568,24 +568,20 @@ class TradeAnalyzer:
 
         ms_title = "MSS Shift to Bullish" if is_buy else "MSS Shift to Bearish"
         ms_detail = (
-            f"Thị trường xác nhận Market Structure Shift (MSS) sang Bullish khi nến Displacement bứt phá vượt qua đỉnh dẫn dắt (Swing High gần nhất tại ${swing_ref:,.2f}), "
-            f"kết thúc chuỗi giảm Lower High → Lower Low. Điểm vào lệnh Buy tại ${entry:,.2f} đón đúng pha hồi (Retracement) về vùng Discount. "
-            f"Cấu trúc tăng được bảo vệ an toàn bởi đáy Invalidation tại ${old_pool_ref:,.2f}."
+            f"Xác nhận MSS Bullish khi nến Displacement bứt phá qua đỉnh dẫn dắt (${swing_ref:,.2f}). "
+            f"Điểm Buy tại ${entry:,.2f} đón đúng nhịp hồi Discount; bảo vệ an toàn bởi đáy Invalidation ${old_pool_ref:,.2f}."
             if is_buy else
-            f"Thị trường xác nhận Market Structure Shift (MSS) sang Bearish khi nến Displacement đâm thủng đáy dẫn dắt (Swing Low gần nhất tại ${swing_ref:,.2f}), "
-            f"kết thúc chuỗi tăng Higher High → Higher Low. Điểm vào lệnh Sell tại ${entry:,.2f} đón đúng pha hồi (Retracement) về vùng Premium. "
-            f"Cấu trúc giảm được bảo vệ an toàn bởi đỉnh Invalidation tại ${old_pool_ref:,.2f}."
+            f"Xác nhận MSS Bearish khi nến Displacement đâm thủng đáy dẫn dắt (${swing_ref:,.2f}). "
+            f"Điểm Sell tại ${entry:,.2f} đón đúng nhịp hồi Premium; bảo vệ an toàn bởi đỉnh Invalidation ${old_pool_ref:,.2f}."
         )
 
         liq_title = "Sell-side Liquidity (SSL) swept" if is_buy else "Buy-side Liquidity (BSL) swept"
         liq_detail = (
-            f"Dòng tiền thông minh đã thực hiện cú đâm râu quét sạch bể thanh khoản bán (Sell-side Liquidity - SSL) bên dưới đáy cũ Old Low tại ${old_pool_ref:,.2f} "
-            f"(kích hoạt toàn bộ Stop Loss của phe Mua cũ) rồi rút chân dứt khoát. Sau khi thanh khoản đáy được dọn sạch, mục tiêu tiếp theo (Draw on Liquidity - DOL) "
-            f"hướng thẳng về bể thanh khoản mua (Buy-side Liquidity - BSL) tại đỉnh ${dol_target_ref:,.2f}."
+            f"Quét sạch bể thanh khoản bán (SSL) dưới đáy cũ ${old_pool_ref:,.2f} rồi rút chân dứt khoát. "
+            f"Mục tiêu kế tiếp (DOL) hướng thẳng về bể thanh khoản mua (BSL) tại đỉnh ${dol_target_ref:,.2f}."
             if is_buy else
-            f"Dòng tiền thông minh đã thực hiện cú đâm râu vượt đỉnh cũ Old High tại ${old_pool_ref:,.2f} để quét sạch Buy-side Liquidity (BSL) "
-            f"(kích hoạt toàn bộ Buy Stop của phe Bán cũ) rồi rút râu đảo chiều mạnh. Sau khi dọn sạch BSL, mục tiêu tiếp theo (Draw on Liquidity - DOL) "
-            f"hướng thẳng về bể thanh khoản bán (Sell-side Liquidity - SSL) tại đáy ${dol_target_ref:,.2f}."
+            f"Quét sạch bể thanh khoản mua (BSL) trên đỉnh cũ ${old_pool_ref:,.2f} rồi rút râu đảo chiều mạnh. "
+            f"Mục tiêu kế tiếp (DOL) hướng thẳng về bể thanh khoản bán (SSL) tại đáy ${dol_target_ref:,.2f}."
         )
 
         # Market Context summary
