@@ -38,9 +38,9 @@ export const createSimulation = async (req: AuthRequest, res: Response) => {
 // GET /api/simulations
 export const getSimulations = async (req: AuthRequest, res: Response) => {
   try {
-    // Nếu là student, chỉ lấy những simulation đã PUBLISHED, ACTIVE, ENDED
+    // Nếu là student hoặc khách viếng thăm, lấy những simulation đã PUBLISHED, ACTIVE, ENDED
     let filter = {};
-    if (req.user.role === 'student') {
+    if (!req.user || req.user.role === 'student') {
       filter = { status: { $in: ['PUBLISHED', 'ACTIVE', 'ENDED'] } };
     }
     

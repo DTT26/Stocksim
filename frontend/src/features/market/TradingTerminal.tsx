@@ -1024,6 +1024,7 @@ export const TradingTerminal = () => {
           };
           setTradeOrders(prev => [...prev, order]);
           setTradeCount(c => c + 1);
+          window.dispatchEvent(new Event('trading-transaction-created'));
           addNotification?.({ title: 'Mở vị thế LONG', message: `Đã mở LONG ${selectedStock.symbol} tại giá ${price.toLocaleString('vi-VN')} đòn bẩy ${leverage}x.`, type: 'success' });
           return { success: true, message: `✅ Mở LONG ${selectedStock.symbol} thành công` };
         }
@@ -1050,6 +1051,7 @@ export const TradingTerminal = () => {
           };
           setTradeOrders(prev => [...prev, order]);
           setTradeCount(c => c + 1);
+          window.dispatchEvent(new Event('trading-transaction-created'));
           addNotification?.({ title: 'Mở vị thế SHORT', message: `Đã mở SHORT ${selectedStock.symbol} tại giá ${price.toLocaleString('vi-VN')} đòn bẩy ${leverage}x.`, type: 'success' });
           return { success: true, message: `✅ Mở SHORT ${selectedStock.symbol} thành công` };
         }
@@ -1121,6 +1123,7 @@ export const TradingTerminal = () => {
       if (res.success) {
         await fetchPortfolio();
         setTradeCount(c => c + 1);
+        window.dispatchEvent(new Event('trading-transaction-created'));
         addNotification?.({ title: 'Đóng vị thế', message: `Đã chốt vị thế ${pos.side} mã ${symbolToClose}.`, type: 'success' });
         return { success: true, message: `✅ Đã chốt vị thế ${symbolToClose} thành công` };
       }
@@ -1605,6 +1608,7 @@ export const TradingTerminal = () => {
                       if (res.success) {
                         await fetchPortfolio();
                         setTradeCount(c => c + 1);
+                        window.dispatchEvent(new Event('trading-transaction-created'));
                         setPreviewTPSL(null);
                         setDraggedTPSL(null);
                         addNotification?.({

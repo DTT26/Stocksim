@@ -73,10 +73,10 @@ export const ToolbarNavbar = ({
           <button
             onClick={onOpenChallenge}
             className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 border border-amber-500/40 text-amber-600 dark:text-amber-400 font-bold text-xs transition-all shadow-sm shadow-amber-500/10 hover:scale-[1.02]"
-            title={`${t('nav.challengeTitle', 'Thử Thách Cấp Vốn Quỹ')} • ${t('nav.accountRank', 'Hạng tài khoản:')} ${accountRankName ? accountRankName.replace(/Cấp/g, t('nav.phaseBadge', 'Cấp')) : t('nav.level1', 'Cấp 1')}`}
+            title={`${t('nav.challengeTitle', 'Mô Phỏng Thử Thách Cấp Vốn')} • ${t('nav.accountRank', 'Hạng tài khoản:')} ${accountRankName ? accountRankName.replace(/Cấp/g, t('nav.phaseBadge', 'Cấp')) : t('nav.level1', 'Cấp 1')}`}
           >
             <Trophy className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-            <span className="hidden sm:inline">{t('nav.challenge', 'Thử Thách Quỹ')}</span>
+            <span className="hidden sm:inline">{t('nav.challenge', 'Mô Phỏng Thử Thách')}</span>
             {challengeStatus === 'ACTIVE' ? (
               <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

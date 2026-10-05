@@ -22,12 +22,12 @@ import {
   getLecturerStudentsOverview,
   getStudentSimulationPerformance
 } from '../controllers/simulationController';
-import { protect, lecturer } from '../middleware/authMiddleware';
+import { protect, lecturer, optionalProtect } from '../middleware/authMiddleware';
 
 const router = Router();
 
 router.route('/')
-  .get(protect, getSimulations as any)
+  .get(optionalProtect, getSimulations as any)
   .post(protect, lecturer, createSimulation as any);
 
 router.get('/dashboard/stats', protect, lecturer, getLecturerDashboardStats as any);

@@ -5,6 +5,7 @@ import {
   Sparkles, Brain, Bot, ShieldAlert, Cpu, ArrowUpRight, 
   CheckCircle2, Eye, LineChart, FileText, Zap, Terminal, MessageSquare
 } from 'lucide-react';
+import { useI18n } from '../../../contexts/I18nContext';
 
 interface AiDemoTab {
   id: 'smc' | 'risk' | 'audit';
@@ -19,64 +20,84 @@ interface AiDemoTab {
   };
 }
 
-const AI_DEMO_TABS: AiDemoTab[] = [
+const getAiDemoTabs = (lang: 'vi' | 'en'): AiDemoTab[] => [
   {
     id: 'smc',
-    label: 'Cấu trúc SMC / ICT',
-    badge: 'CẤU TRÚC THỊ TRƯỜNG',
-    title: 'Phân tích cấu trúc đa khung thời gian',
+    label: lang === 'vi' ? 'Cấu trúc SMC / ICT' : 'SMC / ICT Structure',
+    badge: lang === 'vi' ? 'CẤU TRÚC THỊ TRƯỜNG' : 'MARKET STRUCTURE',
+    title: lang === 'vi' ? 'Phân tích cấu trúc đa khung thời gian' : 'Multi-Timeframe Structure Analysis',
     responsePreview: {
-      heading: 'Khung 15m BTC/USDT: Kiểm định lại Vùng FVG thành công',
+      heading: lang === 'vi' 
+        ? 'Khung 15m BTC/USDT: Kiểm định lại Vùng FVG thành công' 
+        : 'BTC/USDT 15m: Successful FVG Retest & Confirmation',
       metrics: [
-        { label: 'Cấu trúc thị trường', value: 'CHoCH Tăng giá', color: 'text-emerald-400' },
-        { label: 'Vùng phản ứng then chốt', value: 'Đáy FVG $82,400', color: 'text-blue-400' },
-        { label: 'Mục tiêu thanh khoản', value: 'Thanh khoản Phe Mua $83,850', color: 'text-amber-400' },
-        { label: 'Tỷ lệ R:R dự phóng', value: '1 : 2.45', color: 'text-emerald-400' },
+        { label: lang === 'vi' ? 'Cấu trúc thị trường' : 'Market Structure', value: lang === 'vi' ? 'CHoCH Tăng giá' : 'Bullish CHoCH', color: 'text-emerald-400' },
+        { label: lang === 'vi' ? 'Vùng phản ứng then chốt' : 'Key Reaction Zone', value: lang === 'vi' ? 'Đáy FVG $82,400' : 'FVG Low $82,400', color: 'text-blue-400' },
+        { label: lang === 'vi' ? 'Mục tiêu thanh khoản' : 'Liquidity Target', value: lang === 'vi' ? 'Thanh khoản Mua $83,850' : 'Buy-side Liq $83,850', color: 'text-amber-400' },
+        { label: lang === 'vi' ? 'Tỷ lệ R:R dự phóng' : 'Projected R:R', value: '1 : 2.45', color: 'text-emerald-400' },
       ],
-      analysisText: 'AI phát hiện pha quét thanh khoản đáy phiên Á (Asian Low Liquidity Sweep) kèm dịch chuyển cấu trúc thị trường (MSS) rõ nét trên nến 15 phút. Vùng FVG chưa lấp tại $82,400 đóng vai trò hỗ trợ tổ chức đáng tin cậy.',
-      advice: 'Đặt lệnh cắt lỗ (SL) nghiêm ngặt dưới râu nến quét thanh khoản ($81,820). Tránh can thiệp thủ công khi giá bước vào giai đoạn tích lũy.',
+      analysisText: lang === 'vi'
+        ? 'AI phát hiện pha quét thanh khoản đáy phiên Á (Asian Low Liquidity Sweep) kèm dịch chuyển cấu trúc thị trường (MSS) rõ nét trên nến 15 phút. Vùng FVG chưa lấp tại $82,400 đóng vai trò hỗ trợ tổ chức đáng tin cậy.'
+        : 'AI detected an Asian Low Liquidity Sweep with distinct Market Structure Shift (MSS) on the 15m candle. The unfilled FVG at $82,400 acts as high-probability institutional support.',
+      advice: lang === 'vi'
+        ? 'Đặt lệnh cắt lỗ (SL) nghiêm ngặt dưới râu nến quét thanh khoản ($81,820). Tránh can thiệp thủ công khi giá bước vào giai đoạn tích lũy.'
+        : 'Place strict Stop Loss below the sweep wick ($81,820). Refrain from premature manual intervention during consolidation.',
     },
   },
   {
     id: 'risk',
-    label: 'Bảo vệ Quỹ',
-    badge: 'CHỐNG VI PHẠM TÀI KHOẢN',
-    title: 'Thuật toán tính khối lượng chuẩn tổ chức',
+    label: lang === 'vi' ? 'Bảo vệ Quỹ' : 'Prop Protection',
+    badge: lang === 'vi' ? 'CHỐNG VI PHẠM TÀI KHOẢN' : 'ACCOUNT BREACH DEFENSE',
+    title: lang === 'vi' ? 'Thuật toán tính khối lượng chuẩn tổ chức' : 'Institutional Position Sizing Algorithm',
     responsePreview: {
-      heading: 'Tính toán tham số rủi ro Thử thách Quỹ (Tài khoản $100,000)',
+      heading: lang === 'vi'
+        ? 'Tính toán tham số rủi ro Thử thách Quỹ (Tài khoản $100,000)'
+        : 'Prop Firm Risk Parameter Calculation ($100k Account)',
       metrics: [
-        { label: 'Mức rủi ro tối đa', value: '$1,500 USD (1.5%)', color: 'text-blue-400' },
-        { label: 'Khoảng cách Cắt lỗ', value: '580 USD (0.7%)', color: 'text-slate-300' },
-        { label: 'Khối lượng khuyến nghị', value: '2.58 Hợp đồng BTC', color: 'text-emerald-400' },
-        { label: 'Dư địa sụt giảm ngày', value: 'Còn lại 3.5% hôm nay', color: 'text-emerald-400' },
+        { label: lang === 'vi' ? 'Mức rủi ro tối đa' : 'Max Risk Limit', value: '$1,500 USD (1.5%)', color: 'text-blue-400' },
+        { label: lang === 'vi' ? 'Khoảng cách Cắt lỗ' : 'Stop Loss Distance', value: '580 USD (0.7%)', color: 'text-slate-300' },
+        { label: lang === 'vi' ? 'Khối lượng khuyến nghị' : 'Recommended Size', value: lang === 'vi' ? '2.58 Hợp đồng BTC' : '2.58 BTC Contracts', color: 'text-emerald-400' },
+        { label: lang === 'vi' ? 'Dư địa sụt giảm ngày' : 'Daily Buffer', value: lang === 'vi' ? 'Còn lại 3.5% hôm nay' : '3.5% buffer today', color: 'text-emerald-400' },
       ],
-      analysisText: 'Kiểm toán rủi ro trước khi vào lệnh theo đúng quy chuẩn thử thách quỹ. Với mức rủi ro mục tiêu 1.5% và Cắt lỗ tại $81,820, khối lượng an toàn tối đa là 2.58 hợp đồng nhằm đảm bảo không bao giờ chạm giới hạn sụt giảm ngày 4%.',
-      advice: 'Tham số lệnh đã được duyệt an toàn. Cơ chế bảo vệ chủ động: Mọi biến động giật giá ngược chiều sẽ tự động đóng vị thế trước khi chạm ngưỡng vi phạm quy tắc quỹ.',
+      analysisText: lang === 'vi'
+        ? 'Kiểm toán rủi ro trước khi vào lệnh theo đúng quy chuẩn thử thách quỹ. Với mức rủi ro mục tiêu 1.5% và Cắt lỗ tại $81,820, khối lượng an toàn tối đa là 2.58 hợp đồng nhằm đảm bảo không bao giờ chạm giới hạn sụt giảm ngày 4%.'
+        : 'Pre-trade risk audit compliant with prop firm funded rules. At 1.5% target risk and Stop Loss at $81,820, maximum safe sizing is 2.58 contracts to preserve daily 4% limit.',
+      advice: lang === 'vi'
+        ? 'Tham số lệnh đã được duyệt an toàn. Cơ chế bảo vệ chủ động: Mọi biến động giật giá ngược chiều sẽ tự động đóng vị thế trước khi chạm ngưỡng vi phạm quy tắc quỹ.'
+        : 'Trade parameters verified. Active guardrails enabled: Volatility spikes will trigger protective stops before any breach threshold.',
     },
   },
   {
     id: 'audit',
-    label: 'Kiểm toán lệnh',
-    badge: 'KIỂM TOÁN SAU GIAO DỊCH',
-    title: 'Bảng đánh giá kỷ luật vào lệnh',
+    label: lang === 'vi' ? 'Kiểm toán lệnh' : 'Trade Audit',
+    badge: lang === 'vi' ? 'KIỂM TOÁN SAU GIAO DỊCH' : 'POST-TRADE AUDIT',
+    title: lang === 'vi' ? 'Bảng đánh giá kỷ luật vào lệnh' : 'Execution Discipline Scorecard',
     responsePreview: {
-      heading: 'Báo cáo kiểm toán lệnh #4912 (Khớp lệnh AAPL Lợi nhuận +$235 USD)',
+      heading: lang === 'vi'
+        ? 'Báo cáo kiểm toán lệnh #4912 (Khớp lệnh AAPL Lợi nhuận +$235 USD)'
+        : 'Audit Report #4912 (AAPL Filled • Net Profit +$235 USD)',
       metrics: [
-        { label: 'Điểm kỷ luật AI', value: '96 / 100 (Hạng A+)', color: 'text-emerald-400' },
-        { label: 'Tuân thủ Cắt lỗ', value: '100% (Thiết lập sau 14s)', color: 'text-blue-400' },
-        { label: 'Tâm lý giao dịch', value: 'Bình tĩnh • Không FOMO', color: 'text-emerald-400' },
-        { label: 'Hiệu quả chốt lời', value: 'Khớp tại mục tiêu +2.1R', color: 'text-amber-400' },
+        { label: lang === 'vi' ? 'Điểm kỷ luật AI' : 'AI Discipline Score', value: lang === 'vi' ? '96 / 100 (Hạng A+)' : '96 / 100 (Grade A+)', color: 'text-emerald-400' },
+        { label: lang === 'vi' ? 'Tuân thủ Cắt lỗ' : 'Stop Loss Compliance', value: lang === 'vi' ? '100% (Thiết lập sau 14s)' : '100% (Set in 14s)', color: 'text-blue-400' },
+        { label: lang === 'vi' ? 'Tâm lý giao dịch' : 'Trader Psychology', value: lang === 'vi' ? 'Bình tĩnh • Không FOMO' : 'Calm • Zero FOMO', color: 'text-emerald-400' },
+        { label: lang === 'vi' ? 'Hiệu quả chốt lời' : 'Take-Profit Metric', value: lang === 'vi' ? 'Khớp tại mục tiêu +2.1R' : 'Hit Target +2.1R', color: 'text-amber-400' },
       ],
-      analysisText: 'Lệnh MUA AAPL thể hiện sự tuân thủ bài bản mô hình Phá vỡ biên độ mở phiên (ORB). Điểm vào lệnh chuẩn xác khi nến 15m đóng cửa trên đỉnh trước giờ mở cửa và giữ vững tâm lý đến khi chạm TP.',
-      advice: 'Gợi ý tối ưu: Cân nhắc dời Stop Loss về Điểm hòa vốn (Breakeven) ngay khi đạt lợi nhuận +1.5R để triệt tiêu hoàn toàn rủi ro đuôi.',
+      analysisText: lang === 'vi'
+        ? 'Lệnh MUA AAPL thể hiện sự tuân thủ bài bản mô hình Phá vỡ biên độ mở phiên (ORB). Điểm vào lệnh chuẩn xác khi nến 15m đóng cửa trên đỉnh trước giờ mở cửa và giữ vững tâm lý đến khi chạm TP.'
+        : 'AAPL BUY demonstrated structured adherence to Opening Range Breakout (ORB). Validated entry on 15m close above pre-market high with disciplined composure through TP.',
+      advice: lang === 'vi'
+        ? 'Gợi ý tối ưu: Cân nhắc dời Stop Loss về Điểm hòa vốn (Breakeven) ngay khi đạt lợi nhuận +1.5R để triệt tiêu hoàn toàn rủi ro đuôi.'
+        : 'Optimization suggestion: Consider trailing Stop Loss to Breakeven once +1.5R is reached to fully eliminate tail risk.',
     },
   },
 ];
 
 export const CinematicAiMentor: React.FC = () => {
+  const { lang } = useI18n();
   const [activeTabId, setActiveTabId] = useState<'smc' | 'risk' | 'audit'>('smc');
 
-  const activeTab = AI_DEMO_TABS.find(t => t.id === activeTabId) || AI_DEMO_TABS[0];
+  const demoTabs = getAiDemoTabs(lang);
+  const activeTab = demoTabs.find(t => t.id === activeTabId) || demoTabs[0];
 
   return (
     <section id="ai-tutor" className="relative w-full py-24 bg-[#080D18] border-b border-[#1E293B] text-slate-100 overflow-hidden">
@@ -92,25 +113,27 @@ export const CinematicAiMentor: React.FC = () => {
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#0F1B33] border border-blue-500/30 text-blue-400 font-mono text-xs uppercase tracking-widest mb-3">
               <Sparkles className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
-              <span>TRỢ LÝ AI & HUẤN LUYỆN VIÊN GIAO DỊCH</span>
+              <span>{lang === 'vi' ? 'TRỢ LÝ AI & HUẤN LUYỆN VIÊN GIAO DỊCH' : 'AI ASSISTANT & PROP COACH'}</span>
             </div>
 
             <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight uppercase font-sans">
-              TRỢ LÝ GIAO DỊCH AI. <br />
+              {lang === 'vi' ? 'TRỢ LÝ GIAO DỊCH AI.' : 'AI TRADING ASSISTANT.'} <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">
-                NÂNG TẦM MỌI LỆNH ĐẶT.
+                {lang === 'vi' ? 'NÂNG TẦM MỌI LỆNH ĐẶT.' : 'ELEVATE EVERY EXECUTION.'}
               </span>
             </h2>
 
             <p className="mt-3 text-sm sm:text-base text-slate-400 font-sans leading-relaxed">
-              Vượt xa một chatbot thông thường. StockSim AI là huấn luyện viên giao dịch trực tiếp: lập bản đồ cấu trúc thị trường SMC/ICT đa khung thời gian, tự động tính khối lượng chuẩn thử thách quỹ và kiểm toán kỷ luật lệnh sau mỗi phiên.
+              {lang === 'vi'
+                ? 'Vượt xa một chatbot thông thường. StockSim AI là huấn luyện viên giao dịch trực tiếp: lập bản đồ cấu trúc thị trường SMC/ICT đa khung thời gian, tự động tính khối lượng chuẩn thử thách quỹ và kiểm toán kỷ luật lệnh sau mỗi phiên.'
+                : 'Far beyond a generic chatbot. StockSim AI is your live trading coach: mapping multi-timeframe SMC/ICT structures, automating prop-funded position sizing, and auditing trade discipline after each session.'}
             </p>
           </div>
 
           <div className="flex items-center gap-3 font-mono text-xs">
             <div className="px-3.5 py-2 rounded-lg bg-[#0C1424] border border-blue-500/30 text-blue-300 flex items-center gap-2">
               <Brain className="w-4 h-4 text-blue-400" />
-              <span>CƠ SỞ DỮ LIỆU TÀI CHÍNH RAG 24/7</span>
+              <span>{lang === 'vi' ? 'CƠ SỞ DỮ LIỆU TÀI CHÍNH RAG 24/7' : '24/7 RAG FINANCIAL INTELLIGENCE'}</span>
             </div>
           </div>
         </div>
@@ -124,10 +147,12 @@ export const CinematicAiMentor: React.FC = () => {
               <LineChart className="w-5 h-5" />
             </div>
             <h4 className="font-bold text-white text-sm font-sans">
-              Cấu trúc thị trường SMC & ICT
+              {lang === 'vi' ? 'Cấu trúc thị trường SMC & ICT' : 'SMC & ICT Market Structure'}
             </h4>
             <p className="text-xs text-slate-400 font-sans leading-relaxed">
-              Tự động phát hiện Fair Value Gap (FVG), Order Block, Quét thanh khoản, BOS và CHoCH trên đa khung thời gian.
+              {lang === 'vi'
+                ? 'Tự động phát hiện Fair Value Gap (FVG), Order Block, Quét thanh khoản, BOS và CHoCH trên đa khung thời gian.'
+                : 'Automated detection of Fair Value Gaps (FVG), Order Blocks, Liquidity Sweeps, BOS, and CHoCH on multi-timeframe charts.'}
             </p>
           </div>
 
@@ -136,10 +161,12 @@ export const CinematicAiMentor: React.FC = () => {
               <ShieldAlert className="w-5 h-5" />
             </div>
             <h4 className="font-bold text-white text-sm font-sans">
-              Chống vi phạm quỹ & Tính khối lượng
+              {lang === 'vi' ? 'Chống vi phạm quỹ & Tính khối lượng' : 'Prop Breach Defense & Sizing'}
             </h4>
             <p className="text-xs text-slate-400 font-sans leading-relaxed">
-              Tự động tính toán khối lượng lệnh gắn chặt với hạn mức rủi ro tài khoản, ngăn chặn nguy cơ chạm giới hạn lỗ ngày.
+              {lang === 'vi'
+                ? 'Tự động tính toán khối lượng lệnh gắn chặt với hạn mức rủi ro tài khoản, ngăn chặn nguy cơ chạm giới hạn lỗ ngày.'
+                : 'Automated position sizing strictly tied to account risk thresholds, preventing daily drawdown breaches.'}
             </p>
           </div>
 
@@ -148,10 +175,12 @@ export const CinematicAiMentor: React.FC = () => {
               <FileText className="w-5 h-5" />
             </div>
             <h4 className="font-bold text-white text-sm font-sans">
-              Kiểm toán & Đánh giá sau phiên
+              {lang === 'vi' ? 'Kiểm toán & Đánh giá sau phiên' : 'Post-Session Trade Audit'}
             </h4>
             <p className="text-xs text-slate-400 font-sans leading-relaxed">
-              Đánh giá kỷ luật điểm vào/ra, so sánh R:R kế hoạch với thực tế, cảnh báo tâm lý gỡ gạc hay nhồi lệnh quá mức.
+              {lang === 'vi'
+                ? 'Đánh giá kỷ luật điểm vào/ra, so sánh R:R kế hoạch với thực tế, cảnh báo tâm lý gỡ gạc hay nhồi lệnh quá mức.'
+                : 'Evaluate entry/exit discipline, compare planned vs realized R:R, and flag revenge trading or over-leveraging.'}
             </p>
           </div>
 
@@ -160,10 +189,12 @@ export const CinematicAiMentor: React.FC = () => {
               <MessageSquare className="w-5 h-5" />
             </div>
             <h4 className="font-bold text-white text-sm font-sans">
-              Trí tuệ tài chính RAG 24/7
+              {lang === 'vi' ? 'Trí tuệ tài chính RAG 24/7' : '24/7 RAG Financial Tutor'}
             </h4>
             <p className="text-xs text-slate-400 font-sans leading-relaxed">
-              Trợ lý tương tác trực tiếp ngay trên Sàn Giao Dịch, giải đáp Hành động giá, phương pháp Wyckoff và góc nhìn vĩ mô.
+              {lang === 'vi'
+                ? 'Trợ lý tương tác trực tiếp ngay trên Sàn Giao Dịch, giải đáp Hành động giá, phương pháp Wyckoff và góc nhìn vĩ mô.'
+                : 'Direct interactive assistant in the Trading Terminal answering Price Action, Wyckoff methodology, and macro context.'}
             </p>
           </div>
         </div>
@@ -182,13 +213,13 @@ export const CinematicAiMentor: React.FC = () => {
               </div>
               <span className="font-mono text-xs font-bold text-white flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-blue-400" />
-                <span>NHÂN TÍNH TOÁN STOCKSIM AI v2.8</span>
+                <span>{lang === 'vi' ? 'NHÂN TÍNH TOÁN STOCKSIM AI v2.8' : 'STOCKSIM AI ENGINE v2.8'}</span>
               </span>
             </div>
 
             {/* 3 Interactive Prompt Switchers */}
             <div className="flex items-center gap-2 font-mono text-xs">
-              {AI_DEMO_TABS.map(tab => {
+              {demoTabs.map(tab => {
                 const isActive = activeTabId === tab.id;
                 return (
                   <button
@@ -230,7 +261,7 @@ export const CinematicAiMentor: React.FC = () => {
 
                 <div className="flex items-center gap-2 text-xs font-mono text-emerald-400">
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>ĐỘNG CƠ DEEPSEEK-FINTECH ĐÃ KIỂM ĐỊNH</span>
+                  <span>{lang === 'vi' ? 'ĐỘNG CƠ DEEPSEEK-FINTECH ĐÃ KIỂM ĐỊNH' : 'DEEPSEEK-FINTECH ENGINE VERIFIED'}</span>
                 </div>
               </div>
 
@@ -251,7 +282,7 @@ export const CinematicAiMentor: React.FC = () => {
                 <div className="lg:col-span-8 p-4 rounded-xl bg-[#070B14] border border-[#1A263D] space-y-2">
                   <div className="text-[10px] text-slate-500 uppercase flex items-center gap-1.5">
                     <Bot className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Biên bản lập luận & Khớp lệnh của AI</span>
+                    <span>{lang === 'vi' ? 'Biên bản lập luận & Khớp lệnh của AI' : 'AI Reasoning & Execution Transcript'}</span>
                   </div>
                   <p className="text-slate-300 font-sans text-xs sm:text-sm leading-relaxed">
                     {activeTab.responsePreview.analysisText}
@@ -261,7 +292,7 @@ export const CinematicAiMentor: React.FC = () => {
                 <div className="lg:col-span-4 p-4 rounded-xl bg-[#0E172B] border border-blue-500/30 space-y-2">
                   <div className="text-[10px] text-blue-300 uppercase flex items-center gap-1.5 font-bold">
                     <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Khuyến nghị kỷ luật</span>
+                    <span>{lang === 'vi' ? 'Khuyến nghị kỷ luật' : 'Discipline Guidance'}</span>
                   </div>
                   <p className="text-slate-200 font-sans text-xs leading-relaxed">
                     {activeTab.responsePreview.advice}
@@ -276,12 +307,14 @@ export const CinematicAiMentor: React.FC = () => {
                   className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs sm:text-sm font-bold tracking-wide uppercase transition-all shadow-lg shadow-blue-950 flex items-center gap-2 group cursor-pointer"
                 >
                   <Terminal className="w-4 h-4 text-blue-200" />
-                  <span>TRẢI NGHIỆM AI TRÊN SÀN GIAO DỊCH</span>
+                  <span>{lang === 'vi' ? 'TRẢI NGHIỆM AI TRÊN SÀN GIAO DỊCH' : 'EXPERIENCE AI IN TRADING TERMINAL'}</span>
                   <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </Link>
 
                 <div className="text-xs font-mono text-slate-400">
-                  AI hỗ trợ trong quá trình luyện tập • Tự động khóa trong các kỳ thi đánh giá quỹ
+                  {lang === 'vi'
+                    ? 'AI hỗ trợ trong quá trình luyện tập • Tự động khóa trong các kỳ thi đánh giá quỹ'
+                    : 'AI active during practice • Automatically disabled during funded challenge exams'}
                 </div>
               </div>
             </motion.div>
