@@ -5,6 +5,7 @@ const resolveUserId = (req: any): string | null => {
   if (req.user?._id) return req.user._id.toString();
   if (req.params?.userId) return req.params.userId;
   if (req.body?.userId) return req.body.userId;
+  if (req.query?.userId) return req.query.userId as string;
   return null;
 };
 
@@ -105,11 +106,7 @@ export const getPortfolio = async (req: Request, res: Response) => {
 export const getTransactions = async (req: Request, res: Response) => {
   try {
     const userId = resolveUserId(req);
-    if (!userId) {
-      return res.status(400).json({ success: false, message: "Missing userId" });
-    }
-
-    const transactions = await TradingService.getTransactions(userId);
+    const transactions = await TradingService.getTransactions(userId || undefined);
     res.status(200).json({ success: true, data: transactions });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });

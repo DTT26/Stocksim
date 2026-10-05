@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, FileText, Clock, CheckCircle2, AlertCircle, Award, ArrowRight } from 'lucide-react';
+import { useI18n } from '../../contexts/I18nContext';
+
 export const StudentAssignments = () => {
+  const { lang, t } = useI18n();
   const [assignments, setAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
@@ -77,28 +80,28 @@ export const StudentAssignments = () => {
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-bold uppercase border bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 whitespace-nowrap">
             <Award className="w-3.5 h-3.5 shrink-0" />
-            {score !== undefined ? `Đã chấm: ${score}đ` : 'Đã chấm điểm'}
+            {score !== undefined ? (lang === 'vi' ? `Đã chấm: ${score}đ` : `Graded: ${score} pts`) : (lang === 'vi' ? 'Đã chấm điểm' : 'Graded')}
           </span>
         );
       case 'Submitted':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-bold uppercase border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 whitespace-nowrap">
             <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-            Đã nộp bài
+            {lang === 'vi' ? 'Đã nộp bài' : 'Submitted'}
           </span>
         );
       case 'Overdue':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-bold uppercase border bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 whitespace-nowrap">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-            Quá hạn
+            {lang === 'vi' ? 'Quá hạn' : 'Overdue'}
           </span>
         );
       default:
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-bold uppercase border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 whitespace-nowrap">
             <Clock className="w-3.5 h-3.5 shrink-0" />
-            Đang làm
+            {lang === 'vi' ? 'Đang làm' : 'In Progress'}
           </span>
         );
     }
@@ -108,10 +111,12 @@ export const StudentAssignments = () => {
     <div className="space-y-5 sm:space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-          Bài tập & Phân tích
+          {lang === 'vi' ? 'Bài tập & Phân tích' : 'Assignments & Analysis'}
         </h1>
         <p className="text-slate-500 dark:text-slate-400 mt-1 sm:mt-2 text-xs sm:text-sm">
-          Hoàn thành các bài tập phân tích kỹ thuật và quản trị vốn do Giảng viên giao.
+          {lang === 'vi' 
+            ? 'Hoàn thành các bài tập phân tích kỹ thuật và quản trị vốn do Giảng viên giao.' 
+            : 'Complete technical analysis and risk management assignments assigned by instructors.'}
         </p>
       </div>
 
@@ -120,11 +125,11 @@ export const StudentAssignments = () => {
         <div className="p-2.5 sm:p-4 border-b border-slate-200 dark:border-[#253047] flex flex-wrap gap-1.5 sm:gap-2">
           {['All', 'In Progress', 'Submitted', 'Graded', 'Overdue'].map(tab => {
             const labelMap: Record<string, string> = {
-              'All': 'Tất cả',
-              'In Progress': 'Đang làm',
-              'Submitted': 'Đã nộp',
-              'Graded': 'Đã chấm',
-              'Overdue': 'Quá hạn'
+              'All': lang === 'vi' ? 'Tất cả' : 'All',
+              'In Progress': lang === 'vi' ? 'Đang làm' : 'In Progress',
+              'Submitted': lang === 'vi' ? 'Đã nộp' : 'Submitted',
+              'Graded': lang === 'vi' ? 'Đã chấm' : 'Graded',
+              'Overdue': lang === 'vi' ? 'Quá hạn' : 'Overdue'
             };
             const count = getTabCount(tab);
             const isActive = filter === tab;
@@ -159,7 +164,7 @@ export const StudentAssignments = () => {
           {loading ? (
             <div className="p-12 text-center text-slate-400 dark:text-slate-500">
               <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <span className="text-sm">Đang tải danh sách bài tập...</span>
+              <span className="text-sm">{lang === 'vi' ? 'Đang tải danh sách bài tập...' : 'Loading assignments...'}</span>
             </div>
           ) : filteredAssignments.length === 0 ? (
             <div className="py-12 sm:py-16 px-4 text-center text-slate-400 dark:text-slate-500">
@@ -167,10 +172,12 @@ export const StudentAssignments = () => {
                 <FileText className="w-6 h-6" />
               </div>
               <p className="text-sm sm:text-base font-semibold text-slate-700 dark:text-slate-200">
-                Không có bài tập nào trong mục này
+                {lang === 'vi' ? 'Không có bài tập nào trong mục này' : 'No assignments found in this category'}
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-                Các bài tập mới từ giảng viên sẽ xuất hiện tại đây khi được giao.
+                {lang === 'vi'
+                  ? 'Các bài tập mới từ giảng viên sẽ xuất hiện tại đây khi được giao.'
+                  : 'New assignments from instructors will appear here once assigned.'}
               </p>
             </div>
           ) : (
@@ -202,7 +209,7 @@ export const StudentAssignments = () => {
                               {assignment.title}
                             </h3>
                             <span className="inline-block mt-0.5 text-[11px] text-slate-400 dark:text-slate-500 font-mono">
-                              Mã CP: <strong className="text-slate-700 dark:text-slate-300 font-semibold">{assignment.symbol || 'BTCUSDT'}</strong>
+                              {lang === 'vi' ? 'Mã CP:' : 'Symbol:'} <strong className="text-slate-700 dark:text-slate-300 font-semibold">{assignment.symbol || 'BTCUSDT'}</strong>
                             </span>
                           </div>
                         </div>
@@ -214,16 +221,20 @@ export const StudentAssignments = () => {
                       {/* Middle Info: Simulation & Deadline */}
                       <div className="grid grid-cols-2 gap-2 text-xs py-2 px-3 rounded-xl bg-slate-50 dark:bg-[#172033]/60 border border-slate-100 dark:border-[#253047]/60">
                         <div className="min-w-0">
-                          <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500 block mb-0.5">Kỳ thi</span>
+                          <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500 block mb-0.5">
+                            {lang === 'vi' ? 'Kỳ thi' : 'Exam'}
+                          </span>
                           <span className="text-slate-700 dark:text-slate-300 font-medium truncate block" title={simName}>
                             {simName}
                           </span>
                         </div>
                         <div>
-                          <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500 block mb-0.5">Hạn nộp</span>
+                          <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500 block mb-0.5">
+                            {lang === 'vi' ? 'Hạn nộp' : 'Deadline'}
+                          </span>
                           <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
                             <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
-                            <span>{new Date(assignment.deadline).toLocaleDateString('vi-VN')}</span>
+                            <span>{new Date(assignment.deadline).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US')}</span>
                           </div>
                         </div>
                       </div>
@@ -231,7 +242,9 @@ export const StudentAssignments = () => {
                       {/* Progress bar */}
                       <div className="space-y-1.5">
                         <div className="flex justify-between text-xs font-medium">
-                          <span className="text-slate-500 dark:text-slate-400 text-[11px]">Tiến độ checklist</span>
+                          <span className="text-slate-500 dark:text-slate-400 text-[11px]">
+                            {lang === 'vi' ? 'Tiến độ checklist' : 'Checklist progress'}
+                          </span>
                           <span className="font-mono font-bold text-slate-700 dark:text-slate-300 text-[11px]">{progress}%</span>
                         </div>
                         <div className="w-full bg-slate-100 dark:bg-[#253047] rounded-full h-1.5 overflow-hidden">
@@ -248,7 +261,11 @@ export const StudentAssignments = () => {
                           to={`/student/assignments/${id}`} 
                           className="w-full flex items-center justify-center gap-1.5 py-2.5 px-4 bg-indigo-50 hover:bg-indigo-100 active:scale-[0.99] text-indigo-700 border border-indigo-200 dark:bg-indigo-600/20 dark:hover:bg-indigo-600/30 dark:text-indigo-300 dark:border-indigo-500/30 rounded-xl font-semibold text-xs transition-all shadow-sm"
                         >
-                          <span>{status === 'Submitted' || status === 'Graded' ? 'Xem bài làm' : 'Làm bài'}</span>
+                          <span>
+                            {status === 'Submitted' || status === 'Graded'
+                              ? (lang === 'vi' ? 'Xem bài làm' : 'View Submission')
+                              : (lang === 'vi' ? 'Làm bài' : 'Start Assignment')}
+                          </span>
                           <ArrowRight className="w-3.5 h-3.5" />
                         </Link>
                       </div>
@@ -262,12 +279,12 @@ export const StudentAssignments = () => {
                 <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead className="bg-slate-50 dark:bg-[#172033] border-b border-slate-200 dark:border-[#253047] text-slate-500 dark:text-slate-400 uppercase tracking-wider text-xs">
                     <tr>
-                      <th className="px-6 py-4 font-semibold">Tên bài tập</th>
-                      <th className="px-6 py-4 font-semibold">Kỳ thi mô phỏng</th>
-                      <th className="px-6 py-4 font-semibold">Hạn nộp</th>
-                      <th className="px-6 py-4 font-semibold">Tiến độ checklist</th>
-                      <th className="px-6 py-4 font-semibold">Trạng thái</th>
-                      <th className="px-6 py-4 font-semibold text-right">Thao tác</th>
+                      <th className="px-6 py-4 font-semibold">{lang === 'vi' ? 'Tên bài tập' : 'Assignment Title'}</th>
+                      <th className="px-6 py-4 font-semibold">{lang === 'vi' ? 'Kỳ thi mô phỏng' : 'Simulation Exam'}</th>
+                      <th className="px-6 py-4 font-semibold">{lang === 'vi' ? 'Hạn nộp' : 'Deadline'}</th>
+                      <th className="px-6 py-4 font-semibold">{lang === 'vi' ? 'Tiến độ checklist' : 'Checklist Progress'}</th>
+                      <th className="px-6 py-4 font-semibold">{lang === 'vi' ? 'Trạng thái' : 'Status'}</th>
+                      <th className="px-6 py-4 font-semibold text-right">{lang === 'vi' ? 'Thao tác' : 'Action'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-[#253047]">
@@ -295,7 +312,7 @@ export const StudentAssignments = () => {
                                   {assignment.title}
                                 </span>
                                 <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">
-                                  Mã CP: <strong className="text-slate-600 dark:text-slate-400">{assignment.symbol || 'BTCUSDT'}</strong>
+                                  {lang === 'vi' ? 'Mã CP:' : 'Symbol:'} <strong className="text-slate-600 dark:text-slate-400">{assignment.symbol || 'BTCUSDT'}</strong>
                                 </span>
                               </div>
                             </div>
@@ -308,7 +325,7 @@ export const StudentAssignments = () => {
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                               <Calendar className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                              <span>{new Date(assignment.deadline).toLocaleDateString('vi-VN')}</span>
+                              <span>{new Date(assignment.deadline).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US')}</span>
                             </div>
                           </td>
 
@@ -333,7 +350,11 @@ export const StudentAssignments = () => {
                               to={`/student/assignments/${id}`} 
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-600/20 dark:hover:bg-indigo-600/30 dark:text-indigo-300 dark:border-indigo-500/30 rounded-lg font-semibold text-xs transition-colors"
                             >
-                              <span>{status === 'Submitted' || status === 'Graded' ? 'Xem bài làm' : 'Làm bài'}</span>
+                              <span>
+                                {status === 'Submitted' || status === 'Graded'
+                                  ? (lang === 'vi' ? 'Xem bài làm' : 'View Submission')
+                                  : (lang === 'vi' ? 'Làm bài' : 'Start Assignment')}
+                              </span>
                               <ArrowRight className="w-3.5 h-3.5" />
                             </Link>
                           </td>

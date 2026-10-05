@@ -106,13 +106,13 @@ export const WatchlistPanel = ({
       {!user ? (
         <AuthOverlay
           icon={<List className="w-8 h-8" />}
-          title="Danh sách theo dõi"
-          subtitle="Theo dõi các mã giao dịch yêu thích tại một nơi"
+          title={t('auth.watchlistTitle', 'Danh sách theo dõi')}
+          subtitle={t('auth.watchlistSubtitle', 'Theo dõi các mã giao dịch yêu thích tại một nơi')}
           features={[
-            "Giá và biến động theo thời gian thực",
-            "Đồng bộ danh sách theo dõi trên mọi thiết bị của bạn",
-            "Gắn cờ màu và tự sắp xếp",
-            "Nhiều watchlist"
+            t('auth.feature1', 'Giá và biến động theo thời gian thực'),
+            t('auth.feature2', 'Đồng bộ danh sách theo dõi trên mọi thiết bị của bạn'),
+            t('auth.feature3', 'Gắn cờ màu và tự sắp xếp'),
+            t('auth.feature4', 'Nhiều watchlist')
           ]}
         />
       ) : (
@@ -132,7 +132,7 @@ export const WatchlistPanel = ({
               {isDropdownOpen && (
                 <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-[#1e222d] border border-[#e6e8ea] dark:border-[#2a2e39] rounded-lg shadow-xl py-1.5 z-50">
                   <div className="px-3 py-1.5 text-[10px] font-bold text-[#787b86] uppercase tracking-wider">
-                    Gần đây
+                    {t('watchlist.recent', 'Gần đây')}
                   </div>
                   {watchlists.map(w => (
                     <button

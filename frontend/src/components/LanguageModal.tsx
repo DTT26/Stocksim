@@ -67,7 +67,7 @@ export const LanguageModal = ({ isOpen, onClose, currentLanguage, onSelectLangua
                   : 'text-[#787b86] hover:text-[#1e2329] dark:hover:text-white border-transparent'
               }`}
             >
-              Ngôn ngữ
+              {currentLanguage === 'EN' ? 'Language' : 'Ngôn ngữ'}
             </button>
             <button
               onClick={() => setActiveTab('currency')}
@@ -77,7 +77,7 @@ export const LanguageModal = ({ isOpen, onClose, currentLanguage, onSelectLangua
                   : 'text-[#787b86] hover:text-[#1e2329] dark:hover:text-white border-transparent'
               }`}
             >
-              Loại tiền
+              {currentLanguage === 'EN' ? 'Currency' : 'Loại tiền'}
             </button>
           </div>
           <button 
@@ -95,7 +95,7 @@ export const LanguageModal = ({ isOpen, onClose, currentLanguage, onSelectLangua
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#a0a3af] dark:text-[#787b86]" />
               <input 
                 type="text"
-                placeholder="Tìm kiếm"
+                placeholder={currentLanguage === 'EN' ? 'Search currency...' : 'Tìm kiếm'}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-[#f5f5f5] dark:bg-[#131722] text-[#1e2329] dark:text-white pl-12 pr-4 py-3 rounded-full outline-none border border-transparent focus:border-blue-500 transition-colors text-sm"

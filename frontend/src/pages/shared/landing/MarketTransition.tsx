@@ -1,8 +1,10 @@
 import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { TrendingUp, Activity, BarChart2, Shield } from 'lucide-react';
+import { useI18n } from '../../../contexts/I18nContext';
 
 export const MarketTransition: React.FC = () => {
+  const { lang } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { scrollYProgress } = useScroll({
@@ -146,13 +148,13 @@ export const MarketTransition: React.FC = () => {
           >
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#0B1424]/90 border border-blue-500/30 text-blue-400 font-mono text-xs uppercase tracking-widest mb-4">
               <Activity className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
-              <span>DÒNG CHẢY GIAO DỊCH LIÊN TỤC</span>
+              <span>{lang === 'vi' ? 'DÒNG CHẢY GIAO DỊCH LIÊN TỤC' : 'CONTINUOUS TRADING FLOW'}</span>
             </div>
 
             <h2 className="text-5xl sm:text-7xl lg:text-8xl font-black text-white tracking-tighter uppercase font-sans leading-[0.95]">
-              THỊ TRƯỜNG <br />
+              {lang === 'vi' ? 'THỊ TRƯỜNG' : 'THE MARKET'} <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-500 to-indigo-400">
-                KHÔNG BAO GIỜ DỪNG.
+                {lang === 'vi' ? 'KHÔNG BAO GIỜ DỪNG.' : 'NEVER STOPS.'}
               </span>
             </h2>
           </motion.div>
@@ -162,10 +164,12 @@ export const MarketTransition: React.FC = () => {
             className="mt-6"
           >
             <p className="text-xl sm:text-3xl text-slate-300 font-mono font-medium tracking-tight">
-              Và việc tích lũy kinh nghiệm của bạn cũng vậy.
+              {lang === 'vi' ? 'Và việc tích lũy kinh nghiệm của bạn cũng vậy.' : 'And neither does your skill compounding.'}
             </p>
             <p className="text-xs sm:text-sm text-slate-500 font-mono mt-3 max-w-xl mx-auto">
-              Dòng tiền thực vận hành 24/7 trên toàn thế giới. Chuyển đổi trực tiếp từ cơ chế sàn giao dịch sang radar dữ liệu thị trường trực tiếp.
+              {lang === 'vi'
+                ? 'Dòng tiền thực vận hành 24/7 trên toàn thế giới. Chuyển đổi trực tiếp từ cơ chế sàn giao dịch sang radar dữ liệu thị trường trực tiếp.'
+                : 'Real capital flows 24/7 globally. Seamless transition from terminal mechanics to live market radar.'}
             </p>
           </motion.div>
         </div>

@@ -1,3 +1,4 @@
+import { useChallengeTranslation } from './useChallengeTranslation';
 import React, { useState, useEffect } from 'react';
 import { 
   Trophy, CheckCircle2, Lock, RefreshCw, 
@@ -31,6 +32,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
   onStateUpdate,
   userName = 'Trader',
 }) => {
+  const { tr, levelName, badge } = useChallengeTranslation();
   const { user, login } = useAuth();
   const { showConfirm, showAlert } = useModal();
   const [activeTab, setActiveTab] = useState<'levels' | 'dashboard' | 'certificates'>('levels');
@@ -82,14 +84,14 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
         setConfirmStartLevel(null);
         setActiveTab('dashboard');
         setActionMessage({
-          text: `🎉 Đã kích hoạt bài thi Level ${level.id} (${level.levelName}) cho tài khoản ${effectiveUserName}! Vốn: $${level.capitalUSD.toLocaleString('en-US')}.`,
+          text: `${tr("🎉 Đã kích hoạt bài thi:")} ${badge(level.id)} (${levelName(level.id, level.levelName)}) — ${effectiveUserName}. ${tr("Vốn:")} $${level.capitalUSD.toLocaleString('en-US')}.`,
           type: 'success',
         });
         setTimeout(() => setActionMessage(null), 5000);
       }
     } catch (err: any) {
       setActionMessage({
-        text: `Lỗi: ${err.message || 'Không thể bắt đầu bài thi'}`,
+        text: `${tr("Lỗi:")} ${err.message ? tr(err.message) : tr("Không thể bắt đầu bài thi")}`,
         type: 'error',
       });
       setTimeout(() => setActionMessage(null), 5000);
@@ -101,11 +103,11 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
       const res = await challengeApi.resetChallenge();
       if (res.success && res.challenge) {
         onStateUpdate(res.challenge);
-        setActionMessage({ text: res.message, type: 'success' });
+        setActionMessage({ text: tr("Đã reset bài thi thành công."), type: 'success' });
         setTimeout(() => setActionMessage(null), 5000);
       }
     } catch (err: any) {
-      setActionMessage({ text: `Lỗi: ${err.message || 'Không thể reset bài thi'}`, type: 'error' });
+      setActionMessage({ text: `${tr("Lỗi:")} ${err.message ? tr(err.message) : tr("Không thể reset bài thi")}`, type: 'error' });
       setTimeout(() => setActionMessage(null), 5000);
     }
   };
@@ -115,11 +117,11 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
       const res = await challengeApi.pauseChallenge();
       if (res.success && res.challenge) {
         onStateUpdate(res.challenge);
-        setActionMessage({ text: '⏸️ Đã tạm dừng bài thi cấp vốn.', type: 'success' });
+        setActionMessage({ text: tr("⏸️ Đã tạm dừng bài thi cấp vốn."), type: 'success' });
         setTimeout(() => setActionMessage(null), 4000);
       }
     } catch (err: any) {
-      setActionMessage({ text: `Lỗi: ${err.message || 'Không thể tạm dừng'}`, type: 'error' });
+      setActionMessage({ text: `${tr("Lỗi:")} ${err.message ? tr(err.message) : tr("Không thể tạm dừng")}`, type: 'error' });
       setTimeout(() => setActionMessage(null), 4000);
     }
   };
@@ -129,22 +131,22 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
       const res = await challengeApi.resumeChallenge();
       if (res.success && res.challenge) {
         onStateUpdate(res.challenge);
-        setActionMessage({ text: '▶️ Đã tiếp tục bài thi cấp vốn!', type: 'success' });
+        setActionMessage({ text: tr("▶️ Đã tiếp tục bài thi cấp vốn!"), type: 'success' });
         setTimeout(() => setActionMessage(null), 4000);
       }
     } catch (err: any) {
-      setActionMessage({ text: `Lỗi: ${err.message || 'Không thể tiếp tục'}`, type: 'error' });
+      setActionMessage({ text: `${tr("Lỗi:")} ${err.message ? tr(err.message) : tr("Không thể tiếp tục")}`, type: 'error' });
       setTimeout(() => setActionMessage(null), 4000);
     }
   };
 
   const handleEndChallenge = async () => {
     const confirmed = await showConfirm({
-      title: 'Xác nhận kết thúc bài thi',
-      message: 'Bạn có chắc chắn muốn KẾT THÚC bài thi này để quay về trạng thái tài khoản thường không?',
+      title: tr("Xác nhận kết thúc bài thi"),
+      message: tr("Bạn có chắc chắn muốn KẾT THÚC bài thi này để quay về trạng thái tài khoản thường không?"),
       type: 'danger',
-      confirmText: 'Kết thúc bài thi',
-      cancelText: 'Hủy bỏ',
+      confirmText: tr("Kết thúc bài thi"),
+      cancelText: tr("Hủy bỏ"),
     });
     if (!confirmed) {
       return;
@@ -155,15 +157,15 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
         onStateUpdate(res.challenge);
         setActiveTab('levels');
         showAlert({
-          title: 'Đã kết thúc bài thi',
-          message: '⏹️ Đã kết thúc bài thi cấp vốn thành công. Số dư và danh mục tài khoản thường của bạn đã được khôi phục!',
+          title: tr("Đã kết thúc bài thi"),
+          message: tr("⏹️ Đã kết thúc bài thi cấp vốn thành công. Số dư và danh mục tài khoản thường của bạn đã được khôi phục!"),
           type: 'success'
         });
       }
     } catch (err: any) {
       showAlert({
-        title: 'Lỗi kết thúc bài thi',
-        message: `Lỗi: ${err.message || 'Không thể kết thúc bài thi'}`,
+        title: tr("Lỗi kết thúc bài thi"),
+        message: `${tr("Lỗi:")} ${err.message ? tr(err.message) : tr("Không thể kết thúc bài thi")}`,
         type: 'error'
       });
     }
@@ -191,10 +193,10 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
               </div>
               <div>
                 <h2 className="text-base font-bold text-white tracking-wide">
-                  THỬ THÁCH CẤP VỐN TRADER
+                  {tr("THỬ THÁCH CẤP VỐN TRADER")}
                 </h2>
                 <p className="text-[11px] text-slate-400">
-                  Giao dịch thị trường thật • Khóa vốn kỷ luật • Giới hạn 4 lần reset/tuần
+                  {tr("Giao dịch thị trường thật • Khóa vốn kỷ luật • Giới hạn 4 lần reset/tuần")}
                 </p>
               </div>
             </div>
@@ -210,7 +212,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  Gói Cấp Vốn
+                  {tr("Gói Cấp Vốn")}
                 </button>
 
                 <button
@@ -221,7 +223,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <span>Tiến Độ</span>
+                  <span>{tr("Tiến Độ")}</span>
                   {challengeState.status === 'ACTIVE' && (
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   )}
@@ -235,7 +237,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  Chứng Chỉ ({challengeState.certificates.length})
+                  {tr("Chứng Chỉ")} ({challengeState.certificates.length})
                 </button>
               </div>
 
@@ -272,13 +274,13 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-blue-500/10 border border-blue-500/25 rounded-xl text-xs text-blue-300">
                     <div className="flex items-center gap-2">
                       <LogIn className="w-4 h-4 text-blue-400 shrink-0" />
-                      <span>Bạn cần đăng nhập tài khoản trước khi thi để hệ thống lưu lịch sử và cấp chứng chỉ.</span>
+                      <span>{tr("Bạn cần đăng nhập tài khoản trước khi thi để hệ thống lưu lịch sử và cấp chứng chỉ.")}</span>
                     </div>
                     <button
                       onClick={() => login()}
                       className="px-3.5 py-1.5 bg-[#0088ff] hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition-all shrink-0 shadow-md shadow-blue-500/20"
                     >
-                      Đăng nhập ngay
+                      {tr("Đăng nhập ngay")}
                     </button>
                   </div>
                 ) : (
@@ -294,7 +296,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                       <span className="text-slate-300">Trader: <strong className="text-white">{user.name}</strong> <span className="text-slate-500">({user.email})</span></span>
                     </div>
                     <div className="text-xs text-slate-400 flex items-center gap-2 shrink-0">
-                      <span>Lượt reset tuần này:</span>
+                      <span>{tr("Lượt reset tuần này:")}</span>
                       <span className="font-bold text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/30">
                         {MAX_RESETS_PER_WEEK - challengeState.resetsUsedThisWeek} / {MAX_RESETS_PER_WEEK}
                       </span>
@@ -326,18 +328,18 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                           {/* Huy hiệu trạng thái nếu đang thi hoặc đã đỗ */}
                           {isCurrent ? (
                             <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-blue-500 text-white font-bold text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow whitespace-nowrap">
-                              Đang Thi
+                              {tr("Đang Thi")}
                             </div>
                           ) : isPassed ? (
                             <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-emerald-500/90 text-slate-950 font-bold text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow whitespace-nowrap">
-                              ✓ Đã Đỗ
+                              {tr("✓ Đã Đỗ")}
                             </div>
                           ) : null}
 
                           {/* Đầu thẻ: Tên cấp & Vốn */}
                           <div className="text-center pt-1 pb-3 border-b border-white/5">
                             <span className="inline-block text-[11px] font-semibold text-slate-400 mb-1">
-                              {lvl.badge} • {lvl.levelName}
+                              {badge(lvl.id)} • {levelName(lvl.id, lvl.levelName)}
                             </span>
                             <div className="text-2xl font-black text-white font-mono tracking-tight">
                               ${lvl.capitalUSD >= 1000 ? `${lvl.capitalUSD / 1000}K` : lvl.capitalUSD}
@@ -350,7 +352,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                           {/* Chi tiết tiêu chuẩn bài thi */}
                           <div className="py-3 space-y-2.5 text-xs">
                             <div>
-                              <span className="text-[10px] text-slate-500 block">Mục tiêu lợi nhuận</span>
+                              <span className="text-[10px] text-slate-500 block">{tr("Mục tiêu lợi nhuận")}</span>
                               <span className="font-bold text-emerald-400 font-mono text-[13px]">
                                 +{lvl.profitTargetPercent}%
                               </span>
@@ -360,7 +362,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                             </div>
 
                             <div className="pt-1 border-t border-white/5">
-                              <span className="text-[10px] text-slate-500 block">Lỗ tối đa ngày</span>
+                              <span className="text-[10px] text-slate-500 block">{tr("Lỗ tối đa ngày")}</span>
                               <span className="font-bold text-amber-400 font-mono text-[13px]">
                                 -{lvl.dailyLossLimitPercent}%
                               </span>
@@ -370,7 +372,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                             </div>
 
                             <div className="pt-1 border-t border-white/5">
-                              <span className="text-[10px] text-slate-500 block">Sụt giảm tối đa</span>
+                              <span className="text-[10px] text-slate-500 block">{tr("Sụt giảm tối đa")}</span>
                               <span className="font-bold text-rose-400 font-mono text-[13px]">
                                 -{lvl.maxDrawdownPercent}%
                               </span>
@@ -380,20 +382,20 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                             </div>
 
                             <div className="pt-1 border-t border-white/5 flex items-center justify-between text-[11px] gap-2">
-                              <span className="text-slate-500 whitespace-nowrap shrink-0">Ngày tối thiểu:</span>
-                              <span className="font-semibold text-slate-200 whitespace-nowrap">{lvl.minTradingDays} ngày</span>
+                              <span className="text-slate-500 whitespace-nowrap shrink-0">{tr("Ngày tối thiểu:")}</span>
+                              <span className="font-semibold text-slate-200 whitespace-nowrap">{lvl.minTradingDays} {tr("ngày")}</span>
                             </div>
 
                             <div className="flex items-center justify-between text-[11px] gap-2">
-                              <span className="text-slate-500 whitespace-nowrap shrink-0">Đòn bẩy:</span>
+                              <span className="text-slate-500 whitespace-nowrap shrink-0">{tr("Đòn bẩy:")}</span>
                               <span className="font-semibold text-cyan-400 font-mono whitespace-nowrap">
                                 {lvl.id === 6 ? '1:500 (Max)' : `1:${lvl.maxLeverage}`}
                               </span>
                             </div>
 
                             <div className="flex items-center justify-between text-[11px] gap-2">
-                              <span className="text-slate-500 whitespace-nowrap shrink-0">Thời hạn:</span>
-                              <span className="font-medium text-slate-300 whitespace-nowrap">Vô hạn</span>
+                              <span className="text-slate-500 whitespace-nowrap shrink-0">{tr("Thời hạn:")}</span>
+                              <span className="font-medium text-slate-300 whitespace-nowrap">{tr("Vô hạn")}</span>
                             </div>
                           </div>
 
@@ -405,14 +407,14 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                                 className="w-full py-2 bg-white/5 text-slate-500 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1 cursor-not-allowed border border-white/5"
                               >
                                 <Lock className="w-3 h-3" />
-                                <span>Cần đỗ Cấp {lvl.id - 1}</span>
+                                <span>{tr("Cần đỗ Cấp")} {lvl.id - 1}</span>
                               </button>
                             ) : isCurrent ? (
                               <button
                                 onClick={() => setActiveTab('dashboard')}
                                 className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[11px] font-bold transition-all shadow-md shadow-blue-600/20"
                               >
-                                Đang thi
+                                {tr("Đang thi")}
                               </button>
                             ) : isPassed ? (
                               <button
@@ -420,14 +422,14 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                                 className="w-full py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1"
                               >
                                 <CheckCircle2 className="w-3 h-3" />
-                                <span>Thi lại</span>
+                                <span>{tr("Thi lại")}</span>
                               </button>
                             ) : (
                               <button
                                 onClick={() => handleStartClick(lvl)}
                                 className="w-full py-2 bg-[#0088ff] hover:bg-blue-500 text-white rounded-xl text-[11px] font-bold transition-all shadow-md shadow-blue-500/20 hover:scale-[1.02]"
                               >
-                                Bắt đầu
+                                {tr("Bắt đầu")}
                               </button>
                             )}
                           </div>
@@ -440,12 +442,12 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                 {/* Chân trang: Cam kết quy chuẩn */}
                 <div className="pt-2 text-center text-xs text-slate-400 flex flex-wrap items-center justify-center gap-3 sm:gap-6 border-t border-white/5">
                   <span className="flex items-center gap-1.5 text-emerald-400">
-                    <Check className="w-3.5 h-3.5" /> Dữ liệu sàn Binance thời gian thực 100%
+                    <Check className="w-3.5 h-3.5" /> {tr("Dữ liệu sàn Binance thời gian thực 100%")}
                   </span>
                   <span>•</span>
-                  <span>Khóa sửa số dư trong thời gian thi để rèn kỷ luật</span>
+                  <span>{tr("Khóa sửa số dư trong thời gian thi để rèn kỷ luật")}</span>
                   <span>•</span>
-                  <span>Tối đa 4 lượt reset mỗi tuần</span>
+                  <span>{tr("Tối đa 4 lượt reset mỗi tuần")}</span>
                 </div>
 
               </div>
@@ -459,7 +461,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                 <div className="bg-[#121622] border border-white/10 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-xl font-bold text-white">{currentLevelConfig.levelName}</h3>
+                      <h3 className="text-xl font-bold text-white">{levelName(currentLevelConfig.id, currentLevelConfig.levelName)}</h3>
                       <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
                         challengeState.status === 'ACTIVE'
                           ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 animate-pulse'
@@ -471,15 +473,15 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                           ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                           : 'bg-slate-800 text-slate-400'
                       }`}>
-                        {challengeState.status === 'ACTIVE' && 'Đang làm bài thi'}
-                        {challengeState.status === 'PAUSED' && 'Đang tạm dừng'}
-                        {challengeState.status === 'PASSED' && 'Đã hoàn thành xuất sắc'}
-                        {challengeState.status === 'FAILED' && 'Đã vi phạm quy tắc'}
-                        {challengeState.status === 'NOT_STARTED' && 'Chưa bắt đầu'}
+                        {challengeState.status === 'ACTIVE' && tr("Đang làm bài thi")}
+                        {challengeState.status === 'PAUSED' && tr("Đang tạm dừng")}
+                        {challengeState.status === 'PASSED' && tr("Đã hoàn thành xuất sắc")}
+                        {challengeState.status === 'FAILED' && tr("Đã vi phạm quy tắc")}
+                        {challengeState.status === 'NOT_STARTED' && tr("Chưa bắt đầu")}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400">
-                      Vốn cấp ban đầu: <strong className="text-white font-mono text-sm">${challengeState.startingCapitalUSD.toLocaleString('en-US')}</strong>
+                      {tr("Vốn cấp ban đầu:")} <strong className="text-white font-mono text-sm">${challengeState.startingCapitalUSD.toLocaleString('en-US')}</strong>
                     </p>
                   </div>
 
@@ -489,10 +491,10 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                       <button
                         onClick={handlePauseChallenge}
                         className="px-3.5 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors border border-amber-500/30"
-                        title="Tạm dừng đánh giá để nghỉ ngơi hoặc quan sát thị trường"
+                        title={tr("Tạm dừng đánh giá để nghỉ ngơi hoặc quan sát thị trường")}
                       >
                         <Pause className="w-3.5 h-3.5 fill-current" />
-                        <span>Tạm dừng</span>
+                        <span>{tr("Tạm dừng")}</span>
                       </button>
                     )}
 
@@ -500,10 +502,10 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                       <button
                         onClick={handleResumeChallenge}
                         className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-lg shadow-emerald-500/20"
-                        title="Tiếp tục bài thi"
+                        title={tr("Tiếp tục bài thi")}
                       >
                         <Play className="w-3.5 h-3.5 fill-current" />
-                        <span>Tiếp tục thi</span>
+                        <span>{tr("Tiếp tục thi")}</span>
                       </button>
                     )}
 
@@ -511,17 +513,17 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                       <button
                         onClick={handleEndChallenge}
                         className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors border border-rose-500/20"
-                        title="Kết thúc và rời bài thi để quay lại tài khoản thường"
+                        title={tr("Kết thúc và rời bài thi để quay lại tài khoản thường")}
                       >
                         <Square className="w-3.5 h-3.5" />
-                        <span>Kết thúc</span>
+                        <span>{tr("Kết thúc")}</span>
                       </button>
                     )}
 
                     <div className="h-6 w-[1px] bg-white/10 mx-1 hidden sm:block" />
 
                     <div className="text-right text-xs text-slate-400 pr-1">
-                      <span>Lượt reset: </span>
+                      <span>{tr("Lượt reset:")} </span>
                       <strong className="text-cyan-400 font-mono">
                         {MAX_RESETS_PER_WEEK - challengeState.resetsUsedThisWeek}/{MAX_RESETS_PER_WEEK}
                       </strong>
@@ -543,9 +545,9 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                   <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs flex items-start gap-3">
                     <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="text-rose-200 block text-sm font-bold mb-0.5">Tài khoản bài thi đã bị khóa do vi phạm!</strong>
-                      <p>{challengeState.breachReason}</p>
-                      <p className="mt-1 text-slate-400">Hãy nhấn "Reset bài thi" để bắt đầu lại thử thách.</p>
+                      <strong className="text-rose-200 block text-sm font-bold mb-0.5">{tr("Tài khoản bài thi đã bị khóa do vi phạm!")}</strong>
+                      <p>{tr(challengeState.breachReason || '')}</p>
+                      <p className="mt-1 text-slate-400">{tr("Hãy nhấn \"Reset bài thi\" để bắt đầu lại thử thách.")}</p>
                     </div>
                   </div>
                 )}
@@ -556,8 +558,8 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                     <div className="flex items-center gap-3">
                       <Award className="w-7 h-7 text-amber-400 shrink-0" />
                       <div>
-                        <strong className="text-amber-300 block text-base font-bold">Chúc mừng! Bạn đã thi đỗ thử thách!</strong>
-                        <p className="text-slate-300">Level tiếp theo đã được mở khóa và chứng chỉ đã sẵn sàng.</p>
+                        <strong className="text-amber-300 block text-base font-bold">{tr("Chúc mừng! Bạn đã thi đỗ thử thách!")}</strong>
+                        <p className="text-slate-300">{tr("Level tiếp theo đã được mở khóa và chứng chỉ đã sẵn sàng.")}</p>
                       </div>
                     </div>
                     <button
@@ -567,7 +569,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                       }}
                       className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-colors shrink-0 shadow-lg shadow-amber-500/20"
                     >
-                      Xem Bằng Chứng Nhận
+                      {tr("Xem Bằng Chứng Nhận")}
                     </button>
                   </div>
                 )}
@@ -575,30 +577,30 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                 {/* 4 Khối số liệu to rõ ràng */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                   <div className="bg-[#12151f] border border-white/5 rounded-xl p-4">
-                    <span className="text-slate-400 block mb-1">Tài sản (Equity):</span>
+                    <span className="text-slate-400 block mb-1">{tr("Tài sản (Equity):")}</span>
                     <span className="text-xl font-bold text-white font-mono">
                       ${challengeState.currentEquityUSD.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                     </span>
                   </div>
 
                   <div className="bg-[#12151f] border border-white/5 rounded-xl p-4">
-                    <span className="text-slate-400 block mb-1">Lợi nhuận ròng:</span>
+                    <span className="text-slate-400 block mb-1">{tr("Lợi nhuận ròng:")}</span>
                     <span className={`text-xl font-bold font-mono ${challengeState.totalProfitUSD >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {challengeState.totalProfitUSD >= 0 ? '+' : ''}${challengeState.totalProfitUSD.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                     </span>
                   </div>
 
                   <div className="bg-[#12151f] border border-white/5 rounded-xl p-4">
-                    <span className="text-slate-400 block mb-1">Lỗ trong ngày:</span>
+                    <span className="text-slate-400 block mb-1">{tr("Lỗ trong ngày:")}</span>
                     <span className="text-xl font-bold text-amber-400 font-mono">
                       -${challengeState.dailyLossUSD.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                     </span>
                   </div>
 
                   <div className="bg-[#12151f] border border-white/5 rounded-xl p-4">
-                    <span className="text-slate-400 block mb-1">Số ngày đã giao dịch:</span>
+                    <span className="text-slate-400 block mb-1">{tr("Số ngày đã giao dịch:")}</span>
                     <span className="text-xl font-bold text-cyan-400 font-mono">
-                      {challengeState.tradingDaysCount} / {currentLevelConfig.minTradingDays} ngày
+                      {challengeState.tradingDaysCount} / {currentLevelConfig.minTradingDays} {tr("ngày")}
                     </span>
                   </div>
                 </div>
@@ -606,13 +608,13 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                 {/* 3 Thanh tiến độ mượt mà */}
                 <div className="bg-[#12151f] border border-white/5 rounded-2xl p-6 space-y-5">
                   <h4 className="text-xs uppercase tracking-wider text-slate-400 font-bold">
-                    Tiến Độ & Ngưỡng Rủi Ro
+                    {tr("Tiến Độ & Ngưỡng Rủi Ro")}
                   </h4>
 
                   {/* 1. Target */}
                   <div>
                     <div className="flex justify-between text-xs mb-1.5">
-                      <span className="text-slate-300 font-medium">Mục tiêu lợi nhuận (+{currentLevelConfig.profitTargetPercent}%)</span>
+                      <span className="text-slate-300 font-medium">{tr("Mục tiêu lợi nhuận")} (+{currentLevelConfig.profitTargetPercent}%)</span>
                       <span className="text-emerald-400 font-bold font-mono">
                         ${Math.max(0, challengeState.totalProfitUSD).toLocaleString('en-US', { maximumFractionDigits: 1 })} / ${targetAmount.toLocaleString('en-US')} ({targetProgress.toFixed(1)}%)
                       </span>
@@ -625,7 +627,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                   {/* 2. Daily Loss */}
                   <div>
                     <div className="flex justify-between text-xs mb-1.5">
-                      <span className="text-slate-300 font-medium">Giới hạn lỗ ngày (-{currentLevelConfig.dailyLossLimitPercent}%)</span>
+                      <span className="text-slate-300 font-medium">{tr("Giới hạn lỗ ngày")} (-{currentLevelConfig.dailyLossLimitPercent}%)</span>
                       <span className="text-amber-400 font-bold font-mono">
                         -${challengeState.dailyLossUSD.toLocaleString('en-US', { maximumFractionDigits: 1 })} / -${dailyLossLimit.toLocaleString('en-US')} ({dailyLossPercent.toFixed(1)}%)
                       </span>
@@ -638,7 +640,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                   {/* 3. Max Drawdown */}
                   <div>
                     <div className="flex justify-between text-xs mb-1.5">
-                      <span className="text-slate-300 font-medium">Mức sụt giảm tối đa (-{currentLevelConfig.maxDrawdownPercent}%)</span>
+                      <span className="text-slate-300 font-medium">{tr("Mức sụt giảm tối đa")} (-{currentLevelConfig.maxDrawdownPercent}%)</span>
                       <span className="text-rose-400 font-bold font-mono">
                         -${challengeState.maxLossUSD.toLocaleString('en-US', { maximumFractionDigits: 1 })} / -${maxLossLimit.toLocaleString('en-US')} ({maxLossPercent.toFixed(1)}%)
                       </span>
@@ -658,27 +660,27 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                 {challengeState.certificates.length === 0 ? (
                   <div className="py-16 text-center text-slate-400">
                     <Award className="w-12 h-12 mx-auto text-slate-600 mb-2" />
-                    <h4 className="text-sm font-bold text-slate-300">Chưa có chứng chỉ</h4>
-                    <p className="text-xs text-slate-500 mt-1">Hoàn thành mục tiêu của bài thi để nhận Bằng Chứng Nhận Trader Quỹ.</p>
+                    <h4 className="text-sm font-bold text-slate-300">{tr("Chưa có chứng chỉ")}</h4>
+                    <p className="text-xs text-slate-500 mt-1">{tr("Hoàn thành mục tiêu của bài thi để nhận Bằng Chứng Nhận Trader Quỹ.")}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {challengeState.certificates.map(cert => (
                       <div key={cert.certCode} className="p-5 rounded-2xl bg-[#12151f] border border-amber-500/30 flex items-center justify-between">
                         <div>
-                          <h4 className="font-bold text-white text-sm">{cert.levelName}</h4>
+                          <h4 className="font-bold text-white text-sm">{levelName(cert.levelId, cert.levelName)}</h4>
                           <span className="text-xs text-slate-400 block mt-1">
-                            Hạn mức cấp vốn: ${cert.capitalUSD.toLocaleString('en-US')}
+                            {tr("Hạn mức cấp vốn:")} ${cert.capitalUSD.toLocaleString('en-US')}
                           </span>
                           <span className="text-[11px] text-slate-500 block font-mono mt-0.5">
-                            Ngày cấp: {cert.date}
+                            {tr("Ngày cấp:")} {cert.date}
                           </span>
                         </div>
                         <button
                           onClick={() => setSelectedCert(cert)}
                           className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-colors shadow"
                         >
-                          Xem Bằng
+                          {tr("Xem Bằng")}
                         </button>
                       </div>
                     ))}
@@ -699,10 +701,10 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
               <LogIn className="w-7 h-7" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">
-              Yêu Cầu Đăng Nhập Trước Khi Thi
+              {tr("Yêu Cầu Đăng Nhập Trước Khi Thi")}
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed mb-6">
-              Để hệ thống ghi nhận lịch sử thi tuyển, quản lý kỷ luật giao dịch và cấp <strong className="text-white">Bằng Chứng Nhận Trader</strong> cho riêng bạn, bạn cần đăng nhập tài khoản trước khi bắt đầu bài thi.
+              {tr("Để hệ thống ghi nhận lịch sử thi tuyển, quản lý kỷ luật giao dịch và cấp")} <strong className="text-white">{tr("Bằng Chứng Nhận Trader")}</strong> {tr("cho riêng bạn, bạn cần đăng nhập tài khoản trước khi bắt đầu bài thi.")}
             </p>
 
             <div className="space-y-2.5">
@@ -714,14 +716,14 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                 className="w-full py-3 bg-[#0088ff] hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.01]"
               >
                 <LogIn className="w-4 h-4" />
-                <span>Đăng nhập để bắt đầu thi</span>
+                <span>{tr("Đăng nhập để bắt đầu thi")}</span>
               </button>
 
               <button
                 onClick={() => setShowLoginPrompt(false)}
                 className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl text-xs font-medium transition-colors"
               >
-                Để sau
+                {tr("Để sau")}
               </button>
             </div>
           </div>
@@ -734,7 +736,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
           <div className="bg-[#12151f] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl text-slate-200">
             <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
               <Trophy className="w-4 h-4 text-amber-400" />
-              Bắt đầu bài thi {confirmStartLevel.badge} ({confirmStartLevel.levelName})?
+              {tr("Bắt đầu bài thi")} {badge(confirmStartLevel.id)} ({levelName(confirmStartLevel.id, confirmStartLevel.levelName)})?
             </h3>
 
             {user && (
@@ -754,7 +756,7 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
             )}
 
             <p className="text-xs text-slate-400 mb-5 leading-relaxed">
-              Vốn tài khoản sẽ được cấp là <strong className="text-white font-mono">${confirmStartLevel.capitalUSD.toLocaleString('en-US')}</strong>. Hệ thống sẽ khóa tính năng nạp/sửa tiền tự do trong suốt quá trình làm bài thi để rèn luyện kỷ luật thực tế.
+              {tr("Vốn tài khoản sẽ được cấp là")} <strong className="text-white font-mono">${confirmStartLevel.capitalUSD.toLocaleString('en-US')}</strong>{tr(". Hệ thống sẽ khóa tính năng nạp/sửa tiền tự do trong suốt quá trình làm bài thi để rèn luyện kỷ luật thực tế.")}
             </p>
 
             <div className="flex justify-end gap-2 text-xs">
@@ -762,13 +764,13 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
                 onClick={() => setConfirmStartLevel(null)}
                 className="px-4 py-2 bg-white/10 hover:bg-white/20 text-slate-300 rounded-xl font-medium"
               >
-                Hủy
+                {tr("Hủy")}
               </button>
               <button
                 onClick={() => handleStartLevel(confirmStartLevel)}
                 className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-bold shadow-lg shadow-amber-500/20"
               >
-                Xác nhận bắt đầu
+                {tr("Xác nhận bắt đầu")}
               </button>
             </div>
           </div>

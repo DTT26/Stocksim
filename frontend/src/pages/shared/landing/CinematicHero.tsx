@@ -3,22 +3,36 @@ import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
 import { Link } from 'react-router-dom';
 import { Terminal, ArrowUpRight, Cpu, ShieldCheck, Activity, Layers, CheckCircle2 } from 'lucide-react';
 import { HERO_CHART_DATA, generateOrderBook, INITIAL_TRADES_TAPE } from './mockData';
+import { useI18n } from '../../../contexts/I18nContext';
+import { useMarketStore } from '../../../stores/useMarketStore';
 
 export const CinematicHero: React.FC = () => {
+  const { lang } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
   const [isDesktop, setIsDesktop] = useState(false);
 
-  // Live fluctuating ticker in Hero
-  const [aaplPrice, setAaplPrice] = useState(248.42);
-  const [aaplFlash, setAaplFlash] = useState<'UP' | 'DOWN' | null>(null);
+  // Lấy dữ liệu thời gian thực từ Market Store
+  const tickers = useMarketStore(state => state.tickers);
+  const stocks = useMarketStore(state => state.stocks);
 
-  const [btcPrice, setBtcPrice] = useState(83090.00);
-  const [btcFlash, setBtcFlash] = useState<'UP' | 'DOWN' | null>(null);
+  const aaplTicker = tickers['AAPL'];
+  const aaplStock = stocks.find(s => s.symbol === 'AAPL');
+  const liveAaplPrice = aaplTicker?.price ?? aaplStock?.price ?? 340.62;
+  const liveAaplPercent = aaplTicker?.percent ?? aaplStock?.percent ?? 1.04;
+
+  const btcTicker = tickers['BTCUSDT'] || tickers['BTCUSDT.P'];
+  const btcStock = stocks.find(s => s.symbol === 'BTCUSDT');
+  const liveBtcPrice = btcTicker?.price ?? btcStock?.price ?? 83090.00;
+
+  const nvdaTicker = tickers['NVDA'];
+  const nvdaStock = stocks.find(s => s.symbol === 'NVDA');
+  const liveNvdaPrice = nvdaTicker?.price ?? nvdaStock?.price ?? 224.08;
 
   // Terminal state
   const [activeSymbol, setActiveSymbol] = useState<'BTCUSDT' | 'AAPL' | 'NVDA'>('BTCUSDT');
-  const [orderBook, setOrderBook] = useState(() => generateOrderBook(83090));
+  const activePrice = activeSymbol === 'BTCUSDT' ? liveBtcPrice : activeSymbol === 'AAPL' ? liveAaplPrice : liveNvdaPrice;
+  const [orderBook, setOrderBook] = useState(() => generateOrderBook(liveBtcPrice));
   const [simulatedPnl, setSimulatedPnl] = useState(1725.00);
 
   // Scroll animations for continuous transition into next section
@@ -51,32 +65,10 @@ export const CinematicHero: React.FC = () => {
     }
   };
 
-  // Occasional realistic price updates with 400ms flash
+  // Update orderbook when active price updates
   useEffect(() => {
-    const timer = setInterval(() => {
-      // Toggle AAPL or BTC
-      if (Math.random() > 0.5) {
-        const delta = +(Math.random() * 0.28 - 0.12).toFixed(2);
-        setAaplPrice(prev => {
-          const next = +(prev + delta).toFixed(2);
-          setAaplFlash(delta >= 0 ? 'UP' : 'DOWN');
-          setTimeout(() => setAaplFlash(null), 450);
-          return next;
-        });
-      } else {
-        const delta = +(Math.random() * 32 - 15).toFixed(2);
-        setBtcPrice(prev => {
-          const next = +(prev + delta).toFixed(2);
-          setBtcFlash(delta >= 0 ? 'UP' : 'DOWN');
-          setTimeout(() => setBtcFlash(null), 450);
-          setOrderBook(generateOrderBook(next));
-          return next;
-        });
-      }
-    }, 3800);
-
-    return () => clearInterval(timer);
-  }, []);
+    setOrderBook(generateOrderBook(activePrice));
+  }, [activePrice]);
 
   return (
     <section
@@ -164,15 +156,15 @@ export const CinematicHero: React.FC = () => {
             {/* Engine Telemetry Pill */}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#0A101C] border border-[#1E2E48] text-slate-300 text-xs font-mono mb-6 self-start">
               <Cpu className="w-3.5 h-3.5 text-blue-400" />
-              <span>HỆ THỐNG STOCKSIM v2.8</span>
+              <span>{lang === 'vi' ? 'HỆ THỐNG STOCKSIM v2.8' : 'STOCKSIM SYSTEM v2.8'}</span>
               <span className="text-slate-600">|</span>
-              <span className="text-blue-400 font-semibold">100% KHỚP LỆNH CHUẨN XÁC</span>
+              <span className="text-blue-400 font-semibold">{lang === 'vi' ? '100% KHỚP LỆNH CHUẨN XÁC' : '100% ACCURATE EXECUTION'}</span>
             </div>
 
             {/* Editorial Large Typography */}
             <h1 className="text-5xl sm:text-6xl lg:text-[76px] xl:text-[84px] font-extrabold tracking-tight text-white uppercase leading-[0.95] font-sans">
-              <span className="block text-slate-100">Luyện tập</span>
-              <span className="block text-slate-100">Giao dịch.</span>
+              <span className="block text-slate-100">{lang === 'vi' ? 'Luyện tập' : 'Master'}</span>
+              <span className="block text-slate-100">{lang === 'vi' ? 'Giao dịch.' : 'Trading.'}</span>
             </h1>
 
             {/* Animated Second Message */}
@@ -183,37 +175,33 @@ export const CinematicHero: React.FC = () => {
                 transition={{ duration: 0.9, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
                 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight uppercase leading-[0.98] font-sans text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-slate-200"
               >
-                <span>Không rủi ro</span>
-                <span className="block text-blue-400">Vốn thật.</span>
+                <span>{lang === 'vi' ? 'Không rủi ro' : 'Zero Risk'}</span>
+                <span className="block text-blue-400">{lang === 'vi' ? 'Vốn thật.' : 'Real Capital.'}</span>
               </motion.div>
             </div>
 
             {/* Editorial Subhead */}
             <p className="mt-6 text-base sm:text-lg text-slate-400 font-sans leading-relaxed max-w-lg">
-              Nền tảng mô phỏng giao dịch chuẩn tổ chức. Làm chủ dòng tiền, tỷ lệ lợi nhuận/rủi ro và kỷ luật vào lệnh trên dữ liệu thực tế 100% không sợ thua lỗ tài chính.
+              {lang === 'vi'
+                ? 'Nền tảng mô phỏng giao dịch chuẩn tổ chức. Làm chủ dòng tiền, tỷ lệ lợi nhuận/rủi ro và kỷ luật vào lệnh trên dữ liệu thực tế 100% không sợ thua lỗ tài chính.'
+                : 'Institutional-grade trading simulation platform. Master cash flows, risk-to-reward ratios, and execution discipline on 100% live data with zero financial risk.'}
             </p>
 
             {/* Live Hero Price Ticker Card */}
             <div className="mt-6 p-3 rounded-lg bg-[#0A101C] border border-[#1E293B] flex items-center justify-between font-mono text-xs max-w-md">
               <div className="flex items-center gap-3">
                 <span className="font-bold text-white">AAPL (NASDAQ)</span>
-                <span
-                  className={`px-1.5 py-0.5 rounded text-xs font-bold transition-colors duration-300 ${
-                    aaplFlash === 'UP'
-                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/50'
-                      : aaplFlash === 'DOWN'
-                      ? 'bg-rose-950 text-rose-400 border border-rose-500/50'
-                      : 'text-slate-300'
-                  }`}
-                >
-                  ${aaplPrice.toFixed(2)}
+                <span className="px-1.5 py-0.5 rounded text-xs font-bold text-slate-200">
+                  ${liveAaplPrice.toFixed(2)}
                 </span>
-                <span className="text-emerald-400 font-medium">+2.84%</span>
+                <span className={`font-medium ${liveAaplPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {liveAaplPercent >= 0 ? '+' : ''}{liveAaplPercent.toFixed(2)}%
+                </span>
               </div>
 
               <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                <span>DỮ LIỆU TRỰC TIẾP</span>
+                <span>{lang === 'vi' ? 'DỮ LIỆU TRỰC TIẾP' : 'LIVE DATA'}</span>
               </div>
             </div>
 
@@ -224,7 +212,7 @@ export const CinematicHero: React.FC = () => {
                 className="inline-flex items-center gap-2 px-6 py-3.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-mono text-sm font-bold tracking-wide transition-all shadow-lg shadow-blue-950 group"
               >
                 <Terminal className="w-4 h-4 text-blue-200" />
-                <span>MỞ SÀN GIAO DỊCH MÔ PHỎNG</span>
+                <span>{lang === 'vi' ? 'MỞ SÀN GIAO DỊCH MÔ PHỎNG' : 'OPEN SIMULATION TERMINAL'}</span>
                 <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
               </Link>
 
@@ -233,7 +221,7 @@ export const CinematicHero: React.FC = () => {
                 className="inline-flex items-center gap-2 px-5 py-3.5 rounded bg-[#0E1524] hover:bg-[#16233B] text-slate-200 border border-[#23324D] hover:border-slate-500 font-mono text-sm font-medium transition-colors"
               >
                 <Layers className="w-4 h-4 text-slate-400" />
-                <span>KHÁM PHÁ TÍNH NĂNG</span>
+                <span>{lang === 'vi' ? 'KHÁM PHÁ TÍNH NĂNG' : 'EXPLORE FEATURES'}</span>
               </a>
             </div>
           </motion.div>
@@ -259,7 +247,7 @@ export const CinematicHero: React.FC = () => {
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
                   </div>
                   <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mr-1">
-                    TÀI SẢN:
+                    {lang === 'vi' ? 'TÀI SẢN:' : 'ASSET:'}
                   </span>
                   {(['BTCUSDT', 'AAPL', 'NVDA'] as const).map(sym => (
                     <button
@@ -277,16 +265,12 @@ export const CinematicHero: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-3 text-[11px]">
-                  <span className="text-slate-400">GIÁ:</span>
-                  <span
-                    className={`font-bold text-white transition-colors duration-300 ${
-                      btcFlash === 'UP' ? 'text-emerald-400' : btcFlash === 'DOWN' ? 'text-rose-400' : ''
-                    }`}
-                  >
-                    ${activeSymbol === 'BTCUSDT' ? btcPrice.toLocaleString('en-US', { minimumFractionDigits: 2 }) : activeSymbol === 'AAPL' ? aaplPrice.toFixed(2) : '189.27'} USD
+                  <span className="text-slate-400">{lang === 'vi' ? 'GIÁ:' : 'PRICE:'}</span>
+                  <span className="font-bold text-white">
+                    ${activePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                   </span>
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-950 text-blue-400 border border-blue-800/40">
-                    DỮ LIỆU L2
+                    {lang === 'vi' ? 'DỮ LIỆU L2' : 'L2 DATA'}
                   </span>
                 </div>
               </div>
@@ -301,7 +285,7 @@ export const CinematicHero: React.FC = () => {
                       <span className="text-blue-400">EMA 20: 83,280</span>
                       <span className="text-amber-400 hidden sm:inline">EMA 50: 82,930</span>
                     </div>
-                    <span className="text-purple-300 font-semibold">[VÙNG FVG TĂNG TRƯỞNG]</span>
+                    <span className="text-purple-300 font-semibold">{lang === 'vi' ? '[VÙNG FVG TĂNG TRƯỞNG]' : '[BULLISH FVG ZONE]'}</span>
                   </div>
 
                   {/* SVG Chart Render */}
@@ -347,7 +331,7 @@ export const CinematicHero: React.FC = () => {
                     <span>10:00</span>
                     <span>11:00</span>
                     <span>12:00</span>
-                    <span className="text-blue-400 font-semibold">12:45 TRỰC TIẾP</span>
+                    <span className="text-blue-400 font-semibold">{lang === 'vi' ? '12:45 TRỰC TIẾP' : '12:45 LIVE'}</span>
                   </div>
                 </div>
 
@@ -355,7 +339,7 @@ export const CinematicHero: React.FC = () => {
                 <div className="md:col-span-4 p-3 bg-[#070C16] flex flex-col justify-between">
                   <div>
                     <div className="text-[10px] text-slate-400 pb-1 mb-1 border-b border-[#1A263A] flex justify-between">
-                      <span>SỔ LỆNH L2</span>
+                      <span>{lang === 'vi' ? 'SỔ LỆNH L2' : 'L2 ORDER BOOK'}</span>
                       <span>SPREAD $0.50</span>
                     </div>
 
@@ -367,7 +351,7 @@ export const CinematicHero: React.FC = () => {
                         </div>
                       ))}
                       <div className="py-1 my-1 px-1 bg-[#0E1626] rounded text-center text-blue-400 font-bold text-xs">
-                        ${btcPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${activePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                       {orderBook.bids.slice(0, 3).map((b, i) => (
                         <div key={i} className="flex justify-between text-emerald-400">
@@ -381,11 +365,11 @@ export const CinematicHero: React.FC = () => {
                   {/* Simulated Position Indicator */}
                   <div className="pt-2 border-t border-[#1A263A] text-[10px]">
                     <div className="flex justify-between text-slate-400">
-                      <span>LÃI / LỖ VỊ THẾ:</span>
+                      <span>{lang === 'vi' ? 'LÃI / LỖ VỊ THẾ:' : 'POSITION P&L:'}</span>
                       <span className="text-emerald-400 font-bold">+${simulatedPnl.toFixed(2)} USD</span>
                     </div>
                     <div className="flex justify-between text-slate-500 mt-0.5">
-                      <span>TỶ SUẤT ROE:</span>
+                      <span>{lang === 'vi' ? 'TỶ SUẤT ROE:' : 'ROE RETURN:'}</span>
                       <span className="text-emerald-400 font-semibold">+41.87%</span>
                     </div>
                   </div>

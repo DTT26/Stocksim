@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { LineChart, TrendingUp, TrendingDown, ArrowUpRight, Crosshair, BarChart2, ShieldAlert, Award } from 'lucide-react';
+import { useI18n } from '../../../contexts/I18nContext';
 
 interface EquityDataPoint {
   date: string;
@@ -29,6 +30,7 @@ const PERFORMANCE_POINTS: EquityDataPoint[] = [
 ];
 
 export const CinematicPerformance: React.FC = () => {
+  const { lang } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(containerRef, { once: true, margin: '-100px' });
   const [hoverIndex, setHoverIndex] = useState<number | null>(14); // Default to Oct 04 as requested
@@ -68,43 +70,54 @@ export const CinematicPerformance: React.FC = () => {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#0D1525] border border-blue-500/30 text-blue-400 font-mono text-xs uppercase tracking-widest mb-3">
               <LineChart className="w-3.5 h-3.5" />
-              <span>PHÂN TÍCH HIỆU SUẤT TÍCH LŨY</span>
+              <span>{lang === 'vi' ? 'PHÂN TÍCH HIỆU SUẤT TÍCH LŨY' : 'CUMULATIVE PERFORMANCE ANALYTICS'}</span>
             </div>
 
             <h2 className="text-4xl sm:text-6xl font-black tracking-tight text-white uppercase font-sans">
-              MỖI GIAO DỊCH <br />
-              <span className="text-blue-500">MANG MỘT CÂU CHUYỆN.</span>
+              {lang === 'vi' ? (
+                <>
+                  MỖI GIAO DỊCH <br />
+                  <span className="text-blue-500">MANG MỘT CÂU CHUYỆN.</span>
+                </>
+              ) : (
+                <>
+                  EVERY EXECUTED TRADE <br />
+                  <span className="text-blue-500">TELLS A STORY.</span>
+                </>
+              )}
             </h2>
 
             <p className="mt-3 text-sm text-slate-400 font-sans max-w-xl">
-              Từ từng bước giá khớp lệnh đơn lẻ đến lợi thế quản trị rủi ro dài hạn. Quan sát các điểm lệnh hội tụ thành đường cong vốn (Equity Curve) được kiểm toán minh bạch.
+              {lang === 'vi'
+                ? 'Từ từng bước giá khớp lệnh đơn lẻ đến lợi thế quản trị rủi ro dài hạn. Quan sát các điểm lệnh hội tụ thành đường cong vốn (Equity Curve) được kiểm toán minh bạch.'
+                : 'From single tick executions to long-term mathematical edge. Observe your trade points coalesce into a transparently audited equity curve.'}
             </p>
           </div>
 
           {/* Primary Top KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 font-mono">
             <div className="p-3.5 rounded-lg bg-[#0C1220] border border-[#182338]">
-              <div className="text-[10px] text-slate-500 uppercase">Giá Trị Danh Mục</div>
+              <div className="text-[10px] text-slate-500 uppercase">{lang === 'vi' ? 'Giá Trị Danh Mục' : 'Portfolio Value'}</div>
               <div className="text-2xl font-bold text-white mt-0.5">$112,840</div>
-              <div className="text-[10px] text-blue-400 mt-0.5">Giá trị ròng kiểm toán</div>
+              <div className="text-[10px] text-blue-400 mt-0.5">{lang === 'vi' ? 'Giá trị ròng kiểm toán' : 'Audited Net Worth'}</div>
             </div>
 
             <div className="p-3.5 rounded-lg bg-[#0C1220] border border-[#182338]">
-              <div className="text-[10px] text-slate-500 uppercase">Tỷ Suất Sinh Lời</div>
+              <div className="text-[10px] text-slate-500 uppercase">{lang === 'vi' ? 'Tỷ Suất Sinh Lời' : 'Net Return'}</div>
               <div className="text-2xl font-bold text-emerald-400 mt-0.5">+12.84%</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Vượt thị trường: +8.1%</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">{lang === 'vi' ? 'Vượt thị trường: +8.1%' : 'Alpha vs Market: +8.1%'}</div>
             </div>
 
             <div className="p-3.5 rounded-lg bg-[#0C1220] border border-[#182338]">
-              <div className="text-[10px] text-slate-500 uppercase">Tỷ Lệ Thắng</div>
+              <div className="text-[10px] text-slate-500 uppercase">{lang === 'vi' ? 'Tỷ Lệ Thắng' : 'Win Rate'}</div>
               <div className="text-2xl font-bold text-white mt-0.5">61.4%</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">29 Thắng / 19 Thua</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">{lang === 'vi' ? '29 Thắng / 19 Thua' : '29 Wins / 19 Losses'}</div>
             </div>
 
             <div className="p-3.5 rounded-lg bg-[#0C1220] border border-[#182338]">
-              <div className="text-[10px] text-slate-500 uppercase">Số Lệnh</div>
+              <div className="text-[10px] text-slate-500 uppercase">{lang === 'vi' ? 'Số Lệnh' : 'Total Trades'}</div>
               <div className="text-2xl font-bold text-white mt-0.5">48</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Tổng lượt khớp lệnh</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">{lang === 'vi' ? 'Tổng lượt khớp lệnh' : 'Total executions'}</div>
             </div>
           </div>
         </div>
@@ -117,15 +130,17 @@ export const CinematicPerformance: React.FC = () => {
             <div className="flex items-center gap-4">
               <span className="font-bold text-white flex items-center gap-1.5">
                 <span className="w-2.5 h-0.5 bg-blue-500" />
-                ĐƯỜNG CONG VỐN ĐÃ ĐƯỢC XÁC THỰC
+                {lang === 'vi' ? 'ĐƯỜNG CONG VỐN ĐÃ ĐƯỢC XÁC THỰC' : 'VERIFIED EQUITY CURVE'}
               </span>
               <span className="text-slate-500 hidden sm:inline">|</span>
-              <span className="text-slate-400 hidden sm:inline">THAM CHIẾU: S&P 500 (+4.2%)</span>
+              <span className="text-slate-400 hidden sm:inline">
+                {lang === 'vi' ? 'THAM CHIẾU: S&P 500 (+4.2%)' : 'BENCHMARK: S&P 500 (+4.2%)'}
+              </span>
             </div>
 
             <div className="text-slate-400 flex items-center gap-2">
               <Crosshair className="w-3.5 h-3.5 text-blue-400" />
-              <span>RÊ CHUỘT ĐỂ XEM CHI TIẾT ĐIỂM KIỂM TOÁN</span>
+              <span>{lang === 'vi' ? 'RÊ CHUỘT ĐỂ XEM CHI TIẾT ĐIỂM KIỂM TOÁN' : 'HOVER TO INSPECT AUDIT TICKS'}</span>
             </div>
           </div>
 
@@ -139,22 +154,22 @@ export const CinematicPerformance: React.FC = () => {
                 className="absolute top-4 right-6 z-20 font-mono text-xs bg-[#0F172A]/95 border border-blue-500/50 rounded-lg p-3 text-slate-200 shadow-xl backdrop-blur-sm"
               >
                 <div className="text-[11px] text-slate-400 border-b border-[#21304A] pb-1 mb-1.5 flex items-center justify-between gap-4">
-                  <span>ĐIỂM KIỂM TOÁN</span>
+                  <span>{lang === 'vi' ? 'ĐIỂM KIỂM TOÁN' : 'AUDIT POINT'}</span>
                   <span className="font-bold text-white">{activeCoord.date}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-4 text-left">
                   <div>
-                    <div className="text-[10px] text-slate-500 uppercase">Danh Mục</div>
+                    <div className="text-[10px] text-slate-500 uppercase">{lang === 'vi' ? 'Danh Mục' : 'Equity'}</div>
                     <div className="font-bold text-white text-sm">${activeCoord.equity.toLocaleString()}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-slate-500 uppercase">Lãi/Lỗ Ngày</div>
+                    <div className="text-[10px] text-slate-500 uppercase">{lang === 'vi' ? 'Lãi/Lỗ Ngày' : 'Daily PnL'}</div>
                     <div className={`font-bold text-sm ${activeCoord.dailyPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {activeCoord.dailyPnl >= 0 ? '+' : ''}${activeCoord.dailyPnl}
                     </div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-slate-500 uppercase">Tỷ Suất</div>
+                    <div className="text-[10px] text-slate-500 uppercase">{lang === 'vi' ? 'Tỷ Suất' : 'Return'}</div>
                     <div className="font-bold text-emerald-400 text-sm">+{activeCoord.returnPercent.toFixed(2)}%</div>
                   </div>
                 </div>
@@ -280,9 +295,13 @@ export const CinematicPerformance: React.FC = () => {
               transition={{ delay: 0.4, duration: 0.4 }}
               className="p-4 rounded-lg bg-[#0C1220] border border-[#182338]"
             >
-              <div className="text-[11px] font-mono text-slate-400 uppercase">Lãi Trung Bình</div>
+              <div className="text-[11px] font-mono text-slate-400 uppercase">
+                {lang === 'vi' ? 'Lãi Trung Bình' : 'Average Win'}
+              </div>
               <div className="text-xl font-bold font-mono text-emerald-400 mt-1">+$482</div>
-              <div className="text-[10px] text-slate-500 font-mono mt-0.5">Tỷ lệ kỷ luật: 2.08x</div>
+              <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                {lang === 'vi' ? 'Tỷ lệ kỷ luật: 2.08x' : 'Payoff ratio: 2.08x'}
+              </div>
             </motion.div>
 
             <motion.div
@@ -291,9 +310,13 @@ export const CinematicPerformance: React.FC = () => {
               transition={{ delay: 0.5, duration: 0.4 }}
               className="p-4 rounded-lg bg-[#0C1220] border border-[#182338]"
             >
-              <div className="text-[11px] font-mono text-slate-400 uppercase">Lỗ Trung Bình</div>
+              <div className="text-[11px] font-mono text-slate-400 uppercase">
+                {lang === 'vi' ? 'Lỗ Trung Bình' : 'Average Loss'}
+              </div>
               <div className="text-xl font-bold font-mono text-rose-400 mt-1">-$231</div>
-              <div className="text-[10px] text-slate-500 font-mono mt-0.5">Cắt lỗ nghiêm ngặt khi sai điểm</div>
+              <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                {lang === 'vi' ? 'Cắt lỗ nghiêm ngặt khi sai điểm' : 'Strict SL upon invalidation'}
+              </div>
             </motion.div>
 
             <motion.div
@@ -302,9 +325,13 @@ export const CinematicPerformance: React.FC = () => {
               transition={{ delay: 0.6, duration: 0.4 }}
               className="p-4 rounded-lg bg-[#0C1220] border border-[#182338]"
             >
-              <div className="text-[11px] font-mono text-slate-400 uppercase">Hệ Số Lợi Nhuận</div>
+              <div className="text-[11px] font-mono text-slate-400 uppercase">
+                {lang === 'vi' ? 'Hệ Số Lợi Nhuận' : 'Profit Factor'}
+              </div>
               <div className="text-xl font-bold font-mono text-white mt-1">1.82</div>
-              <div className="text-[10px] text-emerald-400 font-mono mt-0.5">Tổng Lãi / Tổng Lỗ</div>
+              <div className="text-[10px] text-emerald-400 font-mono mt-0.5">
+                {lang === 'vi' ? 'Tổng Lãi / Tổng Lỗ' : 'Gross Profit / Gross Loss'}
+              </div>
             </motion.div>
 
             <motion.div
@@ -313,9 +340,13 @@ export const CinematicPerformance: React.FC = () => {
               transition={{ delay: 0.7, duration: 0.4 }}
               className="p-4 rounded-lg bg-[#0C1220] border border-[#182338]"
             >
-              <div className="text-[11px] font-mono text-slate-400 uppercase">Mức Sụt Giảm Tối Đa</div>
+              <div className="text-[11px] font-mono text-slate-400 uppercase">
+                {lang === 'vi' ? 'Mức Sụt Giảm Tối Đa' : 'Max Drawdown'}
+              </div>
               <div className="text-xl font-bold font-mono text-rose-400 mt-1">-4.7%</div>
-              <div className="text-[10px] text-slate-500 font-mono mt-0.5">Trong hạn mức rủi ro 5.0%</div>
+              <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                {lang === 'vi' ? 'Trong hạn mức rủi ro 5.0%' : 'Within 5.0% risk limit'}
+              </div>
             </motion.div>
           </div>
         </div>

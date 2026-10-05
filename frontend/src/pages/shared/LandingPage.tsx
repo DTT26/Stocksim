@@ -13,10 +13,24 @@ import { CinematicPerformance } from './landing/CinematicPerformance';
 import { CinematicTradingJournal } from './landing/CinematicTradingJournal';
 import { CinematicCTA } from './landing/CinematicCTA';
 import { LandingFooter } from './landing/LandingFooter';
+import { useI18n } from '../../contexts/I18nContext';
+import { useMarketStore } from '../../stores/useMarketStore';
 
 export const LandingPage: React.FC = () => {
+  const { lang } = useI18n();
+
   useEffect(() => {
-    document.title = 'StockSim - Nền Tảng Mô Phỏng & Đào Tạo Trading Chuẩn Tổ Chức';
+    document.title = lang === 'vi'
+      ? 'StockSim - Nền Tảng Mô Phỏng & Đào Tạo Trading Chuẩn Tổ Chức'
+      : 'StockSim - Institutional-Grade Paper Trading & Performance Attestation';
+  }, [lang]);
+
+  // Kích hoạt đồng bộ dữ liệu thị trường thực tế ngay khi vào Landing page và cập nhật định kỳ
+  useEffect(() => {
+    const fetchMarket = useMarketStore.getState().fetchMarketData;
+    fetchMarket();
+    const interval = setInterval(fetchMarket, 3500);
+    return () => clearInterval(interval);
   }, []);
 
   return (

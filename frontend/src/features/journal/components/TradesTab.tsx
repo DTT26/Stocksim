@@ -3,12 +3,14 @@ import type { JournalSession, JournalTrade } from '../types/journalTypes';
 import { TradeDetailDrawer } from './TradeDetailDrawer';
 import { formatMoneyVND, formatPercent } from '../../../utils/tradingAnalytics';
 import { Search, RotateCcw, Eye, ListFilter, ArrowUpRight, ArrowDownRight, Clock } from 'lucide-react';
+import { useI18n } from '../../../contexts/I18nContext';
 
 interface TradesTabProps {
   session: JournalSession;
 }
 
 export const TradesTab: React.FC<TradesTabProps> = ({ session }) => {
+  const { lang } = useI18n();
   const trades = session.trades || [];
 
   // Filter states
@@ -59,7 +61,7 @@ export const TradesTab: React.FC<TradesTabProps> = ({ session }) => {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm kiếm mã (VD: BTC, ETH, SOL)..."
+            placeholder={lang === 'vi' ? 'Tìm kiếm mã (VD: BTC, ETH, SOL)...' : 'Search symbol (e.g. BTC, ETH, SOL)...'}
             className="w-full bg-slate-50 dark:bg-[#161f31] border border-slate-200 dark:border-[#253047] text-slate-900 dark:text-white placeholder:text-slate-400 text-xs sm:text-sm rounded-xl pl-9 pr-3 py-2 sm:py-2.5 hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
           />
         </div>
@@ -73,9 +75,9 @@ export const TradesTab: React.FC<TradesTabProps> = ({ session }) => {
               onChange={(e) => setSideFilter(e.target.value as any)}
               className="w-full bg-slate-50 dark:bg-[#161f31] border border-slate-200 dark:border-[#253047] text-slate-900 dark:text-white text-xs sm:text-sm font-medium rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="ALL">Tất cả vị thế</option>
-              <option value="BUY">Mua / Long</option>
-              <option value="SELL">Bán / Short</option>
+              <option value="ALL">{lang === 'vi' ? 'Tất cả vị thế' : 'All sides'}</option>
+              <option value="BUY">{lang === 'vi' ? 'Mua / Long' : 'Buy / Long'}</option>
+              <option value="SELL">{lang === 'vi' ? 'Bán / Short' : 'Sell / Short'}</option>
             </select>
           </div>
 
@@ -86,9 +88,9 @@ export const TradesTab: React.FC<TradesTabProps> = ({ session }) => {
               onChange={(e) => setResultFilter(e.target.value as any)}
               className="w-full bg-slate-50 dark:bg-[#161f31] border border-slate-200 dark:border-[#253047] text-slate-900 dark:text-white text-xs sm:text-sm font-medium rounded-xl px-2.5 sm:px-3 py-2 sm:py-2.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="ALL">Tất cả kết quả</option>
-              <option value="PROFIT">Có lãi</option>
-              <option value="LOSS">Thua lỗ</option>
+              <option value="ALL">{lang === 'vi' ? 'Tất cả kết quả' : 'All outcomes'}</option>
+              <option value="PROFIT">{lang === 'vi' ? 'Có lãi' : 'Profit'}</option>
+              <option value="LOSS">{lang === 'vi' ? 'Thua lỗ' : 'Loss'}</option>
             </select>
           </div>
 
@@ -97,10 +99,10 @@ export const TradesTab: React.FC<TradesTabProps> = ({ session }) => {
             <button
               onClick={handleResetFilters}
               className="flex items-center justify-center gap-1 px-3 py-2 sm:py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer shrink-0"
-              title="Đặt lại bộ lọc"
+              title={lang === 'vi' ? 'Đặt lại bộ lọc' : 'Reset filters'}
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Đặt lại</span>
+              <span className="hidden sm:inline">{lang === 'vi' ? 'Đặt lại' : 'Reset'}</span>
             </button>
           )}
         </div>
@@ -111,9 +113,13 @@ export const TradesTab: React.FC<TradesTabProps> = ({ session }) => {
         {filteredTrades.length === 0 ? (
           <div className="p-8 sm:p-12 text-center">
             <ListFilter className="w-8 h-8 sm:w-10 sm:h-10 text-slate-400 mx-auto mb-2 sm:mb-3" />
-            <h4 className="font-bold text-slate-800 dark:text-white text-sm sm:text-base">Không tìm thấy lệnh phù hợp</h4>
+            <h4 className="font-bold text-slate-800 dark:text-white text-sm sm:text-base">
+              {lang === 'vi' ? 'Không tìm thấy lệnh phù hợp' : 'No matching trades found'}
+            </h4>
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-              Thử điều chỉnh từ khóa tìm kiếm hoặc bộ lọc để xem các lệnh đã thực hiện.
+              {lang === 'vi' 
+                ? 'Thử điều chỉnh từ khóa tìm kiếm hoặc bộ lọc để xem các lệnh đã thực hiện.' 
+                : 'Try adjusting your search query or filters to view executed trades.'}
             </p>
           </div>
         ) : (
@@ -164,7 +170,7 @@ export const TradesTab: React.FC<TradesTabProps> = ({ session }) => {
                               : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                           }`}
                         >
-                          {trade.status === 'OPEN' ? 'ĐANG MỞ' : 'ĐÃ ĐÓNG'}
+                          {trade.status === 'OPEN' ? (lang === 'vi' ? 'ĐANG MỞ' : 'OPEN') : (lang === 'vi' ? 'ĐÃ ĐÓNG' : 'CLOSED')}
                         </span>
                       </div>
 
@@ -191,19 +197,19 @@ export const TradesTab: React.FC<TradesTabProps> = ({ session }) => {
                     {/* Middle Row: Entry, Exit, Qty */}
                     <div className="grid grid-cols-3 gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#161f31]/60 text-[11px] border border-slate-100 dark:border-[#253047]/60">
                       <div>
-                        <span className="text-[10px] text-slate-400 block">Giá vào</span>
+                        <span className="text-[10px] text-slate-400 block">{lang === 'vi' ? 'Giá vào' : 'Entry'}</span>
                         <span className="font-semibold text-slate-800 dark:text-slate-200">
                           {formatMoneyVND(trade.entryPrice)}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-400 block">Giá ra</span>
+                        <span className="text-[10px] text-slate-400 block">{lang === 'vi' ? 'Giá ra' : 'Exit'}</span>
                         <span className="font-semibold text-slate-800 dark:text-slate-200">
                           {trade.exitPrice ? formatMoneyVND(trade.exitPrice) : '-'}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-400 block">Khối lượng</span>
+                        <span className="text-[10px] text-slate-400 block">{lang === 'vi' ? 'Khối lượng' : 'Size'}</span>
                         <span className="font-semibold font-mono text-slate-800 dark:text-slate-200">
                           {trade.quantity || trade.lot || '1'}
                         </span>
@@ -217,7 +223,7 @@ export const TradesTab: React.FC<TradesTabProps> = ({ session }) => {
                         {entryStr} – {exitStr}
                       </span>
                       <span className="text-blue-600 dark:text-blue-400 font-semibold text-[11px] flex items-center gap-1">
-                        <Eye className="w-3 h-3" /> Chi tiết
+                        <Eye className="w-3 h-3" /> {lang === 'vi' ? 'Chi tiết' : 'Details'}
                       </span>
                     </div>
                   </div>
@@ -231,18 +237,18 @@ export const TradesTab: React.FC<TradesTabProps> = ({ session }) => {
                 <thead className="bg-slate-50 dark:bg-[#172033] border-b border-slate-200 dark:border-[#253047] text-[11px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">
                   <tr>
                     <th className="py-3 px-3">#</th>
-                    <th className="py-3 px-3">Mã</th>
-                    <th className="py-3 px-2 text-center">Vị thế</th>
-                    <th className="py-3 px-3 text-right">Giá vào</th>
-                    <th className="py-3 px-3 text-right">Giá ra</th>
-                    <th className="py-3 px-2 text-center">K.Lượng</th>
-                    <th className="py-3 px-3">Thời gian vào</th>
-                    <th className="py-3 px-3">Thời gian ra</th>
-                    <th className="py-3 px-3 text-right">Lãi/Lỗ</th>
-                    <th className="py-3 px-2 text-right">Tỷ suất</th>
-                    <th className="py-3 px-2 text-center">Trạng thái</th>
+                    <th className="py-3 px-3">{lang === 'vi' ? 'Mã' : 'Symbol'}</th>
+                    <th className="py-3 px-2 text-center">{lang === 'vi' ? 'Vị thế' : 'Side'}</th>
+                    <th className="py-3 px-3 text-right">{lang === 'vi' ? 'Giá vào' : 'Entry Price'}</th>
+                    <th className="py-3 px-3 text-right">{lang === 'vi' ? 'Giá ra' : 'Exit Price'}</th>
+                    <th className="py-3 px-2 text-center">{lang === 'vi' ? 'K.Lượng' : 'Qty'}</th>
+                    <th className="py-3 px-3">{lang === 'vi' ? 'Thời gian vào' : 'Entry Time'}</th>
+                    <th className="py-3 px-3">{lang === 'vi' ? 'Thời gian ra' : 'Exit Time'}</th>
+                    <th className="py-3 px-3 text-right">{lang === 'vi' ? 'Lãi/Lỗ' : 'P&L'}</th>
+                    <th className="py-3 px-2 text-right">{lang === 'vi' ? 'Tỷ suất' : 'Return'}</th>
+                    <th className="py-3 px-2 text-center">{lang === 'vi' ? 'Trạng thái' : 'Status'}</th>
                     <th className="py-3 px-3 sm:px-4 text-right sticky right-0 z-10 bg-slate-50 dark:bg-[#172033] shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] dark:shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.3)]">
-                      Thao tác
+                      {lang === 'vi' ? 'Thao tác' : 'Action'}
                     </th>
                   </tr>
                 </thead>
@@ -337,7 +343,7 @@ export const TradesTab: React.FC<TradesTabProps> = ({ session }) => {
                                 : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                             }`}
                           >
-                            {trade.status === 'OPEN' ? 'ĐANG MỞ' : 'ĐÃ ĐÓNG'}
+                            {trade.status === 'OPEN' ? (lang === 'vi' ? 'ĐANG MỞ' : 'OPEN') : (lang === 'vi' ? 'ĐÃ ĐÓNG' : 'CLOSED')}
                           </span>
                         </td>
 
@@ -347,7 +353,7 @@ export const TradesTab: React.FC<TradesTabProps> = ({ session }) => {
                             className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer shrink-0"
                           >
                             <Eye className="w-3.5 h-3.5 shrink-0" />
-                            <span>Chi tiết</span>
+                            <span>{lang === 'vi' ? 'Chi tiết' : 'Details'}</span>
                           </button>
                         </td>
                       </tr>

@@ -663,7 +663,10 @@ export class TradingService {
   /**
    * Lấy lịch sử giao dịch của user (giữ nguyên toàn bộ lịch sử trước đó và trong bài thi)
    */
-  static async getTransactions(userId: string) {
+  static async getTransactions(userId?: string) {
+    if (!userId) {
+      return await Transaction.find().sort({ createdAt: -1 }).limit(30);
+    }
     return await Transaction.find({ userId }).sort({ createdAt: -1 });
   }
 }

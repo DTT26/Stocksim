@@ -1,13 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { DUAL_TICKER_ITEMS } from './mockData';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { useMarketStore } from '../../../stores/useMarketStore';
+
+const TICKER_SYMBOLS = [
+  'BTCUSDT',
+  'ETHUSDT',
+  'SOLUSDT',
+  'AAPL',
+  'NVDA',
+  'TSLA',
+  'MSFT',
+  'META',
+  'AMZN',
+  'XAUUSD',
+  'EURUSD',
+];
 
 export const DualMarketTicker: React.FC = () => {
   const [isPaused, setIsPaused] = useState(false);
+  const stocks = useMarketStore(state => state.stocks);
+  const tickers = useMarketStore(state => state.tickers);
+
+  const tickerItems = useMemo(() => {
+    return TICKER_SYMBOLS.map(sym => {
+      const t = tickers[sym];
+      const s = stocks.find(item => item.symbol.toUpperCase() === sym.toUpperCase());
+      const price = t?.price ?? s?.price ?? 0;
+      const changePercent = t?.percent ?? s?.percent ?? 0;
+      return {
+        symbol: sym,
+        price,
+        changePercent,
+      };
+    }).filter(item => item.price > 0);
+  }, [tickers, stocks]);
 
   // Repeat items for seamless infinite marquee loop
-  const tickerList = [...DUAL_TICKER_ITEMS, ...DUAL_TICKER_ITEMS, ...DUAL_TICKER_ITEMS];
+  const tickerList = useMemo(() => {
+    return [...tickerItems, ...tickerItems, ...tickerItems];
+  }, [tickerItems]);
 
   return (
     <section className="relative w-full py-4 bg-[#05080E] border-b border-[#1E293B] overflow-hidden select-none">

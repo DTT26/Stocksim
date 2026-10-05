@@ -2,8 +2,10 @@ import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Terminal, Trophy, ShieldCheck, Activity } from 'lucide-react';
+import { useI18n } from '../../../contexts/I18nContext';
 
 export const CinematicCTA: React.FC = () => {
+  const { lang } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { scrollYProgress } = useScroll({
@@ -58,16 +60,20 @@ export const CinematicCTA: React.FC = () => {
         {/* Top Minimal Badge */}
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#0A1220] border border-blue-500/30 text-blue-400 font-mono text-xs uppercase tracking-widest mb-8">
           <Terminal className="w-3.5 h-3.5" />
-          <span>KHÔNG RỦI RO TÀI CHÍNH THỰC • TỐI ĐA HÓA UY TÍN NĂNG LỰC</span>
+          <span>
+            {lang === 'vi'
+              ? 'KHÔNG RỦI RO TÀI CHÍNH THỰC • TỐI ĐA HÓA UY TÍN NĂNG LỰC'
+              : 'ZERO FINANCIAL RISK • MAXIMUM CREDENTIAL PROOF'}
+          </span>
         </div>
 
         {/* Main Headline */}
         <motion.div style={{ opacity: text1Opacity }} className="space-y-1">
           <h2 className="text-4xl sm:text-6xl lg:text-7xl xl:text-8xl font-black text-slate-400 tracking-tight uppercase font-sans">
-            BẠN KHÔNG THỂ HỌC
+            {lang === 'vi' ? 'BẠN KHÔNG THỂ HỌC' : 'YOU CANNOT LEARN'}
           </h2>
           <h2 className="text-4xl sm:text-6xl lg:text-7xl xl:text-8xl font-black text-slate-300 tracking-tight uppercase font-sans">
-            TRADING CHỈ BẰNG CÁCH NHÌN.
+            {lang === 'vi' ? 'TRADING CHỈ BẰNG CÁCH NHÌN.' : 'TRADING JUST BY WATCHING.'}
           </h2>
         </motion.div>
 
@@ -77,14 +83,27 @@ export const CinematicCTA: React.FC = () => {
           className="mt-4 sm:mt-6"
         >
           <h2 className="text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black text-white tracking-tight uppercase font-sans leading-none">
-            BẠN CHỈ THÀNH THẠO <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-500 to-indigo-400">
-              KHI THỰC CHIẾN.
-            </span>
+            {lang === 'vi' ? (
+              <>
+                BẠN CHỈ THÀNH THẠO <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-500 to-indigo-400">
+                  KHI THỰC CHIẾN.
+                </span>
+              </>
+            ) : (
+              <>
+                YOU ONLY MASTER IT <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-500 to-indigo-400">
+                  BY EXECUTING.
+                </span>
+              </>
+            )}
           </h2>
 
           <p className="mt-8 text-base sm:text-xl text-slate-300 font-sans max-w-2xl mx-auto leading-relaxed">
-            Rèn luyện kỹ năng với nguồn vốn mô phỏng. Xây dựng hồ sơ năng lực trading được kiểm toán minh bạch mà không gặp rủi ro tài chính cá nhân.
+            {lang === 'vi'
+              ? 'Rèn luyện kỹ năng với nguồn vốn mô phỏng. Xây dựng hồ sơ năng lực trading được kiểm toán minh bạch mà không gặp rủi ro tài chính cá nhân.'
+              : 'Hone institutional-grade discipline with simulated capital. Build a transparent, verifiable track record without risking your own funds.'}
           </p>
 
           {/* Action CTAs */}
@@ -93,7 +112,7 @@ export const CinematicCTA: React.FC = () => {
               to="/trade/btcusdt"
               className="w-full sm:w-auto px-8 py-4 rounded bg-blue-600 hover:bg-blue-500 text-white font-mono text-sm font-bold tracking-wider uppercase transition-all shadow-xl shadow-blue-600/30 flex items-center justify-center gap-2 group"
             >
-              <span>BẮT ĐẦU GIAO DỊCH</span>
+              <span>{lang === 'vi' ? 'BẮT ĐẦU GIAO DỊCH' : 'START TRADING NOW'}</span>
               <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </Link>
 
@@ -102,7 +121,7 @@ export const CinematicCTA: React.FC = () => {
               className="w-full sm:w-auto px-8 py-4 rounded bg-[#0A101C] hover:bg-[#121B2D] text-slate-300 hover:text-white border border-[#1E293B] hover:border-slate-600 font-mono text-sm font-semibold tracking-wider uppercase transition-colors flex items-center justify-center gap-2"
             >
               <Trophy className="w-4 h-4 text-blue-400" />
-              <span>Khám Phá Đấu Trường</span>
+              <span>{lang === 'vi' ? 'Khám Phá Đấu Trường' : 'Explore Arenas'}</span>
             </a>
           </div>
 
@@ -110,15 +129,15 @@ export const CinematicCTA: React.FC = () => {
           <div className="mt-14 pt-8 border-t border-[#162235] flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs font-mono text-slate-500">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Sổ Cái Khớp Lệnh Mã Hóa</span>
+              <span>{lang === 'vi' ? 'Sổ Cái Khớp Lệnh Mã Hóa' : 'Cryptographic Trade Ledger'}</span>
             </div>
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-blue-400" />
-              <span>Độ Sâu Sổ Lệnh Chuẩn Từng Tick</span>
+              <span>{lang === 'vi' ? 'Độ Sâu Sổ Lệnh Chuẩn Từng Tick' : 'Tick-by-Tick Orderbook Depth'}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-400" />
-              <span>Hệ Thống Đánh Giá Chuẩn Tổ Chức</span>
+              <span>{lang === 'vi' ? 'Hệ Thống Đánh Giá Chuẩn Tổ Chức' : 'Institutional Evaluation Rules'}</span>
             </div>
           </div>
         </motion.div>

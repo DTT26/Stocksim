@@ -1,13 +1,66 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { Trophy, ShieldCheck, Users, Calendar, Award, ArrowUpRight, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { CINEMATIC_LEADERBOARD } from './mockData';
+import { useI18n } from '../../../contexts/I18nContext';
 
 export const CinematicSimulations: React.FC = () => {
+  const { lang } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(containerRef, { once: true, margin: '-100px' });
 
-  const headlineWords = ['GIAO DỊCH', 'KỶ LUẬT.', 'KHÔNG', 'CLICK LỆNH', 'NGẪU NHIÊN.'];
+  const [liveSim, setLiveSim] = useState<any>(null);
+  const [leaderboard, setLeaderboard] = useState<any[]>(CINEMATIC_LEADERBOARD);
+
+  // Tải dữ liệu thực tế cuộc thi mô phỏng và bảng xếp hạng từ database
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSimulations = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/simulations', { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0 && isMounted) {
+            const active = data.find((s: any) => s.status === 'ACTIVE') || data[0];
+            setLiveSim(active);
+
+            // Tải danh sách người tham gia thực tế nếu có
+            if (active._id) {
+              const pRes = await fetch(`/api/simulations/${active._id}/participants`, { headers }).catch(() => null);
+              if (pRes && pRes.ok) {
+                const pList = await pRes.json();
+                if (Array.isArray(pList) && pList.length > 0 && isMounted) {
+                  const sorted = [...pList].sort((a: any, b: any) => (b.returnRate || 0) - (a.returnRate || 0));
+                  const formatted = sorted.slice(0, 4).map((p: any, idx: number) => ({
+                    rank: idx + 1,
+                    name: p.userId?.name || p.userId?.email?.split('@')[0] || `Trader #${idx + 1}`,
+                    returnPercent: p.returnRate || 0,
+                    portfolio: `$${(p.portfolioValue || p.currentBalance || active.initialBalance || 100000).toLocaleString('en-US')}`,
+                    trades: p.ordersCount || 0,
+                    isUser: false,
+                  }));
+                  setLeaderboard(formatted);
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        // Fallback to initial display
+      }
+    };
+
+    fetchSimulations();
+    return () => { isMounted = false; };
+  }, []);
+
+  const headlineWords = lang === 'vi'
+    ? ['GIAO DỊCH', 'KỶ LUẬT.', 'KHÔNG', 'CLICK LỆNH', 'NGẪU NHIÊN.']
+    : ['DISCIPLINED', 'TRADING.', 'NO', 'RANDOM', 'GAMBLING.'];
 
   return (
     <section
@@ -19,7 +72,7 @@ export const CinematicSimulations: React.FC = () => {
         <div className="mb-14 text-center max-w-4xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#10192A] border border-blue-500/30 text-blue-400 font-mono text-xs uppercase tracking-widest mb-4">
             <Trophy className="w-3.5 h-3.5" />
-            <span>ĐẤU TRƯỜNG MÔ PHỎNG TỔ CHỨC</span>
+            <span>{lang === 'vi' ? 'ĐẤU TRƯỜNG MÔ PHỎNG TỔ CHỨC' : 'INSTITUTIONAL SIMULATION ARENA'}</span>
           </div>
 
           <h2 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white uppercase font-sans flex flex-wrap justify-center gap-x-4 gap-y-2 leading-tight">
@@ -33,7 +86,7 @@ export const CinematicSimulations: React.FC = () => {
                   delay: idx * 0.1,
                   ease: [0.215, 0.61, 0.355, 1],
                 }}
-                className={word.includes('KỶ LUẬT') ? 'text-blue-400' : ''}
+                className={word.includes('KỶ LUẬT') || word.includes('DISCIPLINED') ? 'text-blue-400' : ''}
               >
                 {word}
               </motion.span>
@@ -41,7 +94,9 @@ export const CinematicSimulations: React.FC = () => {
           </h2>
 
           <p className="mt-4 text-sm sm:text-base text-slate-400 font-sans max-w-2xl mx-auto">
-            Tham gia các giải đấu giao dịch có cấu trúc theo mô hình đánh giá của quỹ Prop Firm và các khóa học tài chính đại học danh tiếng.
+            {lang === 'vi'
+              ? 'Tham gia các giải đấu giao dịch có cấu trúc theo mô hình đánh giá của quỹ Prop Firm và các khóa học tài chính đại học danh tiếng.'
+              : 'Participate in structured trading competitions modeled after Prop Firm evaluations and prestigious university finance programs.'}
           </p>
         </div>
 
@@ -54,58 +109,62 @@ export const CinematicSimulations: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-[#1A2538]">
               <div>
                 <span className="text-[11px] font-mono uppercase tracking-wider text-blue-400">
-                  ĐẤU TRƯỜNG PHÁI SINH • KỲ MÙA THU 2026
+                  {lang === 'vi' ? 'ĐẤU TRƯỜNG PHÁI SINH • KỲ MÙA THU 2026' : 'DERIVATIVES ARENA • FALL TERM 2026'}
                 </span>
                 <h3 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
-                  THỬ THÁCH CỔ PHIẾU CÔNG NGHỆ MỸ
+                  {liveSim?.name || (lang === 'vi' ? 'THỬ THÁCH CỔ PHIẾU CÔNG NGHỆ MỸ' : 'US TECH EQUITIES CHALLENGE')}
                 </h3>
               </div>
 
               <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-xs font-bold">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span>ĐANG DIỄN RA</span>
+                <span>{lang === 'vi' ? 'ĐANG DIỄN RA' : 'LIVE NOW'}</span>
               </div>
             </div>
 
             {/* Core simulation stats */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <div className="p-4 rounded-lg bg-[#0A0F1A] border border-[#182338]">
-                <div className="text-[11px] font-mono text-slate-400 uppercase">Vốn Khởi Điểm</div>
-                <div className="text-xl font-bold font-mono text-slate-200 mt-1">$100,000</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Vốn Mô Phỏng USD</div>
+                <div className="text-[11px] font-mono text-slate-400 uppercase">{lang === 'vi' ? 'Vốn Khởi Điểm' : 'Initial Capital'}</div>
+                <div className="text-xl font-bold font-mono text-slate-200 mt-1">
+                  ${(liveSim?.initialBalance || 100000).toLocaleString('en-US')}
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">{lang === 'vi' ? 'Vốn Mô Phỏng USD' : 'Simulated USD Capital'}</div>
               </div>
 
               <div className="p-4 rounded-lg bg-[#0A0F1A] border border-[#182338]">
-                <div className="text-[11px] font-mono text-slate-400 uppercase">Giá Trị Danh Mục</div>
+                <div className="text-[11px] font-mono text-slate-400 uppercase">{lang === 'vi' ? 'Giá Trị Danh Mục' : 'Portfolio Value'}</div>
                 <div className="text-xl font-bold font-mono text-white mt-1">$108,420</div>
-                <div className="text-[10px] text-emerald-400 font-mono mt-0.5">+$8,420 Lãi Ròng</div>
+                <div className="text-[10px] text-emerald-400 font-mono mt-0.5">{lang === 'vi' ? '+$8,420 Lãi Ròng' : '+$8,420 Net PnL'}</div>
               </div>
 
               <div className="p-4 rounded-lg bg-[#0A0F1A] border border-[#182338]">
-                <div className="text-[11px] font-mono text-slate-400 uppercase">Tỷ Suất Lợi Nhuận</div>
+                <div className="text-[11px] font-mono text-slate-400 uppercase">{lang === 'vi' ? 'Tỷ Suất Lợi Nhuận' : 'Return Rate'}</div>
                 <div className="text-xl font-bold font-mono text-emerald-400 mt-1 flex items-center gap-1">
                   <ArrowUpRight className="w-4 h-4" />
                   <span>+8.42%</span>
                 </div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Tham chiếu: +2.10%</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">{lang === 'vi' ? 'Tham chiếu: +2.10%' : 'Benchmark: +2.10%'}</div>
               </div>
 
               <div className="p-4 rounded-lg bg-[#0A0F1A] border border-[#182338]">
-                <div className="text-[11px] font-mono text-slate-400 uppercase">Thứ Hạng Hiện Tại</div>
+                <div className="text-[11px] font-mono text-slate-400 uppercase">{lang === 'vi' ? 'Thứ Hạng Hiện Tại' : 'Current Rank'}</div>
                 <div className="text-xl font-bold font-mono text-blue-400 mt-1">#4</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Top 10% Dẫn Đầu</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">{lang === 'vi' ? 'Top 10% Dẫn Đầu' : 'Top 10% Leaderboard'}</div>
               </div>
 
               <div className="p-4 rounded-lg bg-[#0A0F1A] border border-[#182338]">
-                <div className="text-[11px] font-mono text-slate-400 uppercase">Số Lượng Đăng Ký</div>
-                <div className="text-xl font-bold font-mono text-slate-200 mt-1">42</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Trader & Sinh Viên</div>
+                <div className="text-[11px] font-mono text-slate-400 uppercase">{lang === 'vi' ? 'Số Lượng Đăng Ký' : 'Participants'}</div>
+                <div className="text-xl font-bold font-mono text-slate-200 mt-1">
+                  {liveSim?.participantsCount || 42}
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">{lang === 'vi' ? 'Trader & Sinh Viên' : 'Traders & Students'}</div>
               </div>
 
               <div className="p-4 rounded-lg bg-[#0A0F1A] border border-[#182338]">
-                <div className="text-[11px] font-mono text-slate-400 uppercase">Hạn Chót</div>
-                <div className="text-xl font-bold font-mono text-slate-200 mt-1">22 Th10</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Còn Lại 18 Ngày</div>
+                <div className="text-[11px] font-mono text-slate-400 uppercase">{lang === 'vi' ? 'Hạn Chót' : 'Deadline'}</div>
+                <div className="text-xl font-bold font-mono text-slate-200 mt-1">{lang === 'vi' ? '22 Th10' : 'Oct 22'}</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">{lang === 'vi' ? 'Còn Lại 18 Ngày' : '18 Days Left'}</div>
               </div>
             </div>
 
@@ -113,24 +172,24 @@ export const CinematicSimulations: React.FC = () => {
             <div className="p-4 rounded-lg bg-[#070B14] border border-[#1A2538] space-y-2">
               <div className="text-xs font-mono font-bold text-slate-300 uppercase flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-blue-400" />
-                <span>Quy Định Quản Trị Tổ Chức</span>
+                <span>{lang === 'vi' ? 'Quy Định Quản Trị Tổ Chức' : 'Institutional Risk Rules'}</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-400 font-sans">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>Rủi ro tối đa 2% vốn trên mỗi lệnh</span>
+                  <span>{lang === 'vi' ? 'Rủi ro tối đa 2% vốn trên mỗi lệnh' : 'Max 2% capital risk per trade'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>Bắt buộc cài Stop-Loss trong 60 giây</span>
+                  <span>{lang === 'vi' ? 'Bắt buộc cài Stop-Loss trong 60 giây' : 'Stop-Loss mandatory within 60s'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>Mức sụt giảm danh mục tối đa 5.0%</span>
+                  <span>{lang === 'vi' ? 'Mức sụt giảm danh mục tối đa 5.0%' : 'Max portfolio drawdown 5.0%'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>Khớp lệnh 100% theo giá thị trường thật</span>
+                  <span>{lang === 'vi' ? 'Khớp lệnh 100% theo giá thị trường thật' : '100% real-market tick execution'}</span>
                 </div>
               </div>
             </div>
@@ -142,15 +201,15 @@ export const CinematicSimulations: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-amber-400" />
                 <span className="font-mono text-xs font-bold text-white uppercase tracking-wider">
-                  Bảng Xếp Hạng Trực Tiếp
+                  {lang === 'vi' ? 'Bảng Xếp Hạng Trực Tiếp' : 'Live Leaderboard'}
                 </span>
               </div>
-              <span className="text-[11px] font-mono text-slate-500">KIỂM TOÁN TỪNG TICK</span>
+              <span className="text-[11px] font-mono text-slate-500">{lang === 'vi' ? 'KIỂM TOÁN TỪNG TICK' : 'TICK-AUDITED'}</span>
             </div>
 
             {/* Animated Leaderboard List */}
             <div className="space-y-2.5">
-              {CINEMATIC_LEADERBOARD.map((item, idx) => (
+              {leaderboard.map((item, idx) => (
                 <motion.div
                   key={item.rank}
                   initial={{ opacity: 0, y: 25 }}
@@ -184,16 +243,16 @@ export const CinematicSimulations: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className={`font-semibold text-sm ${item.isUser ? 'text-white font-bold' : 'text-slate-200'}`}>
-                          {item.name}
+                          {item.isUser ? (lang === 'vi' ? 'Bạn' : 'You') : item.name}
                         </span>
                         {item.isUser && (
                           <span className="px-1.5 py-0.2 rounded bg-blue-500 text-white font-mono text-[9px] font-black uppercase">
-                            BẠN
+                            {lang === 'vi' ? 'BẠN' : 'YOU'}
                           </span>
                         )}
                       </div>
                       <div className="text-[11px] font-mono text-slate-500">
-                        {item.trades} lệnh đã thực hiện
+                        {lang === 'vi' ? `${item.trades} lệnh đã thực hiện` : `${item.trades} executed trades`}
                       </div>
                     </div>
                   </div>
@@ -213,7 +272,9 @@ export const CinematicSimulations: React.FC = () => {
 
             <div className="pt-2 text-center">
               <span className="text-[11px] font-mono text-slate-500">
-                Lợi nhuận (P&L) được kiểm toán đối chiếu trực tiếp theo độ sâu sổ lệnh sàn thật.
+                {lang === 'vi'
+                  ? 'Lợi nhuận (P&L) được kiểm toán đối chiếu trực tiếp theo độ sâu sổ lệnh sàn thật.'
+                  : 'Profit & Loss (P&L) is audited directly against real exchange orderbook depth.'}
               </span>
             </div>
           </div>
