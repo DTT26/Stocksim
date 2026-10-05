@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
   X, ChevronRight, ChevronLeft, Check, Sparkles, 
-  Lightbulb, CheckCircle2, MousePointerClick, ArrowRight
+  Lightbulb, CheckCircle2, MousePointerClick, ArrowRight, Eye
 } from 'lucide-react';
 
 export interface TourStep {
   target: string; // CSS selector or data-tour identifier
+  fallbackTarget?: string;
   panel?: 'simulation' | 'order' | 'journal' | 'watchlist' | null;
   title: string;
   badge: string;
@@ -13,6 +14,7 @@ export interface TourStep {
   content: string;
   tip?: string;
   placement?: 'top' | 'bottom' | 'left' | 'right' | 'center';
+  isClickable?: boolean;
 }
 
 interface SpotlightOnboardingTourProps {
@@ -46,7 +48,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Click chuột vào ô Ticker (BTCUSDT) để chọn mã',
       content: 'Nhấp trực tiếp vào ô mã ở góc trên bên trái để tìm kiếm và chọn mã giao dịch (BTCUSDT, ETHUSDT, AAPL, NVDA, FPT...).',
       tip: 'Mẹo: Bạn có thể chọn bất kỳ mã nào để hệ thống tải lại toàn bộ biểu đồ lịch sử.',
-      placement: 'bottom'
+      placement: 'bottom',
+      isClickable: true
     },
     {
       target: '[data-tour="bar-replay-btn"]',
@@ -55,7 +58,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Click nút Replay để kích hoạt chế độ chọn nến',
       content: 'Bấm nút "Replay" trên thanh công cụ để chuẩn bị chọn điểm bắt đầu phiên luyện tập trong quá khứ.',
       tip: 'Chế độ Replay sẽ giúp bạn cắt toàn bộ nến tương lai để thực hành như thời gian thực.',
-      placement: 'bottom'
+      placement: 'bottom',
+      isClickable: true
     },
     {
       target: '#market-chart',
@@ -65,7 +69,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Nhấp chuột vào 1 cây nến trên biểu đồ để cắt nến',
       content: 'Di chuột vào khu vực nến trên biểu đồ và click vào một cây nến bạn muốn bắt đầu. Toàn bộ nến sau đó sẽ bị ẩn đi.',
       tip: 'Hãy nhấp chuột trực tiếp vào vùng thân nến bất kỳ trên màn hình biểu đồ.',
-      placement: 'top'
+      placement: 'top',
+      isClickable: true
     },
     {
       target: '[data-tour="sim-new-session-btn"], [data-tour="sim-continue-btn"]',
@@ -75,7 +80,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Nhấp nút (+) BẮT ĐẦU PHIÊN MỚI (hoặc ▶ Tiếp tục)',
       content: 'Trong bảng Mô phỏng Giao dịch bên phải, nhấn nút xanh (+) BẮT ĐẦU PHIÊN MỚI để tạo phiên, hoặc bấm Tiếp tục phiên đang có.',
       tip: 'Số dư $100,000 hoàn toàn là tiền ảo không có rủi ro tài chính.',
-      placement: 'left'
+      placement: 'left',
+      isClickable: true
     },
     {
       target: '[data-tour="sim-start-create-btn"], [data-tour="order-type-tabs"]',
@@ -85,7 +91,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Nhấp nút xanh "BẮT ĐẦU" để mở Form Mô Phỏng',
       content: 'Nhấn nút "BẮT ĐẦU" ở cuối bảng cấu hình để mở giao diện Form Mô Phỏng Đặt Lệnh (Hình 3).',
       tip: 'Bạn có thể giữ nguyên các thông số mặc định và bấm BẮT ĐẦU.',
-      placement: 'left'
+      placement: 'left',
+      isClickable: true
     },
     // ═══════════════════════════════════════════════════════════════
     // HÌNH 1 (Form Đặt Lệnh) — Bước 6 → 15
@@ -98,7 +105,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Click chọn giữa THỊ TRƯỜNG, LIMIT hoặc STOP',
       content: 'Lệnh THỊ TRƯỜNG khớp ngay lập tức theo giá Ask/Bid. Lệnh LIMIT cho phép bạn đặt chờ giá hồi tốt hơn. Lệnh STOP chờ giá bứt phá.',
       tip: 'Người mới nên dùng lệnh THỊ TRƯỜNG để khớp lệnh thực hành ngay.',
-      placement: 'left'
+      placement: 'left',
+      isClickable: true
     },
     {
       target: '[data-tour="order-side-btns"]',
@@ -108,7 +116,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Click chọn MUA (LONG) hoặc BÁN (SHORT)',
       content: 'Chọn MUA (LONG) nếu bạn nhận định xu hướng giá sẽ tăng. Chọn BÁN (SHORT) nếu bạn nhận định xu hướng giá sẽ giảm.',
       tip: 'Nút MUA sẽ có màu xanh lá và nút BÁN sẽ có màu đỏ nổi bật.',
-      placement: 'left'
+      placement: 'left',
+      isClickable: true
     },
     {
       target: '[data-tour="order-market-price"]',
@@ -118,7 +127,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Xem giá khớp thị trường hiện tại',
       content: 'Hiển thị chính xác mức giá thị trường theo cây nến Replay bạn đang dừng lại (kèm độ trượt giá Spread tối ưu).',
       tip: 'Giá khớp sẽ nhảy theo từng bước nến mà bạn tua.',
-      placement: 'left'
+      placement: 'left',
+      isClickable: false
     },
     {
       target: '[data-tour="order-risk-box"]',
@@ -128,7 +138,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Nhấp chọn các mức Risk: 0.5%, 1%, 2% hoặc 3%',
       content: 'Cài đặt mức rủi ro tối đa bạn chấp nhận mất cho vị thế này. Ví dụ với vốn $100,000, rủi ro 1% tương đương đúng $1,000.00.',
       tip: 'Nguyên tắc bảo vệ vốn: Không nên đặt Risk vượt quá 1-2% trên mỗi giao dịch.',
-      placement: 'left'
+      placement: 'left',
+      isClickable: true
     },
     {
       target: '[data-tour="order-volume-box"]',
@@ -138,7 +149,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Nhấp nút (+ / -) hoặc chọn chế độ Auto / Manual',
       content: 'Chế độ Manual cho phép bạn nhập số lot thủ công (ví dụ 0.01 lot). Chế độ Auto sẽ tự động tính số lot chuẩn xác dựa theo khoảng cách Cắt lỗ (SL) và mức Risk.',
       tip: 'Auto Lot là công cụ đắc lực giúp bạn không bao giờ bị tính sai khối lượng.',
-      placement: 'left'
+      placement: 'left',
+      isClickable: true
     },
     {
       target: '[data-tour="order-leverage-slider"]',
@@ -148,7 +160,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Thử kéo hoặc nhấp chọn các mốc đòn bẩy: 1X, 25X, 50X...',
       content: 'Đòn bẩy giúp tăng sức mua và giảm số tiền ký quỹ ban đầu cần bỏ ra để mở vị thế. Bạn có thể chọn từ 1X đến 125X tùy chiến lược.',
       tip: 'Đòn bẩy 10X là mức cân bằng tuyệt vời cho người mới luyện tập.',
-      placement: 'left'
+      placement: 'left',
+      isClickable: true
     },
     {
       target: '[data-tour="order-tpsl-box"]',
@@ -158,7 +171,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Tích chọn ô "Thiết lập Chốt lời / Cắt lỗ (TP/SL)"',
       content: 'Luôn cài đặt giá Chốt lời (TP) để tự động chốt lợi nhuận khi giá đạt đỉnh mục tiêu, và Cắt lỗ (SL) để dừng giao dịch tự động khi thị trường đi ngược.',
       tip: 'Bạn cũng có thể kéo thả trực tiếp các đường TP/SL màu xanh/đỏ ngay trên Chart.',
-      placement: 'left'
+      placement: 'left',
+      isClickable: true
     },
     {
       target: '[data-tour="order-setup-tag"]',
@@ -168,7 +182,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Nhập ghi chú lý do vào lệnh (Vd: Breakout, Pinbar...)',
       content: 'Ghi chú mẫu hình kỹ thuật hoặc lý do bạn vào lệnh. Thông tin này sẽ được lưu thẳng vào Nhật Ký để AI Mentor chấm điểm và đánh giá chiến thuật.',
       tip: 'Giúp bạn nhận diện mô hình nào mang lại tỷ lệ thắng cao nhất.',
-      placement: 'left'
+      placement: 'left',
+      isClickable: true
     },
     {
       target: '[data-tour="order-margin-summary"]',
@@ -178,7 +193,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Quan sát Ký quỹ yêu cầu & Ký quỹ khả dụng',
       content: 'Kiểm tra mức tiền ký quỹ bị khóa cho lệnh ($61.56), khối lượng thực tế (0.01 BTC), chênh lệch Spread Mua/Bán và số dư khả dụng còn lại ($95,000).',
       tip: 'Đảm bảo Ký quỹ yêu cầu không vượt quá Ký quỹ khả dụng.',
-      placement: 'left'
+      placement: 'left',
+      isClickable: false
     },
     {
       target: '[data-tour="order-submit-btn"]',
@@ -188,7 +204,8 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Nhấp nút xanh "PLACE LONG MARKET" để khớp lệnh',
       content: 'Nhấn nút đặt lệnh để đưa vị thế vào thị trường ngay lập tức. Sau đó bạn có thể tua nến bằng thanh Replay để quan sát P&L biến động!',
       tip: 'Vị thế vừa mở sẽ hiển thị ngay trong bảng Vị thế ở góc dưới màn hình.',
-      placement: 'left'
+      placement: 'left',
+      isClickable: true
     },
     // ═══════════════════════════════════════════════════════════════
     // HÌNH 2 (Bảng Vị Thế / Positions Table) — Bước 16 → 21
@@ -201,57 +218,68 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
       actionPrompt: '👉 Quan sát bảng Vị thế ở phía dưới màn hình',
       content: 'Đây là bảng quản lý toàn bộ vị thế đang mở. Tại đây bạn theo dõi các cột: Symbol, Size, Entry Price, Mark Price, Margin, Side, PNL (ROE%), TP/SL và nút Đóng lệnh.',
       tip: 'Bảng này cập nhật P&L theo thời gian thực khi bạn tua nến Replay!',
-      placement: 'top'
+      placement: 'top',
+      isClickable: false
     },
     {
-      target: '[data-tour="position-row"]',
+      target: '[data-tour="pos-symbol"], [data-tour="pos-size"]',
+      fallbackTarget: '[data-tour="pos-header-symbol"], [data-tour="pos-header-size"]',
       panel: 'simulation',
       title: '17. Symbol & Size — Mã và Khối Lượng',
       badge: 'BƯỚC 17 / 23 • BẢNG VỊ THẾ',
       actionPrompt: '👉 Xem cột Symbol (mã giao dịch) và Size (khối lượng)',
       content: '• Symbol: Mã tài sản đang giao dịch (VD: BTCUSDT)\n• Size: Khối lượng thực tế tính bằng đơn vị tài sản (VD: 0.01 BTC) kèm số lot tương ứng trong ngoặc.',
       tip: 'Khối lượng = Lot × Hệ số hợp đồng. Mỗi tài sản có hệ số khác nhau.',
-      placement: 'top'
+      placement: 'top',
+      isClickable: false
     },
     {
-      target: '[data-tour="position-row"]',
+      target: '[data-tour="pos-entry"], [data-tour="pos-mark"]',
+      fallbackTarget: '[data-tour="pos-header-entry"], [data-tour="pos-header-mark"]',
       panel: 'simulation',
       title: '18. Entry Price & Mark Price — Giá Vào & Giá Thị Trường',
       badge: 'BƯỚC 18 / 23 • BẢNG VỊ THẾ',
       actionPrompt: '👉 So sánh cột Entry Price (giá vào) với Mark Price (giá hiện tại)',
       content: '• Entry Price: Mức giá khớp lệnh khi bạn mở vị thế\n• Mark Price: Giá thị trường hiện tại đang cập nhật realtime. Sự chênh lệch giữa 2 giá này quyết định lãi/lỗ của bạn.',
       tip: 'Nếu LONG: Mark Price > Entry = Lãi. Nếu SHORT: Mark Price < Entry = Lãi.',
-      placement: 'top'
+      placement: 'top',
+      isClickable: false
     },
     {
-      target: '[data-tour="position-row"]',
+      target: '[data-tour="pos-margin"], [data-tour="pos-side"]',
+      fallbackTarget: '[data-tour="pos-header-margin"], [data-tour="pos-header-side"]',
       panel: 'simulation',
       title: '19. Margin & Side — Ký Quỹ & Chiều Vị Thế',
       badge: 'BƯỚC 19 / 23 • BẢNG VỊ THẾ',
       actionPrompt: '👉 Xem cột Margin (ký quỹ) và Side (LONG/SHORT x Đòn bẩy)',
       content: '• Margin: Số tiền ký quỹ bị khóa cho vị thế này (VD: $78.34)\n• Side: Chiều giao dịch (LONG x10, SHORT x10) — kèm hệ số đòn bẩy đang sử dụng.',
       tip: 'Margin = (Giá × Khối lượng) ÷ Đòn bẩy. Đòn bẩy cao → Margin thấp hơn.',
-      placement: 'top'
+      placement: 'top',
+      isClickable: false
     },
     {
-      target: '[data-tour="position-row"]',
+      target: '[data-tour="pos-pnl"], [data-tour="pos-tpsl"]',
+      fallbackTarget: '[data-tour="pos-header-pnl"], [data-tour="pos-header-tpsl"]',
       panel: 'simulation',
       title: '20. PNL (ROE%) & TP/SL — Lãi/Lỗ & Mức Giá Bảo Vệ',
       badge: 'BƯỚC 20 / 23 • BẢNG VỊ THẾ',
       actionPrompt: '👉 Xem cột PNL (ROE%) màu xanh/đỏ và cột TP/SL',
       content: '• PNL: Lợi nhuận/Thua lỗ realtime (xanh = lãi, đỏ = lỗ). ROE% là tỷ suất lợi nhuận trên ký quỹ\n• TP / SL: Mức giá Chốt lời / Cắt lỗ tự động. Khi giá chạm TP hoặc SL, vị thế sẽ tự đóng.',
       tip: 'ROE% = (PNL ÷ Margin) × 100%. Đòn bẩy cao = ROE% dao động mạnh hơn.',
-      placement: 'top'
+      placement: 'top',
+      isClickable: false
     },
     {
       target: '[data-tour="close-position-btn"]',
+      fallbackTarget: '[data-tour="positions-manager"]',
       panel: 'simulation',
       title: '21. Đóng Lệnh Thủ Công',
       badge: 'BƯỚC 21 / 23 • BẢNG VỊ THẾ',
       actionPrompt: '👉 Nhấp nút "Đóng lệnh" để chốt lãi/lỗ vị thế hiện tại',
       content: 'Khi muốn chốt sổ vị thế bất kỳ lúc nào, nhấn nút "Đóng lệnh" trên dòng vị thế. P&L sẽ được cộng/trừ vào Balance ngay lập tức.',
       tip: 'Bạn cũng có thể để TP/SL tự động đóng lệnh thay vì đóng thủ công.',
-      placement: 'top'
+      placement: 'top',
+      isClickable: true
     },
     // ═══════════════════════════════════════════════════════════════
     // HOÀN THÀNH & NHẬT KÝ — Bước 22 → 23
@@ -331,68 +359,67 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
     // Use longer delay for positions steps (15-21) to ensure DOM is ready after position opens
     const delay = (currentStepIndex >= 15 && currentStepIndex <= 21) ? 500 : 200;
     setTimeout(() => {
-      // For positions table steps (15-21), ensure PositionsManager is expanded
-      if (currentStepIndex >= 15 && currentStepIndex <= 20) {
+      // For positions table steps (16-21), ensure PositionsManager is expanded
+      if (currentStepIndex >= 15 && currentStepIndex <= 21) {
         const posManager = document.querySelector('[data-tour="positions-manager"]') as HTMLElement;
         if (posManager && posManager.classList.contains('h-10')) {
+          // Click the first tab button to expand it
           const tabBtn = posManager.querySelector('button') as HTMLElement;
           if (tabBtn) tabBtn.click();
         }
       }
 
-      // For step 21 (close-position-btn), scroll the positions table container to the right
-      // so the "Đóng lệnh" button becomes visible
-      if (currentStepIndex === 20) {
-        const scrollContainer = document.querySelector('[data-tour="positions-manager"] .overflow-auto') as HTMLElement;
-        if (scrollContainer) {
-          scrollContainer.scrollLeft = scrollContainer.scrollWidth; // scroll all the way right
-        }
-      }
-      // For steps 16-19 (position-row overview), scroll back to the left
-      if (currentStepIndex >= 15 && currentStepIndex <= 19) {
-        const scrollContainer = document.querySelector('[data-tour="positions-manager"] .overflow-auto') as HTMLElement;
-        if (scrollContainer) {
-          scrollContainer.scrollLeft = 0; // scroll to start to show Symbol/Size
-        }
+      // Query elements: support multiple selectors union (e.g. pos-symbol + pos-size)
+      let elements = Array.from(document.querySelectorAll(step.target)) as HTMLElement[];
+      if (elements.length === 0 && step.fallbackTarget) {
+        elements = Array.from(document.querySelectorAll(step.fallbackTarget)) as HTMLElement[];
       }
 
-      // Small extra delay after scroll to let the DOM reflow
-      setTimeout(() => {
-        const selectors = step.target.split(',').map(s => s.trim());
-        let el: HTMLElement | null = null;
-        for (const sel of selectors) {
-          el = document.querySelector(sel) as HTMLElement | null;
-          if (el) break;
-        }
+      if (elements.length > 0) {
+        let minLeft = Infinity;
+        let minTop = Infinity;
+        let maxRight = -Infinity;
+        let maxBottom = -Infinity;
+        let hasValid = false;
 
-        if (el) {
-          // For position-row steps, use the entire positions-manager rect instead
-          // so the cutout covers the full table width (not just the clipped tr)
-          let rectEl = el;
-          if (currentStepIndex >= 16 && currentStepIndex <= 19) {
-            // Use the positions-manager as the cutout target for a wider highlight
-            const posManager = document.querySelector('[data-tour="positions-manager"]') as HTMLElement;
-            if (posManager) rectEl = posManager;
+        elements.forEach(el => {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) {
+            hasValid = true;
+            minLeft = Math.min(minLeft, r.left);
+            minTop = Math.min(minTop, r.top);
+            maxRight = Math.max(maxRight, r.right);
+            maxBottom = Math.max(maxBottom, r.bottom);
           }
+        });
 
-          const rect = rectEl.getBoundingClientRect();
+        if (hasValid) {
+          const rect = new DOMRect(minLeft, minTop, maxRight - minLeft, maxBottom - minTop);
           setTargetRect(rect);
-          el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+          elements[0].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
 
           // Non-bubbling action listener for the current step target
-          const onUserAction = () => {
-            handleNext();
-          };
+          if (step.isClickable !== false) {
+            const onUserAction = () => {
+              handleNext();
+            };
 
-          el.addEventListener('click', onUserAction, { capture: true, once: true });
+            elements.forEach(el => {
+              el.addEventListener('click', onUserAction, { capture: true, once: true });
+            });
 
-          listenerCleanupRef.current = () => {
-            el.removeEventListener('click', onUserAction, { capture: true });
-          };
+            listenerCleanupRef.current = () => {
+              elements.forEach(el => {
+                el.removeEventListener('click', onUserAction, { capture: true });
+              });
+            };
+          }
         } else {
           setTargetRect(null);
         }
-      }, 100);
+      } else {
+        setTargetRect(null);
+      }
     }, delay);
   }, [isOpen, currentStepIndex, steps, onSetRightPanel, onTriggerReplayStart, handleNext]);
 
@@ -428,7 +455,7 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
   const currentStep = steps[currentStepIndex];
 
   // Calculate tooltip placement style
-  const getTooltipStyle = () => {
+  const getTooltipStyle = (): React.CSSProperties => {
     const defaultStyle: React.CSSProperties = {
       position: 'fixed',
       top: '50%',
@@ -439,53 +466,95 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
 
     if (!targetRect) return defaultStyle;
 
-    const pad = 16;
-    const tooltipWidth = 380;
-    const tooltipHeight = 280;
-
+    const pad = 20;
+    const tooltipWidth = 390;
     const preferredPlacement = currentStep.placement || 'bottom';
 
-    let top = 0;
-    let left = 0;
+    const clampLeft = (desiredLeft: number) => {
+      return Math.max(pad, Math.min(window.innerWidth - tooltipWidth - pad, desiredLeft));
+    };
 
-    if (preferredPlacement === 'bottom') {
-      top = targetRect.bottom + pad;
-      left = Math.min(
-        window.innerWidth - tooltipWidth - pad,
-        Math.max(pad, targetRect.left + targetRect.width / 2 - tooltipWidth / 2)
-      );
-      if (top + tooltipHeight > window.innerHeight) {
-        top = Math.max(pad, targetRect.top - tooltipHeight - pad);
-      }
-    } else if (preferredPlacement === 'left') {
-      top = Math.min(
-        window.innerHeight - tooltipHeight - pad,
-        Math.max(pad, targetRect.top + targetRect.height / 2 - tooltipHeight / 2)
-      );
-      left = Math.max(pad, targetRect.left - tooltipWidth - pad);
-      if (left < pad) {
-        left = Math.min(window.innerWidth - tooltipWidth - pad, targetRect.right + pad);
-      }
-    } else if (preferredPlacement === 'right') {
-      top = Math.min(
-        window.innerHeight - tooltipHeight - pad,
-        Math.max(pad, targetRect.top + targetRect.height / 2 - tooltipHeight / 2)
-      );
-      left = Math.min(window.innerWidth - tooltipWidth - pad, targetRect.right + pad);
-    } else if (preferredPlacement === 'top') {
-      top = Math.max(pad, targetRect.top - tooltipHeight - pad);
-      left = Math.min(
-        window.innerWidth - tooltipWidth - pad,
-        Math.max(pad, targetRect.left + targetRect.width / 2 - tooltipWidth / 2)
-      );
+    const targetCenterX = targetRect.left + targetRect.width / 2;
+    const defaultLeft = clampLeft(targetCenterX - tooltipWidth / 2);
+
+    if (preferredPlacement === 'top') {
+      // Anchor strictly ABOVE targetRect, growing upwards!
+      // This mathematically PREVENTS the tooltip from EVER overlapping targetRect downwards!
+      const bottom = Math.max(pad, window.innerHeight - targetRect.top + pad + 10);
+      return {
+        position: 'fixed' as const,
+        bottom: `${bottom}px`,
+        left: `${defaultLeft}px`,
+        maxWidth: `${tooltipWidth}px`,
+        width: 'calc(100vw - 32px)',
+        maxHeight: `${Math.max(220, targetRect.top - pad * 2)}px`,
+        overflowY: 'auto',
+        zIndex: 100003
+      };
     }
 
-    return {
-      position: 'fixed' as const,
-      top: `${top}px`,
-      left: `${left}px`,
-      zIndex: 100003
-    };
+    if (preferredPlacement === 'bottom') {
+      const top = targetRect.bottom + pad;
+      return {
+        position: 'fixed' as const,
+        top: `${top}px`,
+        left: `${defaultLeft}px`,
+        maxWidth: `${tooltipWidth}px`,
+        width: 'calc(100vw - 32px)',
+        maxHeight: `${Math.max(220, window.innerHeight - targetRect.bottom - pad * 2)}px`,
+        overflowY: 'auto',
+        zIndex: 100003
+      };
+    }
+
+    if (preferredPlacement === 'left') {
+      const targetCenterY = targetRect.top + targetRect.height / 2;
+      const top = Math.max(pad, Math.min(window.innerHeight - 380 - pad, targetCenterY - 170));
+      const right = window.innerWidth - targetRect.left + pad;
+
+      // If not enough room on the left, fall back to docked bottom left
+      if (targetRect.left < tooltipWidth + pad) {
+        return {
+          position: 'fixed' as const,
+          bottom: `${Math.max(pad, window.innerHeight - targetRect.top + pad)}px`,
+          left: `${pad}px`,
+          maxWidth: `${tooltipWidth}px`,
+          width: 'calc(100vw - 32px)',
+          maxHeight: `${Math.max(220, targetRect.top - pad * 2)}px`,
+          overflowY: 'auto',
+          zIndex: 100003
+        };
+      }
+
+      return {
+        position: 'fixed' as const,
+        top: `${top}px`,
+        right: `${right}px`,
+        maxWidth: `${tooltipWidth}px`,
+        width: 'calc(100vw - 32px)',
+        maxHeight: `${window.innerHeight - pad * 2}px`,
+        overflowY: 'auto',
+        zIndex: 100003
+      };
+    }
+
+    if (preferredPlacement === 'right') {
+      const targetCenterY = targetRect.top + targetRect.height / 2;
+      const top = Math.max(pad, Math.min(window.innerHeight - 380 - pad, targetCenterY - 170));
+      const left = targetRect.right + pad;
+      return {
+        position: 'fixed' as const,
+        top: `${top}px`,
+        left: `${left}px`,
+        maxWidth: `${tooltipWidth}px`,
+        width: 'calc(100vw - 32px)',
+        maxHeight: `${window.innerHeight - pad * 2}px`,
+        overflowY: 'auto',
+        zIndex: 100003
+      };
+    }
+
+    return defaultStyle;
   };
 
   return (
@@ -530,10 +599,17 @@ export const SpotlightOnboardingTour: React.FC<SpotlightOnboardingTourProps> = (
           }}
         >
           {/* Animated click cue pointing directly to the element */}
-          <div className="absolute -top-3.5 -right-3.5 flex items-center gap-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-extrabold text-[10px] px-2.5 py-0.5 rounded-full shadow-lg shadow-cyan-500/50 animate-bounce pointer-events-none border border-white/40 whitespace-nowrap">
-            <MousePointerClick className="w-3.5 h-3.5 text-white" />
-            <span>CLICK THỰC HÀNH</span>
-          </div>
+          {currentStep.isClickable !== false ? (
+            <div className="absolute -top-3.5 -right-3.5 flex items-center gap-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-extrabold text-[10px] px-2.5 py-0.5 rounded-full shadow-lg shadow-emerald-500/50 animate-bounce pointer-events-none border border-white/40 whitespace-nowrap">
+              <MousePointerClick className="w-3.5 h-3.5 text-white" />
+              <span>CLICK THỰC HÀNH</span>
+            </div>
+          ) : (
+            <div className="absolute -top-3.5 -right-3.5 flex items-center gap-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-extrabold text-[10px] px-2.5 py-0.5 rounded-full shadow-lg border border-white/40 whitespace-nowrap pointer-events-none">
+              <Eye className="w-3.5 h-3.5 text-white" />
+              <span>QUAN SÁT</span>
+            </div>
+          )}
         </div>
       )}
 

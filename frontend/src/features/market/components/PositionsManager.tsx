@@ -20,7 +20,7 @@ export const PositionsManager = ({ currentPrice }: PositionsManagerProps) => {
 
   const tabs = [
     { id: 'positions', label: `Vị thế (${positions.length})` },
-    { id: 'orders', label: `Lệnh mở (${orders.length})` },
+    { id: 'orders', label: `Lệnh chờ (${orders.length})` },
     { id: 'history', label: `Lịch sử giao dịch (${history.length})` }
   ];
 
@@ -84,37 +84,38 @@ export const PositionsManager = ({ currentPrice }: PositionsManagerProps) => {
             <table data-tour="positions-table" className="w-full min-w-[760px] text-left text-xs text-[#1e2329] dark:text-[#d1d4dc]">
               <thead className="sticky top-0 bg-[#f8f9fa] dark:bg-[#0b0e11] text-[#787b86] font-normal text-[11px] border-b border-[#e6e8ea] dark:border-transparent z-10">
                 <tr>
-                  <th className="px-4 py-2">Symbol</th>
-                  <th className="px-4 py-2">Size</th>
-                  <th className="px-4 py-2">Entry Price</th>
-                  <th className="px-4 py-2">Mark Price</th>
-                  <th className="px-4 py-2">Margin</th>
-                  <th className="px-4 py-2">Side</th>
-                  <th className="px-4 py-2 text-right">PNL (ROE%)</th>
-                  <th className="px-4 py-2 text-center">TP / SL</th>
+                  <th data-tour="pos-header-symbol" className="px-4 py-2">Symbol</th>
+                  <th data-tour="pos-header-size" className="px-4 py-2">Size</th>
+                  <th data-tour="pos-header-entry" className="px-4 py-2">Entry Price</th>
+                  <th data-tour="pos-header-mark" className="px-4 py-2">Mark Price</th>
+                  <th data-tour="pos-header-margin" className="px-4 py-2">Margin</th>
+                  <th data-tour="pos-header-side" className="px-4 py-2">Side</th>
+                  <th data-tour="pos-header-pnl" className="px-4 py-2 text-right">PNL (ROE%)</th>
+                  <th data-tour="pos-header-tpsl" className="px-4 py-2 text-center">TP / SL</th>
                   <th className="px-4 py-2 text-center">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e6e8ea] dark:divide-[#2a2e39]/50">
-                {positions.map(p => {
+                {positions.map((p, idx) => {
                   const pnlInfo = calculatePositionPnL(p);
                   const pnlColor = pnlInfo.netPnl >= 0 ? 'text-[#089981]' : 'text-[#f23645]';
+                  const isFirst = idx === 0;
                   return (
-                    <tr key={p.id} data-tour="position-row" className="hover:bg-[#f5f5f5] dark:hover:bg-[#1e222d] transition-colors">
-                      <td className="px-4 py-2 font-bold">{p.symbol}</td>
-                      <td className="px-4 py-2 font-mono">
+                    <tr key={p.id} data-tour={isFirst ? "position-row" : undefined} className="hover:bg-[#f5f5f5] dark:hover:bg-[#1e222d] transition-colors">
+                      <td data-tour={isFirst ? "pos-symbol" : undefined} className="px-4 py-2 font-bold">{p.symbol}</td>
+                      <td data-tour={isFirst ? "pos-size" : undefined} className="px-4 py-2 font-mono">
                         {pnlInfo.actualQty < 1 ? Number(pnlInfo.actualQty.toFixed(6)).toString() : pnlInfo.actualQty.toLocaleString('vi-VN')} {getAssetUnit(p.symbol)}
                         <span className="text-[10px] text-[#787b86] ml-1">({p.lot} Lot)</span>
                       </td>
-                      <td className="px-4 py-2">{p.entryPrice.toLocaleString('vi-VN')}</td>
-                      <td className="px-4 py-2">{pnlInfo.markPrice.toLocaleString('vi-VN')}</td>
-                      <td className="px-4 py-2 font-mono">${p.margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className={`px-4 py-2 font-bold ${p.side === 'LONG' ? 'text-[#089981]' : 'text-[#f23645]'}`}>{p.side} x{store.session!.config.leverage}</td>
-                      <td className={`px-4 py-2 text-right font-mono font-bold ${pnlColor}`}>
+                      <td data-tour={isFirst ? "pos-entry" : undefined} className="px-4 py-2">{p.entryPrice.toLocaleString('vi-VN')}</td>
+                      <td data-tour={isFirst ? "pos-mark" : undefined} className="px-4 py-2">{pnlInfo.markPrice.toLocaleString('vi-VN')}</td>
+                      <td data-tour={isFirst ? "pos-margin" : undefined} className="px-4 py-2 font-mono">${p.margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td data-tour={isFirst ? "pos-side" : undefined} className={`px-4 py-2 font-bold ${p.side === 'LONG' ? 'text-[#089981]' : 'text-[#f23645]'}`}>{p.side} x{store.session!.config.leverage}</td>
+                      <td data-tour={isFirst ? "pos-pnl" : undefined} className={`px-4 py-2 text-right font-mono font-bold ${pnlColor}`}>
                         {pnlInfo.netPnl >= 0 ? '+' : '-'}${Math.abs(pnlInfo.netPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 
                         <span className="text-[10px] ml-1">({pnlInfo.netPnl >= 0 ? '+' : ''}{pnlInfo.roe.toFixed(2)}%)</span>
                       </td>
-                      <td className="px-4 py-2 text-center text-[#787b86]">
+                      <td data-tour={isFirst ? "pos-tpsl" : undefined} className="px-4 py-2 text-center text-[#787b86]">
                         {p.tp ? p.tp.toLocaleString('vi-VN') : '-'} / {p.sl ? p.sl.toLocaleString('vi-VN') : '-'}
                       </td>
                       <td className="px-4 py-2 text-center">
@@ -144,7 +145,7 @@ export const PositionsManager = ({ currentPrice }: PositionsManagerProps) => {
                             <Sparkles className="w-3 h-3" /> AI
                           </button>
                           <button 
-                            data-tour="close-position-btn"
+                            data-tour={isFirst ? "close-position-btn" : undefined}
                             onClick={() => store.closePosition(p.id)}
                             className="bg-[#f0f3fa] hover:bg-[#e0e5f2] text-[#4b5563] hover:text-[#1e2329] dark:bg-[#2a2e39] dark:hover:bg-[#363a45] dark:text-[#d1d4dc] dark:hover:text-white px-3 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer"
                           >

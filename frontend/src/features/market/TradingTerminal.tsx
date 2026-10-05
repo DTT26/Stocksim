@@ -86,6 +86,7 @@ export const TradingTerminal = () => {
   const [editingSymbol, setEditingSymbol] = useState<string | null>(null);
 
   const [activeRightPanel, setActiveRightPanel] = useState<'watchlist' | 'order' | 'simulation' | 'calculator' | 'journal' | null>('watchlist');
+  const [simulationView, setSimulationView] = useState<'list' | 'trading'>('list');
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
 
   const { user, login } = useAuth();
@@ -1569,9 +1570,9 @@ export const TradingTerminal = () => {
                   }}
                 />
               </div>
-              {store.isActive && store.session ? (
+              {activeRightPanel === 'simulation' && simulationView === 'trading' && store.isActive && store.session ? (
                 <PositionsManager currentPrice={selectedStock.price} />
-              ) : (
+              ) : isChallengeActive ? (
                 <BottomPanel
                   balance={balance}
                   totalEquity={totalEquity}
@@ -1624,7 +1625,7 @@ export const TradingTerminal = () => {
                   }}
                   refreshTrigger={tradeCount}
                 />
-              )}
+              ) : null}
             </div>
           )}
 
@@ -1692,6 +1693,8 @@ export const TradingTerminal = () => {
               onSelectStock={handleStockSelect}
               onPreviewTPSLChange={setPreviewTPSL}
               draggedTPSL={draggedTPSL}
+              view={simulationView}
+              onViewChange={setSimulationView}
             />
           )}
 
@@ -1801,6 +1804,8 @@ export const TradingTerminal = () => {
                   onSelectStock={handleStockSelect}
                   onPreviewTPSLChange={setPreviewTPSL}
                   draggedTPSL={draggedTPSL}
+                  view={simulationView}
+                  onViewChange={setSimulationView}
                 />
               )}
 
