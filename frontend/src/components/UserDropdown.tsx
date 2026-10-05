@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { LogOut, Keyboard, LayoutDashboard, Trophy } from 'lucide-react';
+import { LogOut, LayoutDashboard, Trophy } from 'lucide-react';
 import { googleLogout } from '@react-oauth/google';
 import { Link } from 'react-router-dom';
 import { UserAvatar } from './UserAvatar';
@@ -74,30 +74,6 @@ export const UserDropdown = ({
             </div>
           </div>
 
-          {/* Balance (Phân định rõ Tài khoản Thi vs Tài khoản Thường) */}
-          {user.balance !== undefined && (
-            <div className="px-4 py-2.5 border-b border-gray-100 dark:border-[#2a2e39] hover:bg-gray-50 dark:hover:bg-[#2a2e39]/50 flex items-center justify-between transition-colors">
-              <div className="flex items-center gap-2.5">
-                <span className="w-4 h-4 rounded-full border border-gray-400 dark:border-gray-500 flex items-center justify-center text-[10px] text-gray-600 dark:text-gray-300">C</span>
-                <div>
-                  <span className="font-semibold text-gray-900 dark:text-white block text-sm">${(user.balance || 0).toLocaleString('en-US')}</span>
-                  <span className="text-[10px] text-gray-500 dark:text-[#787b86]">
-                    {isChallenge ? `Tài khoản thi (${challengeLevelName || 'Cấp Vốn'})` : 'Tài khoản thường (Standard)'}
-                  </span>
-                </div>
-              </div>
-              {isChallenge ? (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-300 font-bold border border-amber-500/20 dark:border-amber-500/30">
-                  THI
-                </span>
-              ) : (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 font-bold border border-blue-500/20 dark:border-blue-500/30">
-                  DEMO
-                </span>
-              )}
-            </div>
-          )}
-
           {/* Account Rank Info (Cho user biết tài khoản đang đạt tới cấp độ nào) */}
           <div className="px-4 py-2.5 border-b border-gray-100 dark:border-[#2a2e39] bg-amber-500/5 dark:bg-white/[0.02] flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -122,12 +98,8 @@ export const UserDropdown = ({
           <div className="py-1 border-b border-gray-100 dark:border-[#2a2e39]">
             <Link to={dashboardRoute} className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#2a2e39] flex items-center gap-3 transition-colors text-blue-600 dark:text-blue-400 font-medium">
               <LayoutDashboard className="w-4 h-4" />
-              <span>My Dashboard</span>
+              <span>Trang tổng quan</span>
             </Link>
-            <button className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#2a2e39] flex items-center gap-3 transition-colors text-gray-700 dark:text-[#d1d4dc]">
-              <Keyboard className="w-4 h-4 text-gray-400 dark:text-[#787b86]" />
-              <span>Phím tắt</span>
-            </button>
           </div>
 
           <div className="py-1">

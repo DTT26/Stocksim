@@ -68,9 +68,9 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
     return (
       <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-12 text-center shadow-sm">
         <Activity className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white">Not enough trading data</h3>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white">Chưa đủ dữ liệu giao dịch</h3>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-          Complete some trades in this simulation to unlock advanced performance and risk charts.
+          Hãy thực hiện thêm các lệnh trong phiên mô phỏng này để mở khóa các biểu đồ hiệu suất và quản trị rủi ro.
         </p>
       </div>
     );
@@ -86,14 +86,14 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <LineChartIcon className="w-4 h-4 text-blue-500" />
-                <span>Equity Curve</span>
+                <span>Đường cong Vốn (Equity Curve)</span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Portfolio balance growth starting from initial capital
+                Mức tăng trưởng tài sản khởi đầu từ số vốn ban đầu
               </p>
             </div>
             <div className="text-right">
-              <span className="text-xs text-slate-400 font-semibold block">Ending Equity</span>
+              <span className="text-xs text-slate-400 font-semibold block">Tài sản Cuối kỳ</span>
               <span className="text-sm font-extrabold text-blue-600 dark:text-blue-400">
                 {formatMoneyVND(equityPoints[equityPoints.length - 1]?.equity)}
               </span>
@@ -116,7 +116,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
                   fontSize={11}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(val) => (val === 0 ? 'Start' : `T#${val}`)}
+                  tickFormatter={(val) => (val === 0 ? 'Bắt đầu' : `T#${val}`)}
                 />
                 <YAxis
                   stroke={textFill}
@@ -131,14 +131,14 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
                       const data = payload[0].payload;
                       return (
                         <div className="bg-slate-900 dark:bg-[#1c2230] border border-slate-700 dark:border-[#32394d] text-xs p-3 rounded-lg shadow-xl text-white">
-                          <div className="font-bold text-slate-300">Trade #{data.tradeNumber} • {data.time}</div>
+                          <div className="font-bold text-slate-300">Lệnh #{data.tradeNumber} • {data.time}</div>
                           <div className="mt-1 flex items-center justify-between gap-4">
-                            <span className="text-slate-400">Equity:</span>
+                            <span className="text-slate-400">Tài sản:</span>
                             <span className="font-bold text-blue-400">{formatMoneyVND(data.equity)}</span>
                           </div>
                           {data.tradeNumber > 0 && (
                             <div className="flex items-center justify-between gap-4 mt-0.5">
-                              <span className="text-slate-400">Trade P&L:</span>
+                              <span className="text-slate-400">Lãi/Lỗ:</span>
                               <span className={`font-bold ${data.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                 {formatMoneyVND(data.pnl, true)}
                               </span>
@@ -169,14 +169,14 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Activity className="w-4 h-4 text-rose-500" />
-                <span>Drawdown Curve</span>
+                <span>Biểu đồ Sụt giảm Vốn (Drawdown)</span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Percentage drop from the preceding peak
+                Mức sụt giảm (%) tính từ đỉnh cao nhất
               </p>
             </div>
             <div className="text-right">
-              <span className="text-xs text-slate-400 font-semibold block">Max Drawdown</span>
+              <span className="text-xs text-slate-400 font-semibold block">Sụt giảm Tối đa</span>
               <span className="text-sm font-extrabold text-rose-500">
                 -{drawdownData.maxDrawdownPercent}%
               </span>
@@ -250,13 +250,13 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
         <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">P&L Distribution</h3>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Phân bổ Lợi nhuận</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Number of trades grouped by outcome size
+                Số lượng lệnh phân theo biên độ lãi/lỗ
               </p>
             </div>
             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-              Histogram
+              Biểu đồ tần suất
             </span>
           </div>
 
@@ -274,11 +274,11 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
                         <div className="bg-slate-900 dark:bg-[#1c2230] border border-slate-700 dark:border-[#32394d] text-xs p-3 rounded-lg shadow-xl text-white">
                           <div className="font-bold text-slate-300">{data.label}</div>
                           <div className="mt-1 flex items-center justify-between gap-4">
-                            <span className="text-slate-400">Trades:</span>
+                            <span className="text-slate-400">Số lệnh:</span>
                             <span className="font-bold text-white">{data.count}</span>
                           </div>
                           <div className="flex items-center justify-between gap-4 mt-0.5">
-                            <span className="text-slate-400">Net Bucket P&L:</span>
+                            <span className="text-slate-400">Tổng Lãi/Lỗ:</span>
                             <span className="font-bold">{formatMoneyVND(data.pnlSum, true)}</span>
                           </div>
                         </div>
@@ -302,15 +302,15 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
           <div>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Risk Distribution</h3>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Phân bổ Rủi ro</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   {riskAnalysis.hasPlannedSL
-                    ? 'Capital at risk based on Stop Loss distance per trade'
-                    : 'Realized capital at risk per trade (% of portfolio equity)'}
+                    ? 'Số vốn rủi ro tính theo khoảng cách Stop Loss từng lệnh'
+                    : 'Số vốn rủi ro thực tế theo mức sụt vốn (% tài sản)'}
                 </p>
               </div>
               <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                Risk Analytics
+                Phân tích Rủi ro
               </span>
             </div>
 
@@ -327,13 +327,13 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
                         const data = payload[0].payload;
                         return (
                           <div className="bg-slate-900 dark:bg-[#1c2230] border border-slate-700 dark:border-[#32394d] text-xs p-3 rounded-lg shadow-xl text-white">
-                            <div className="font-bold text-slate-300">Risk Range: {data.label}</div>
+                            <div className="font-bold text-slate-300">Mức rủi ro: {data.label}</div>
                             <div className="mt-1 flex items-center justify-between gap-4">
-                              <span className="text-slate-400">Trades:</span>
+                              <span className="text-slate-400">Số lệnh:</span>
                               <span className="font-bold text-white">{data.count}</span>
                             </div>
                             <div className="flex items-center justify-between gap-4 mt-0.5">
-                              <span className="text-slate-400">Estimated Risk Capital:</span>
+                              <span className="text-slate-400">Vốn rủi ro ước tính:</span>
                               <span className="font-bold text-amber-400">{formatMoneyVND(data.pnlRiskSum)}</span>
                             </div>
                           </div>
@@ -355,7 +355,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
             <div className="grid grid-cols-2 gap-2.5 mt-3 text-center">
               <div className="p-2.5 bg-slate-50 dark:bg-[#161f31] rounded-lg border border-slate-200/60 dark:border-[#253047]/60">
                 <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                  Trades with SL
+                  Lệnh có đặt SL
                 </span>
                 <span className={`text-base font-bold ${
                   riskAnalysis.tradesWithSLPercent >= 50
@@ -369,7 +369,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
               </div>
               <div className="p-2.5 bg-slate-50 dark:bg-[#161f31] rounded-lg border border-slate-200/60 dark:border-[#253047]/60">
                 <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                  Risk Discipline
+                  Kỷ luật Quản trị
                 </span>
                 <span className={`text-base font-bold ${
                   riskAnalysis.disciplineRating === 'Excellent'
@@ -391,13 +391,13 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
             {/* Risk Stats Summary Row */}
             <div className="mt-2.5 p-2.5 bg-slate-50/50 dark:bg-[#161f31]/50 rounded-lg text-xs space-y-1.5 border border-slate-100 dark:border-[#253047]/50">
               <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                <span>Avg. Risk Exposure:</span>
+                <span>Rủi ro Trung bình:</span>
                 <span className="font-semibold text-slate-900 dark:text-white">
                   ~{formatMoneyVND(riskAnalysis.avgRiskAmount)} ({riskAnalysis.avgRiskPercent}%)
                 </span>
               </div>
               <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                <span>Max Single Trade Risk:</span>
+                <span>Rủi ro lớn nhất 1 lệnh:</span>
                 <span className="font-semibold text-slate-900 dark:text-white">
                   ~{formatMoneyVND(riskAnalysis.maxRiskAmount)} ({riskAnalysis.maxRiskPercent}%)
                 </span>
@@ -425,10 +425,10 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Flame className="w-4 h-4 text-amber-500" />
-                <span>Trading Activity Heatmap</span>
+                <span>Bản đồ Nhiệt Hoạt động</span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Activity distribution across trading days and market hours
+                Mật độ giao dịch theo ngày trong tuần và khung giờ
               </p>
             </div>
 
@@ -454,7 +454,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Trades
+                Số lệnh
               </button>
             </div>
           </div>
@@ -463,7 +463,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
             <div className="min-w-[320px]">
               {/* Heatmap Column Headers */}
               <div className="grid grid-cols-7 gap-1 text-[11px] font-semibold text-slate-400 mb-1 text-center">
-                <div className="text-left pl-1">Day</div>
+                <div className="text-left pl-1">Thứ</div>
                 <div>09h</div>
                 <div>10h</div>
                 <div>11h</div>
@@ -497,7 +497,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
                     return (
                       <div
                         key={hour}
-                        title={`${dayName} @ ${hour}:00 — P&L: ${formatMoneyVND(cell?.pnl || 0, true)} (${cell?.trades || 0} trades)`}
+                        title={`${dayName} @ ${hour}:00 — P&L: ${formatMoneyVND(cell?.pnl || 0, true)} (${cell?.trades || 0} lệnh)`}
                         className={`h-8 rounded flex items-center justify-center text-[10px] cursor-pointer transition-transform hover:scale-105 ${bgClass}`}
                       >
                         {val !== 0 ? (heatmapMetric === 'pnl' ? (val > 0 ? '+W' : '-L') : val) : '-'}
@@ -516,14 +516,14 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-emerald-500" />
-                <span>Performance Trend</span>
+                <span>Xu hướng Hiệu suất</span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Rolling Win Rate over consecutive trades
+                Tỷ lệ thắng biến thiên qua các lệnh liên tiếp
               </p>
             </div>
             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
-              Consistency
+              Độ ổn định
             </span>
           </div>
 
@@ -546,9 +546,9 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ session }) => {
                       const data = payload[0].payload;
                       return (
                         <div className="bg-slate-900 dark:bg-[#1c2230] border border-slate-700 dark:border-[#32394d] text-xs p-3 rounded-lg shadow-xl text-white">
-                          <div className="font-bold text-slate-300">Trade #{data.tradeIndex}</div>
+                          <div className="font-bold text-slate-300">Lệnh #{data.tradeIndex}</div>
                           <div className="mt-1 flex items-center justify-between gap-4">
-                            <span className="text-slate-400">Rolling Win Rate:</span>
+                            <span className="text-slate-400">Tỷ lệ thắng tích lũy:</span>
                             <span className="font-bold text-emerald-400">{data.rollingWinRate}%</span>
                           </div>
                         </div>

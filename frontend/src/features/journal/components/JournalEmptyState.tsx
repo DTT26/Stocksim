@@ -10,9 +10,9 @@ interface JournalEmptyStateProps {
 }
 
 export const JournalEmptyState: React.FC<JournalEmptyStateProps> = ({
-  title = 'No trading sessions yet',
-  description = 'Start trading in a simulation and your sessions will appear here.',
-  buttonText = 'Explore Simulations',
+  title = 'Chưa có phiên giao dịch nào',
+  description = 'Bắt đầu giao dịch trong kỳ thi mô phỏng và các phiên của bạn sẽ xuất hiện tại đây.',
+  buttonText = 'Khám phá kỳ thi mô phỏng',
   onAction
 }) => {
   const navigate = useNavigate();

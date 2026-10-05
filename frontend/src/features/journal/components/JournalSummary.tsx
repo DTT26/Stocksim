@@ -16,7 +16,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
       <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-3.5 sm:p-5 shadow-sm min-w-0">
         <div className="flex items-center justify-between text-slate-400 dark:text-slate-500 mb-1.5 sm:mb-2">
           <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
-            Total Sessions
+            Tổng số phiên
           </span>
           <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500 shrink-0" />
         </div>
@@ -24,7 +24,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
           {stats.totalSessions}
         </div>
         <div className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mt-0.5 sm:mt-1 font-medium truncate">
-          Recorded sessions
+          Phiên đã ghi nhận
         </div>
       </div>
 
@@ -32,7 +32,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
       <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-3.5 sm:p-5 shadow-sm min-w-0">
         <div className="flex items-center justify-between text-slate-400 dark:text-slate-500 mb-1.5 sm:mb-2">
           <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
-            Total Trades
+            Tổng số lệnh
           </span>
           <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500 shrink-0" />
         </div>
@@ -40,7 +40,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
           {stats.totalTrades}
         </div>
         <div className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mt-0.5 sm:mt-1 font-medium truncate">
-          Executed orders
+          Lệnh đã thực thi
         </div>
       </div>
 
@@ -48,7 +48,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
       <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-3.5 sm:p-5 shadow-sm min-w-0">
         <div className="flex items-center justify-between text-slate-400 dark:text-slate-500 mb-1.5 sm:mb-2">
           <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
-            Win Rate
+            Tỷ lệ thắng
           </span>
           <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 shrink-0" />
         </div>
@@ -56,7 +56,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
           {formatPercent(stats.winRate, false)}
         </div>
         <div className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mt-0.5 sm:mt-1 font-medium truncate">
-          Profitable trades ratio
+          Tỷ lệ lệnh có lãi
         </div>
       </div>
 
@@ -64,7 +64,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
       <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-3.5 sm:p-5 shadow-sm min-w-0">
         <div className="flex items-center justify-between text-slate-400 dark:text-slate-500 mb-1.5 sm:mb-2">
           <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
-            Net P&L
+            Lợi nhuận ròng (P&L)
           </span>
           {isProfit ? (
             <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 shrink-0" />
@@ -82,7 +82,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
           {formatMoneyVND(stats.netPnL, true)}
         </div>
         <div className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mt-0.5 sm:mt-1 font-medium truncate">
-          Realized cumulative
+          Lũy kế thực tế
         </div>
       </div>
     </div>

@@ -156,9 +156,9 @@ export const AssignmentModal = ({ isOpen, onClose, onSaved, assignmentToEdit, si
   };
 
   const steps = [
-    { num: 1, title: 'Details', icon: <Target className="w-4 h-4" /> },
-    { num: 2, title: 'Checklist & Content', icon: <BookOpen className="w-4 h-4" /> },
-    { num: 3, title: 'Review', icon: <Check className="w-4 h-4" /> }
+    { num: 1, title: 'Thông tin cơ bản', icon: <Target className="w-4 h-4" /> },
+    { num: 2, title: 'Nội dung & Checklist', icon: <BookOpen className="w-4 h-4" /> },
+    { num: 3, title: 'Xem lại', icon: <Check className="w-4 h-4" /> }
   ];
 
   return (
@@ -167,7 +167,7 @@ export const AssignmentModal = ({ isOpen, onClose, onSaved, assignmentToEdit, si
         {/* Header */}
         <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-slate-200 dark:border-[#262626] flex justify-between items-center bg-slate-50/80 dark:bg-[#000000]">
           <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
-            {assignmentToEdit ? 'Chỉnh sửa bài tập (Edit Assignment)' : 'Tạo bài tập mới (Create Assignment)'}
+            {assignmentToEdit ? 'Chỉnh sửa bài tập' : 'Tạo bài tập mới'}
           </h2>
           <button 
             onClick={onClose} 
@@ -218,11 +218,11 @@ export const AssignmentModal = ({ isOpen, onClose, onSaved, assignmentToEdit, si
           <div className="max-w-xl mx-auto py-2">
             {step === 1 && (
               <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Thông tin cơ bản (Assignment Details)</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Thông tin cơ bản</h3>
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Tiêu đề bài tập (Title) *</label>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Tiêu đề bài tập *</label>
                     <input
                       type="text"
                       name="title"
@@ -235,7 +235,7 @@ export const AssignmentModal = ({ isOpen, onClose, onSaved, assignmentToEdit, si
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Liên kết Kỳ mô phỏng (Linked Simulation) *</label>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Liên kết Kỳ thi mô phỏng *</label>
                     <select
                       name="simulationId"
                       required
@@ -243,7 +243,7 @@ export const AssignmentModal = ({ isOpen, onClose, onSaved, assignmentToEdit, si
                       onChange={handleChange}
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#262626] rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-white transition-all text-sm cursor-pointer"
                     >
-                      <option value="" disabled className="text-slate-400">Chọn một kỳ mô phỏng...</option>
+                      <option value="" disabled className="text-slate-400">Chọn một kỳ thi mô phỏng...</option>
                       {simulations.map(sim => (
                         <option key={sim._id} value={sim._id} className="bg-white dark:bg-[#121214] text-slate-900 dark:text-white">
                           {sim.name}
@@ -254,7 +254,7 @@ export const AssignmentModal = ({ isOpen, onClose, onSaved, assignmentToEdit, si
 
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Mã cổ phiếu trọng tâm (Target Stock Symbol) *</label>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Mã tài sản trọng tâm *</label>
                       <button
                         type="button"
                         onClick={() => setCustomSymbolMode(!customSymbolMode)}
@@ -526,7 +526,7 @@ export const AssignmentModal = ({ isOpen, onClose, onSaved, assignmentToEdit, si
 
             {step === 3 && (
               <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Xem lại bài tập (Review Assignment)</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Xem lại bài tập</h3>
                 
                 <div className="bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#262626] rounded-2xl p-5 sm:p-6 space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-slate-200 dark:border-[#262626]">
@@ -597,7 +597,7 @@ export const AssignmentModal = ({ isOpen, onClose, onSaved, assignmentToEdit, si
             onClick={onClose}
             className="px-5 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
           >
-            Cancel
+            Hủy bỏ
           </button>
           
           <div className="flex gap-2.5 sm:gap-3">
@@ -606,7 +606,7 @@ export const AssignmentModal = ({ isOpen, onClose, onSaved, assignmentToEdit, si
                 onClick={handlePrev}
                 className="px-4 sm:px-5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-[#121214] border border-slate-200 dark:border-[#262626] rounded-xl hover:bg-slate-100 dark:hover:bg-[#1c1c1f] transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
               >
-                <ChevronLeft className="w-4 h-4" /> Back
+                <ChevronLeft className="w-4 h-4" /> Quay lại
               </button>
             )}
             
@@ -616,7 +616,7 @@ export const AssignmentModal = ({ isOpen, onClose, onSaved, assignmentToEdit, si
                 disabled={step === 1 && (!formData.title || !formData.simulationId || !formData.deadline)}
                 className="px-5 sm:px-6 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer shadow-sm"
               >
-                Next <ChevronRight className="w-4 h-4" />
+                Tiếp tục <ChevronRight className="w-4 h-4" />
               </button>
             ) : (
               <button
@@ -629,7 +629,7 @@ export const AssignmentModal = ({ isOpen, onClose, onSaved, assignmentToEdit, si
                 ) : (
                   <Check className="w-4 h-4" />
                 )}
-                {assignmentToEdit ? 'Save Changes' : 'Create Assignment'}
+                {assignmentToEdit ? 'Lưu thay đổi' : 'Tạo bài tập'}
               </button>
             )}
           </div>

@@ -20,7 +20,7 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
 
   const exitTimeFormatted = trade.exitTime || trade.closeTime
     ? new Date((trade.exitTime || trade.closeTime)!).toLocaleString('vi-VN')
-    : 'Open position';
+    : 'Vị thế đang mở';
 
   let durationMins = trade.holdingTimeMinutes;
   if (durationMins === undefined && (trade.entryTime || trade.openTime) && (trade.exitTime || trade.closeTime)) {
@@ -64,7 +64,7 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -82,7 +82,7 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
           >
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider block text-slate-500 dark:text-slate-400">
-                Realized Net P&L
+                Lợi nhuận Ròng Thực tế
               </span>
               <div className="text-2xl font-extrabold mt-0.5">
                 {formatMoneyVND(trade.pnl, true)}
@@ -98,30 +98,30 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
           {/* Pricing & Volume Details */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-              Execution Prices & Volume
+              Giá Khớp lệnh & Khối lượng
             </h4>
             <div className="bg-slate-50 dark:bg-[#161f31] rounded-xl p-4 border border-slate-200/60 dark:border-[#253047]/60 space-y-3 text-xs sm:text-sm">
               <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Entry Price</span>
+                <span className="text-slate-500 dark:text-slate-400">Giá Mở vị thế</span>
                 <span className="font-bold text-slate-900 dark:text-white">
                   {formatMoneyVND(trade.entryPrice)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Exit Price</span>
+                <span className="text-slate-500 dark:text-slate-400">Giá Đóng vị thế</span>
                 <span className="font-bold text-slate-900 dark:text-white">
-                  {trade.exitPrice ? formatMoneyVND(trade.exitPrice) : 'Open'}
+                  {trade.exitPrice ? formatMoneyVND(trade.exitPrice) : 'Đang mở'}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Quantity / Lot</span>
+                <span className="text-slate-500 dark:text-slate-400">Khối lượng / Lot</span>
                 <span className="font-semibold text-slate-900 dark:text-white font-mono">
                   {trade.quantity || trade.lot || '1'}
                 </span>
               </div>
               {trade.closeReason && (
                 <div className="flex justify-between pt-2 border-t border-slate-200/40 dark:border-slate-700/40">
-                  <span className="text-slate-500 dark:text-slate-400">Close Reason</span>
+                  <span className="text-slate-500 dark:text-slate-400">Lý do Đóng lệnh</span>
                   <span className="font-bold text-blue-600 dark:text-blue-400">
                     {trade.closeReason}
                   </span>
@@ -134,25 +134,25 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
           {(trade.sl || trade.tp) && (
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-                Risk Orders
+                Lệnh Quản trị Rủi ro
               </h4>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-50 dark:bg-[#161f31] rounded-xl p-3 border border-slate-200/60 dark:border-[#253047]/60">
                   <div className="flex items-center gap-1.5 text-xs text-rose-500 font-semibold mb-1">
                     <ShieldAlert className="w-3.5 h-3.5" />
-                    <span>Stop Loss</span>
+                    <span>Cắt lỗ (SL)</span>
                   </div>
                   <span className="font-bold text-slate-900 dark:text-white text-sm">
-                    {trade.sl ? formatMoneyVND(trade.sl) : 'None'}
+                    {trade.sl ? formatMoneyVND(trade.sl) : 'Không có'}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-[#161f31] rounded-xl p-3 border border-slate-200/60 dark:border-[#253047]/60">
                   <div className="flex items-center gap-1.5 text-xs text-emerald-500 font-semibold mb-1">
                     <Target className="w-3.5 h-3.5" />
-                    <span>Take Profit</span>
+                    <span>Chốt lời (TP)</span>
                   </div>
                   <span className="font-bold text-slate-900 dark:text-white text-sm">
-                    {trade.tp ? formatMoneyVND(trade.tp) : 'None'}
+                    {trade.tp ? formatMoneyVND(trade.tp) : 'Không có'}
                   </span>
                 </div>
               </div>
@@ -162,19 +162,19 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
           {/* Timing & Holding */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-              Timing & Duration
+              Thời gian & Thời lượng
             </h4>
             <div className="bg-slate-50 dark:bg-[#161f31] rounded-xl p-4 border border-slate-200/60 dark:border-[#253047]/60 space-y-2.5 text-xs">
               <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Entry Time</span>
+                <span className="text-slate-500 dark:text-slate-400">Thời gian Mở lệnh</span>
                 <span className="font-medium text-slate-700 dark:text-slate-300">{entryTimeFormatted}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Exit Time</span>
+                <span className="text-slate-500 dark:text-slate-400">Thời gian Đóng lệnh</span>
                 <span className="font-medium text-slate-700 dark:text-slate-300">{exitTimeFormatted}</span>
               </div>
               <div className="flex justify-between pt-1 border-t border-slate-200/40 dark:border-slate-700/40">
-                <span className="text-slate-500 dark:text-slate-400">Holding Duration</span>
+                <span className="text-slate-500 dark:text-slate-400">Thời gian Giữ lệnh</span>
                 <span className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5" />
                   {formatHoldingTime(durationMins)}
@@ -187,7 +187,7 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
           {trade.setupTag && (
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                Setup Tag
+                Chiến lược / Setup
               </h4>
               <div className="flex items-center gap-2 p-3 bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl text-sm font-semibold">
                 <Tag className="w-4 h-4" />
@@ -201,9 +201,9 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
         <div className="p-4 border-t border-slate-200 dark:border-[#253047] bg-slate-50 dark:bg-[#161f31]/50">
           <button
             onClick={onClose}
-            className="w-full py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-semibold text-sm transition-colors"
+            className="w-full py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-semibold text-sm transition-colors cursor-pointer"
           >
-            Close
+            Đóng
           </button>
         </div>
       </div>

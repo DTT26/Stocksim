@@ -88,10 +88,10 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
   };
 
   const steps = [
-    { num: 1, title: 'Basic Info', icon: <Target className="w-4 h-4" /> },
-    { num: 2, title: 'Trading Settings', icon: <SettingsIcon className="w-4 h-4" /> },
-    { num: 3, title: 'Students', icon: <Users className="w-4 h-4" /> },
-    { num: 4, title: 'Review', icon: <Check className="w-4 h-4" /> }
+    { num: 1, title: 'Thông tin chung', icon: <Target className="w-4 h-4" /> },
+    { num: 2, title: 'Cài đặt giao dịch', icon: <SettingsIcon className="w-4 h-4" /> },
+    { num: 3, title: 'Thí sinh', icon: <Users className="w-4 h-4" /> },
+    { num: 4, title: 'Xem lại', icon: <Check className="w-4 h-4" /> }
   ];
 
   return (
@@ -100,7 +100,7 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
         {/* Header */}
         <div className="px-4 sm:px-6 py-3.5 sm:py-5 border-b border-slate-200 dark:border-[#262626] flex justify-between items-center bg-slate-50/80 dark:bg-[#000000]">
           <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
-            {simulationToEdit ? 'Edit Simulation' : 'Create New Simulation'}
+            {simulationToEdit ? 'Chỉnh sửa kỳ thi mô phỏng' : 'Tạo kỳ thi mô phỏng mới'}
           </h2>
           <button 
             onClick={onClose} 
@@ -151,37 +151,37 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
           <div className="max-w-2xl mx-auto py-2">
             {step === 1 && (
               <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Basic Information</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Thông tin cơ bản</h3>
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Simulation Name *</label>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Tên kỳ thi mô phỏng *</label>
                     <input
                       type="text"
                       name="name"
                       required
                       value={formData.name}
                       onChange={handleChange}
-                      placeholder="e.g. Mô phỏng đầu tư chứng khoán HOSE K20"
+                      placeholder="VD: Kỳ thi đầu tư chứng khoán HOSE - Khóa 2026"
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#262626] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:bg-white dark:focus:bg-[#18181b] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-colors"
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Description</label>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Mô tả chi tiết</label>
                     <textarea
                       name="description"
                       rows={3}
                       value={formData.description}
                       onChange={handleChange}
-                      placeholder="Describe the rules and goals..."
+                      placeholder="Mô tả mục tiêu, điều kiện và quy tắc cuộc thi..."
                       className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#262626] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:bg-white dark:focus:bg-[#18181b] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none transition-colors"
                     />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Vốn khởi tạo (Initial Balance USD) *</label>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Vốn khởi tạo ban đầu (USD) *</label>
                       <input
                         type="number"
                         name="initialBalance"
@@ -195,7 +195,7 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Thị trường (Market) *</label>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Thị trường giao dịch *</label>
                       <select
                         name="market"
                         value={formData.market}
@@ -203,9 +203,9 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
                         className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#262626] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:bg-white dark:focus:bg-[#18181b] text-slate-900 dark:text-white transition-colors cursor-pointer"
                       >
                         <option value="VN">Cổ phiếu Việt Nam (HOSE, HNX)</option>
-                        <option value="GLOBAL">Crypto & US Stocks (Quốc tế)</option>
-                        <option value="CRYPTO">Crypto Only</option>
-                        <option value="US">US Stocks Only</option>
+                        <option value="GLOBAL">Crypto & Cổ phiếu Mỹ (Quốc tế)</option>
+                        <option value="CRYPTO">Chỉ Tiền mã hóa (Crypto)</option>
+                        <option value="US">Chỉ Cổ phiếu Mỹ (US Stocks)</option>
                         <option value="FOREX">Ngoại hối (Forex)</option>
                       </select>
                     </div>
@@ -213,7 +213,7 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Start Date *</label>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Ngày bắt đầu *</label>
                       <input
                         type="date"
                         name="startDate"
@@ -225,7 +225,7 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">End Date *</label>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Ngày kết thúc *</label>
                       <input
                         type="date"
                         name="endDate"
@@ -243,12 +243,12 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
 
             {step === 2 && (
               <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Trading Settings</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Cài đặt quy tắc giao dịch</h3>
                 <div className="bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#262626] rounded-2xl p-8 flex flex-col items-center justify-center text-center">
                   <SettingsIcon className="w-12 h-12 text-slate-400 dark:text-slate-600 mb-4 opacity-50" />
-                  <h4 className="text-slate-900 dark:text-white font-bold mb-2">Advanced settings are not yet supported</h4>
+                  <h4 className="text-slate-900 dark:text-white font-bold mb-2">Cài đặt nâng cao đang được chuẩn bị</h4>
                   <p className="text-slate-500 dark:text-slate-400 text-sm max-w-md">
-                    Features like Commission, Transaction Fee, Trading Limit, and Short Selling will be available in a future backend update. For now, default simulator rules apply.
+                    Các tính năng như tỷ lệ đòn bẩy, mức phí giao dịch, giới hạn mở vị thế và cơ chế bán khống sẽ có mặt trong bản cập nhật tới. Hiện tại hệ thống áp dụng cơ chế khớp lệnh thị trường mô phỏng tiêu chuẩn.
                   </p>
                 </div>
               </div>
@@ -256,12 +256,12 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
 
             {step === 3 && (
               <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Add Students</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Thí sinh tham gia</h3>
                 <div className="bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#262626] rounded-2xl p-8 flex flex-col items-center justify-center text-center">
                   <Users className="w-12 h-12 text-indigo-500 mb-4 opacity-50" />
-                  <h4 className="text-slate-900 dark:text-white font-bold mb-2">Assign Participants Later</h4>
+                  <h4 className="text-slate-900 dark:text-white font-bold mb-2">Phân bổ sinh viên sau khi tạo</h4>
                   <p className="text-slate-500 dark:text-slate-400 text-sm max-w-md">
-                    To add students, please finish creating this simulation first. Then, use the "Manage Participants" action from the Simulations list to invite students.
+                    Để thêm sinh viên, vui lòng hoàn tất khởi tạo kỳ thi trước. Sau đó bạn có thể dùng tính năng "Danh sách thí sinh" từ màn hình danh sách kỳ thi để duyệt hoặc gán sinh viên.
                   </p>
                 </div>
               </div>
@@ -269,36 +269,36 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
 
             {step === 4 && (
               <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Review Simulation</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Xem lại kỳ thi</h3>
                 
                 <div className="bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#262626] rounded-2xl p-6 space-y-4">
                   <div className="grid grid-cols-3 gap-4 pb-4 border-b border-slate-200 dark:border-[#262626]">
                     <div className="col-span-3">
-                      <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Name</p>
-                      <p className="text-slate-900 dark:text-white font-bold">{formData.name || <span className="text-rose-500">Required</span>}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Tên kỳ thi</p>
+                      <p className="text-slate-900 dark:text-white font-bold">{formData.name || <span className="text-rose-500">Bắt buộc</span>}</p>
                     </div>
                     <div className="col-span-3">
-                      <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Description</p>
-                      <p className="text-slate-700 dark:text-slate-300 text-sm">{formData.description || 'No description'}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Mô tả</p>
+                      <p className="text-slate-700 dark:text-slate-300 text-sm">{formData.description || 'Chưa có mô tả'}</p>
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Market</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Thị trường</p>
                       <p className="text-slate-900 dark:text-white font-semibold flex items-center gap-2">
                         <Target className="w-4 h-4 text-indigo-500" />
-                        {formData.market === 'VN' ? 'Vietnam (HOSE, HNX)' : formData.market}
+                        {formData.market === 'VN' ? 'Việt Nam (HOSE, HNX)' : formData.market}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Initial Capital</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Vốn khởi tạo</p>
                       <p className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">
                         ${Number(formData.initialBalance >= 1000000 ? formData.initialBalance / 1000 : formData.initialBalance).toLocaleString('en-US')} USD
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Duration</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Thời gian diễn ra</p>
                       <p className="text-slate-700 dark:text-slate-300 text-sm font-medium">
                         {formData.startDate} → {formData.endDate}
                       </p>
@@ -316,7 +316,7 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
             onClick={onClose}
             className="px-3 sm:px-5 py-2 text-xs sm:text-sm font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
           >
-            Cancel
+            Hủy bỏ
           </button>
           
           <div className="flex gap-2 sm:gap-3">
@@ -325,7 +325,7 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
                 onClick={handlePrev}
                 className="px-3 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-[#121214] border border-slate-200 dark:border-[#262626] rounded-xl hover:bg-slate-100 dark:hover:bg-[#1c1c1f] transition-colors flex items-center gap-1.5 cursor-pointer"
               >
-                <ChevronLeft className="w-4 h-4" /> Back
+                <ChevronLeft className="w-4 h-4" /> Quay lại
               </button>
             )}
             
@@ -335,7 +335,7 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
                 disabled={step === 1 && (!formData.name || !formData.initialBalance || !formData.startDate || !formData.endDate)}
                 className="px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer shadow-sm shadow-indigo-600/25"
               >
-                Next <ChevronRight className="w-4 h-4" />
+                Tiếp tục <ChevronRight className="w-4 h-4" />
               </button>
             ) : (
               <button
@@ -348,7 +348,7 @@ export const SimulationModal = ({ isOpen, onClose, onSaved, simulationToEdit }: 
                 ) : (
                   <Check className="w-4 h-4" />
                 )}
-                {simulationToEdit ? 'Save Changes' : 'Create Simulation'}
+                {simulationToEdit ? 'Lưu thay đổi' : 'Tạo kỳ thi'}
               </button>
             )}
           </div>

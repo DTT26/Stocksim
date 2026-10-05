@@ -34,7 +34,7 @@ export const TradingJournalPanel: React.FC = () => {
               {t('journal.title', 'Nhật ký Giao dịch')}
             </h2>
             <span className="text-[11px] text-slate-500 dark:text-slate-400">
-              {t('journal.subtitle', 'Session Journal & Notes')}
+              {t('journal.subtitle', 'Ghi chú & Nhật ký phiên')}
             </span>
           </div>
         </div>
@@ -65,7 +65,7 @@ export const TradingJournalPanel: React.FC = () => {
                   {t('journal.perfAnalysis', 'Phân tích Hiệu suất Chi tiết')}
                 </h4>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {t('journal.perfDesc', 'Xem 4 Tab: Overview, Charts, Breakdown, Trades')}
+                  {t('journal.perfDesc', 'Xem tổng quan, biểu đồ và lịch sử lệnh')}
                 </p>
               </div>
             </div>
@@ -78,14 +78,14 @@ export const TradingJournalPanel: React.FC = () => {
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-500 dark:text-slate-400 font-medium">{t('journal.currentSession', 'Phiên hiện tại:')}</span>
             <span className="font-bold text-slate-900 dark:text-white">
-              {session?.name || `${session?.symbol || 'STOCK'} Session`}
+              {session?.name || `${session?.symbol || 'STOCK'} Phiên`}
             </span>
           </div>
 
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
             <div>
               <span className="text-[10px] uppercase font-semibold text-slate-400 block">
-                Net P&L
+                Lợi nhuận ròng
               </span>
               <span
                 className={`text-sm font-bold ${
@@ -98,7 +98,7 @@ export const TradingJournalPanel: React.FC = () => {
 
             <div>
               <span className="text-[10px] uppercase font-semibold text-slate-400 block">
-                Win Rate
+                Tỷ lệ thắng
               </span>
               <span className="text-sm font-bold text-slate-900 dark:text-white">
                 {formatPercent(winRate, false)}
@@ -238,10 +238,11 @@ export const TradingJournalPanel: React.FC = () => {
       {/* Footer */}
       <div className="p-3 border-t border-[#e6e8ea] dark:border-[#2a2e39] shrink-0 bg-slate-50 dark:bg-[#161f31]/40">
         <button
+          data-tour="open-full-journal-btn"
           onClick={() => navigate('/student/journal')}
-          className="w-full py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-colors shadow-sm"
+          className="w-full py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
         >
-          <span>{t('journal.fullJournalBtn', 'Mở Trading Journal Đầy Đủ')}</span>
+          <span>{t('journal.fullJournalBtn', 'Mở Nhật ký Giao dịch Đầy đủ')}</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>

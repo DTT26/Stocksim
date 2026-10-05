@@ -85,6 +85,13 @@ export const LecturerAssignments = () => {
     return matchesSearch;
   });
 
+  const tabLabels: Record<string, string> = {
+    All: 'Tất cả',
+    Open: 'Đang mở',
+    Closed: 'Đã đóng',
+    Draft: 'Bản nháp',
+  };
+
   const counts = {
     All: assignments.length,
     Open: assignments.filter(a => a.status === 'OPEN').length,
@@ -92,20 +99,29 @@ export const LecturerAssignments = () => {
     Draft: assignments.filter(a => a.status === 'DRAFT').length,
   };
 
+  const getStatusBadgeText = (status: string) => {
+    switch (status) {
+      case 'OPEN': return 'ĐANG MỞ';
+      case 'CLOSED': return 'ĐÃ ĐÓNG';
+      case 'DRAFT': return 'BẢN NHÁP';
+      default: return status;
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Assignments</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 sm:mt-2 text-sm sm:text-base">Create trading assignments and evaluate student submissions.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Quản lý bài tập</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 sm:mt-2 text-sm sm:text-base">Tạo bài tập thực hành giao dịch và đánh giá bài nộp của sinh viên.</p>
         </div>
         <button 
           onClick={handleOpenCreateModal}
           className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 sm:px-6 rounded-xl transition-colors shadow-lg shadow-indigo-600/20 flex items-center gap-2 cursor-pointer"
         >
           <PlusCircle className="w-5 h-5" />
-          Create Assignment
+          Tạo bài tập mới
         </button>
       </div>
 
@@ -122,7 +138,7 @@ export const LecturerAssignments = () => {
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#172033] border border-transparent'
               }`}
             >
-              {tab} <span className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold ${activeTab === tab ? 'bg-indigo-600/20 text-indigo-600 dark:text-indigo-300' : 'bg-slate-100 dark:bg-[#253047] text-slate-600 dark:text-slate-300'}`}>{(counts as any)[tab]}</span>
+              {tabLabels[tab]} <span className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold ${activeTab === tab ? 'bg-indigo-600/20 text-indigo-600 dark:text-indigo-300' : 'bg-slate-100 dark:bg-[#253047] text-slate-600 dark:text-slate-300'}`}>{(counts as any)[tab]}</span>
             </button>
           ))}
         </div>
@@ -132,13 +148,13 @@ export const LecturerAssignments = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 group-focus-within:text-indigo-500" />
             <input
               type="text"
-              placeholder="Search assignments..."
+              placeholder="Tìm kiếm bài tập..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-4 py-2 bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 w-full transition-colors"
             />
           </div>
-          <button className="p-2 shrink-0 border border-slate-200 dark:border-[#253047] rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#172033] transition-colors cursor-pointer">
+          <button className="p-2 shrink-0 border border-slate-200 dark:border-[#253047] rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#172033] transition-colors cursor-pointer" title="Bộ lọc">
             <Filter className="w-4 h-4" />
           </button>
         </div>
@@ -151,13 +167,13 @@ export const LecturerAssignments = () => {
           {loading ? (
             <div className="p-8 text-center text-slate-500 flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-xs">Loading assignments...</p>
+              <p className="text-xs">Đang tải danh sách bài tập...</p>
             </div>
           ) : filteredAssignments.length === 0 ? (
             <div className="p-8 text-center text-slate-500 flex flex-col items-center gap-2">
               <BookOpen className="w-8 h-8 opacity-20 mb-1" />
-              <p className="text-sm font-medium text-slate-900 dark:text-white">No assignments found.</p>
-              {searchQuery && <p className="text-xs text-slate-500 dark:text-slate-400">Try adjusting your search filters.</p>}
+              <p className="text-sm font-medium text-slate-900 dark:text-white">Chưa có bài tập nào.</p>
+              {searchQuery && <p className="text-xs text-slate-500 dark:text-slate-400">Hãy thử điều chỉnh bộ lọc hoặc từ khóa tìm kiếm.</p>}
             </div>
           ) : (
             filteredAssignments.map((ass) => {
@@ -194,7 +210,7 @@ export const LecturerAssignments = () => {
                       'bg-slate-100 dark:bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-500/20'
                     }`}>
                       {ass.status === 'OPEN' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
-                      {ass.status}
+                      {getStatusBadgeText(ass.status)}
                     </span>
                   </div>
 
@@ -202,7 +218,7 @@ export const LecturerAssignments = () => {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-600 dark:text-slate-400 pt-0.5">
                     <div className="flex items-center gap-1">
                       <Target className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span className="truncate max-w-[150px]">{ass.simulationId?.name || 'Unknown Simulation'}</span>
+                      <span className="truncate max-w-[150px]">{ass.simulationId?.name || 'Kỳ thi không xác định'}</span>
                     </div>
 
                     {ass.deadline && (
@@ -279,11 +295,11 @@ export const LecturerAssignments = () => {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 dark:bg-[#172033]/50 border-b border-slate-200 dark:border-[#253047] text-slate-500 dark:text-slate-400 uppercase tracking-wider text-xs font-semibold">
               <tr>
-                <th className="px-6 py-4 font-semibold">Assignment Details</th>
-                <th className="px-6 py-4 font-semibold">Simulation</th>
-                <th className="px-6 py-4 font-semibold text-center">Status</th>
-                <th className="px-6 py-4 font-semibold text-center">Deadline</th>
-                <th className="px-6 py-4 font-semibold text-right">Actions</th>
+                <th className="px-6 py-4 font-semibold">Chi tiết bài tập</th>
+                <th className="px-6 py-4 font-semibold">Kỳ thi mô phỏng</th>
+                <th className="px-6 py-4 font-semibold text-center">Trạng thái</th>
+                <th className="px-6 py-4 font-semibold text-center">Hạn nộp</th>
+                <th className="px-6 py-4 font-semibold text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-[#253047]">
@@ -292,7 +308,7 @@ export const LecturerAssignments = () => {
                   <td colSpan={5} className="px-6 py-16 text-center text-slate-500">
                     <div className="flex flex-col items-center gap-4">
                       <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                      <p>Loading assignments...</p>
+                      <p>Đang tải danh sách bài tập...</p>
                     </div>
                   </td>
                 </tr>
@@ -301,8 +317,8 @@ export const LecturerAssignments = () => {
                   <td colSpan={5} className="px-6 py-16 text-center text-slate-500">
                     <div className="flex flex-col items-center gap-2">
                       <BookOpen className="w-10 h-10 opacity-20 mb-2" />
-                      <p className="text-slate-900 dark:text-white font-medium">No assignments found.</p>
-                      {searchQuery && <p className="text-sm text-slate-500 dark:text-slate-400">Try adjusting your search filters.</p>}
+                      <p className="text-slate-900 dark:text-white font-medium">Chưa có bài tập nào.</p>
+                      {searchQuery && <p className="text-sm text-slate-500 dark:text-slate-400">Hãy thử điều chỉnh bộ lọc hoặc từ khóa tìm kiếm.</p>}
                     </div>
                   </td>
                 </tr>
@@ -336,7 +352,7 @@ export const LecturerAssignments = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-medium">
                         <Target className="w-4 h-4 text-emerald-500" />
-                        {ass.simulationId?.name || 'Unknown Simulation'}
+                        {ass.simulationId?.name || 'Kỳ thi không xác định'}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -346,18 +362,14 @@ export const LecturerAssignments = () => {
                         'bg-slate-100 dark:bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-500/20'
                       }`}>
                         {ass.status === 'OPEN' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
-                        {ass.status}
+                        {getStatusBadgeText(ass.status)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center justify-center gap-1.5">
                         <Clock className={`w-4 h-4 ${new Date(ass.deadline) < new Date() ? 'text-rose-500' : 'text-slate-400 dark:text-slate-500'}`} />
                         <span className={new Date(ass.deadline) < new Date() ? 'text-rose-500' : ''}>
-                          {new Date(ass.deadline).toLocaleDateString(undefined, {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
+                          {new Date(ass.deadline).toLocaleDateString('vi-VN')}
                         </span>
                       </div>
                     </td>
@@ -375,7 +387,7 @@ export const LecturerAssignments = () => {
                         <button 
                           onClick={() => handleOpenAssignModal(ass)}
                           className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-indigo-500/10 rounded-lg transition-colors cursor-pointer"
-                          title="Assign to Students"
+                          title="Giao cho sinh viên"
                         >
                           <Users className="w-5 h-5" />
                         </button>
@@ -383,7 +395,7 @@ export const LecturerAssignments = () => {
                         <button 
                           onClick={() => handleOpenEditModal(ass)}
                           className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg transition-colors cursor-pointer"
-                          title="Edit Assignment"
+                          title="Chỉnh sửa bài tập"
                         >
                           <Edit3 className="w-5 h-5" />
                         </button>
@@ -392,7 +404,7 @@ export const LecturerAssignments = () => {
                           <button 
                             onClick={() => handleUpdateStatus(ass._id, 'CLOSED')}
                             className="p-2 text-rose-500 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors ml-1 cursor-pointer"
-                            title="Close Assignment"
+                            title="Đóng bài tập"
                           >
                             <Lock className="w-5 h-5" />
                           </button>
@@ -400,9 +412,9 @@ export const LecturerAssignments = () => {
                           <button 
                             onClick={() => handleUpdateStatus(ass._id, 'OPEN')}
                             className="p-2 text-emerald-500 dark:text-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg transition-colors ml-1 cursor-pointer"
-                            title="Open Assignment"
+                            title="Mở bài tập"
                           >
-                            <CheckCircle className="w-5 h-5" />
+                            <CheckCircle className="w-4 h-4" />
                           </button>
                         )}
                       </div>

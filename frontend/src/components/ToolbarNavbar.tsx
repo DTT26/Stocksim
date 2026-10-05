@@ -16,6 +16,7 @@ interface ToolbarNavbarProps {
   onOpenSettings?: () => void;
   onOpenChallenge?: () => void;
   onOpenAiTutor?: () => void;
+  onOpenGuide?: () => void;
   challengeLevelName?: string;
   challengeStatus?: string;
   accountRankBadge?: string;
@@ -31,6 +32,7 @@ export const ToolbarNavbar = ({
   onOpenSettings,
   onOpenChallenge, 
   onOpenAiTutor,
+  onOpenGuide,
   challengeLevelName, 
   challengeStatus,
   accountRankBadge,
@@ -49,14 +51,24 @@ export const ToolbarNavbar = ({
   return (
     <>
       <nav className="h-12 bg-white dark:bg-[#131722] border-b border-[#e6e8ea] dark:border-[#2a2e39] flex items-center px-4 justify-between text-[#1e2329] dark:text-[#d1d4dc] text-sm shrink-0 relative z-50">
-        {/* Logo StockSim & Prop Firm Challenge */}
-        <div className="flex items-center gap-3">
+        {/* Logo StockSim & Buttons */}
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link to="/" className="flex items-center group mr-1">
             <span className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
               Stock<span className="text-indigo-600 dark:text-indigo-500">Sim</span>
             </span>
           </Link>
           
+          {/* Nút Hướng Dẫn Thực Chiến */}
+          <button
+            onClick={onOpenGuide}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-bold text-xs transition-all shadow-sm shadow-emerald-500/10 hover:scale-[1.02] cursor-pointer"
+            title="Mở hướng dẫn chi tiết từng bước cho người dùng mới"
+          >
+            <span className="text-sm">🎓</span>
+            <span className="hidden sm:inline">Hướng Dẫn Thực Chiến</span>
+          </button>
+
           {/* Nút Thử Thách Quỹ (Prop Firm Challenge) */}
           <button
             onClick={onOpenChallenge}

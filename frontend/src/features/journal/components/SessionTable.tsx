@@ -52,12 +52,12 @@ export const SessionTable: React.FC<SessionTableProps> = ({
                   {session.status === 'ACTIVE' ? (
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      ACTIVE
+                      ĐANG MỞ
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
                       <CheckCircle2 className="w-3 h-3 text-slate-400" />
-                      DONE
+                      ĐÃ ĐÓNG
                     </span>
                   )}
                 </div>
@@ -82,7 +82,7 @@ export const SessionTable: React.FC<SessionTableProps> = ({
 
                 <div>
                   <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block uppercase">
-                    Win Rate / Trades
+                    Tỷ lệ thắng / Lệnh
                   </span>
                   <div className="flex items-center gap-1.5">
                     <span
@@ -106,14 +106,14 @@ export const SessionTable: React.FC<SessionTableProps> = ({
                     {formattedDate}
                   </span>
                   <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                    Equity: {formatMoneyVND(session.endingBalance || session.balance)}
+                    Tài sản: {formatMoneyVND(session.endingBalance || session.balance)}
                   </span>
                 </div>
               </div>
 
               {/* Bottom Action Hint */}
               <div className="flex items-center justify-end text-blue-600 dark:text-blue-400 text-xs font-semibold gap-1 pt-0.5">
-                <span>View Session</span>
+                <span>Xem chi tiết</span>
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
@@ -126,15 +126,15 @@ export const SessionTable: React.FC<SessionTableProps> = ({
         <table className="w-full text-left text-sm whitespace-nowrap min-w-[820px]">
           <thead className="bg-slate-50 dark:bg-[#172033] border-b border-slate-200 dark:border-[#253047] text-[11px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">
             <tr>
-              <th className="py-3.5 px-3.5 sm:px-4">Session</th>
-              <th className="py-3.5 px-3">Simulation</th>
-              <th className="py-3.5 px-3">Started</th>
-              <th className="py-3.5 px-2.5 text-center">Trades</th>
-              <th className="py-3.5 px-2.5 text-center">Win Rate</th>
-              <th className="py-3.5 px-3 text-right">P&L</th>
-              <th className="py-3.5 px-3 text-right">Portfolio Value</th>
+              <th className="py-3.5 px-3.5 sm:px-4">Phiên giao dịch</th>
+              <th className="py-3.5 px-3">Kỳ thi mô phỏng</th>
+              <th className="py-3.5 px-3">Bắt đầu</th>
+              <th className="py-3.5 px-2.5 text-center">Lệnh</th>
+              <th className="py-3.5 px-2.5 text-center">Tỷ lệ thắng</th>
+              <th className="py-3.5 px-3 text-right">Lợi nhuận (P&L)</th>
+              <th className="py-3.5 px-3 text-right">Giá trị tài sản</th>
               <th className="py-3.5 px-3 sm:px-4 text-right sticky right-0 z-10 bg-slate-50 dark:bg-[#172033] shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] dark:shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.3)]">
-                Action
+                Thao tác
               </th>
             </tr>
           </thead>
@@ -169,12 +169,12 @@ export const SessionTable: React.FC<SessionTableProps> = ({
                           {session.status === 'ACTIVE' ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              ACTIVE
+                              ĐANG MỞ
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
                               <CheckCircle2 className="w-3 h-3 text-slate-400" />
-                              COMPLETED
+                              ĐÃ ĐÓNG
                             </span>
                           )}
                           {session.timeframe && (
@@ -239,7 +239,7 @@ export const SessionTable: React.FC<SessionTableProps> = ({
                       type="button"
                       className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 group-hover:translate-x-0.5 transition-transform cursor-pointer shrink-0"
                     >
-                      <span>View</span>
+                      <span>Xem</span>
                       <ArrowRight className="w-3.5 h-3.5 shrink-0" />
                     </button>
                   </td>

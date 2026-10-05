@@ -55,9 +55,9 @@ export const BreakdownTab: React.FC<BreakdownTabProps> = ({ session }) => {
     return (
       <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-12 text-center shadow-sm">
         <Layers className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white">No performance breakdown available yet</h3>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white">Chưa có dữ liệu phân tích chi tiết</h3>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-          Start trading to analyze which symbols, holding durations, and directions work best for your strategy.
+          Bắt đầu giao dịch để phân tích các mã, thời gian nắm giữ và vị thế hoạt động hiệu quả nhất cho chiến lược của bạn.
         </p>
       </div>
     );
@@ -72,20 +72,20 @@ export const BreakdownTab: React.FC<BreakdownTabProps> = ({ session }) => {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Layers className="w-4 h-4 text-blue-500" />
-              <span>Performance by Symbol</span>
+              <span>Hiệu suất theo Mã Cổ phiếu/Crypto</span>
             </h3>
-            <span className="text-xs text-slate-400 font-medium">Sorted by Total P&L</span>
+            <span className="text-xs text-slate-400 font-medium">Sắp xếp theo Tổng Lãi/Lỗ</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-[#253047] pb-2">
                 <tr>
-                  <th className="py-2.5 px-3">Symbol</th>
-                  <th className="py-2.5 px-3 text-center">Trades</th>
-                  <th className="py-2.5 px-3 text-center">Win Rate</th>
-                  <th className="py-2.5 px-3 text-right">Avg P&L</th>
-                  <th className="py-2.5 px-3 text-right">Total P&L</th>
+                  <th className="py-2.5 px-3">Mã</th>
+                  <th className="py-2.5 px-3 text-center">Số lệnh</th>
+                  <th className="py-2.5 px-3 text-center">Tỷ lệ Thắng</th>
+                  <th className="py-2.5 px-3 text-right">Lãi/Lỗ TB</th>
+                  <th className="py-2.5 px-3 text-right">Tổng Lãi/Lỗ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#1f283e]">
@@ -130,16 +130,16 @@ export const BreakdownTab: React.FC<BreakdownTabProps> = ({ session }) => {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <ArrowLeftRight className="w-4 h-4 text-indigo-500" />
-              <span>Long vs Short</span>
+              <span>Vị thế Mua (Long) vs Bán (Short)</span>
             </h3>
-            <span className="text-xs text-slate-400">Directional bias</span>
+            <span className="text-xs text-slate-400">Xu hướng vị thế</span>
           </div>
 
           {/* Ratio Bar */}
           <div className="mb-4">
             <div className="flex justify-between text-xs font-bold mb-1.5">
-              <span className="text-emerald-600 dark:text-emerald-400">LONG ({longRatio}%)</span>
-              <span className="text-rose-600 dark:text-rose-400">SHORT ({shortRatio}%)</span>
+              <span className="text-emerald-600 dark:text-emerald-400">MUA / LONG ({longRatio}%)</span>
+              <span className="text-rose-600 dark:text-rose-400">BÁN / SHORT ({shortRatio}%)</span>
             </div>
             <div className="w-full h-3 bg-slate-200 dark:bg-slate-700 rounded-full flex overflow-hidden">
               <div
@@ -158,24 +158,24 @@ export const BreakdownTab: React.FC<BreakdownTabProps> = ({ session }) => {
             <table className="w-full text-left text-sm">
               <thead className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-[#253047]">
                 <tr>
-                  <th className="py-2.5 px-3">Metric</th>
-                  <th className="py-2.5 px-3 text-right text-emerald-500 font-bold">Long</th>
-                  <th className="py-2.5 px-3 text-right text-rose-500 font-bold">Short</th>
+                  <th className="py-2.5 px-3">Chỉ số</th>
+                  <th className="py-2.5 px-3 text-right text-emerald-500 font-bold">Mua (Long)</th>
+                  <th className="py-2.5 px-3 text-right text-rose-500 font-bold">Bán (Short)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#1f283e] text-xs">
                 <tr>
-                  <td className="py-2.5 px-3 font-medium text-slate-500 dark:text-slate-400">Trades</td>
+                  <td className="py-2.5 px-3 font-medium text-slate-500 dark:text-slate-400">Số lệnh</td>
                   <td className="py-2.5 px-3 text-right font-semibold text-slate-900 dark:text-white">{longSide?.trades || 0}</td>
                   <td className="py-2.5 px-3 text-right font-semibold text-slate-900 dark:text-white">{shortSide?.trades || 0}</td>
                 </tr>
                 <tr>
-                  <td className="py-2.5 px-3 font-medium text-slate-500 dark:text-slate-400">Win Rate</td>
+                  <td className="py-2.5 px-3 font-medium text-slate-500 dark:text-slate-400">Tỷ lệ Thắng</td>
                   <td className="py-2.5 px-3 text-right font-bold text-emerald-500">{formatPercent(longSide?.winRate || 0, false)}</td>
                   <td className="py-2.5 px-3 text-right font-bold text-rose-500">{formatPercent(shortSide?.winRate || 0, false)}</td>
                 </tr>
                 <tr>
-                  <td className="py-2.5 px-3 font-medium text-slate-500 dark:text-slate-400">Total P&L</td>
+                  <td className="py-2.5 px-3 font-medium text-slate-500 dark:text-slate-400">Tổng Lãi/Lỗ</td>
                   <td className={`py-2.5 px-3 text-right font-bold ${(longSide?.totalPnL || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                     {formatMoneyVND(longSide?.totalPnL || 0, true)}
                   </td>
@@ -184,12 +184,12 @@ export const BreakdownTab: React.FC<BreakdownTabProps> = ({ session }) => {
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2.5 px-3 font-medium text-slate-500 dark:text-slate-400">Average Win</td>
+                  <td className="py-2.5 px-3 font-medium text-slate-500 dark:text-slate-400">Mức Thắng TB</td>
                   <td className="py-2.5 px-3 text-right font-medium text-emerald-500">{formatMoneyVND(longSide?.avgWin || 0, true)}</td>
                   <td className="py-2.5 px-3 text-right font-medium text-emerald-500">{formatMoneyVND(shortSide?.avgWin || 0, true)}</td>
                 </tr>
                 <tr>
-                  <td className="py-2.5 px-3 font-medium text-slate-500 dark:text-slate-400">Average Loss</td>
+                  <td className="py-2.5 px-3 font-medium text-slate-500 dark:text-slate-400">Mức Lỗ TB</td>
                   <td className="py-2.5 px-3 text-right font-medium text-rose-500">{formatMoneyVND(-(longSide?.avgLoss || 0), true)}</td>
                   <td className="py-2.5 px-3 text-right font-medium text-rose-500">{formatMoneyVND(-(shortSide?.avgLoss || 0), true)}</td>
                 </tr>
@@ -206,19 +206,19 @@ export const BreakdownTab: React.FC<BreakdownTabProps> = ({ session }) => {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Calendar className="w-4 h-4 text-emerald-500" />
-              <span>Performance by Trading Day</span>
+              <span>Hiệu suất theo Ngày Giao dịch</span>
             </h3>
-            <span className="text-xs text-slate-400">Daily results</span>
+            <span className="text-xs text-slate-400">Kết quả từng ngày</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-[#253047] pb-2">
                 <tr>
-                  <th className="py-2.5 px-3">Date</th>
-                  <th className="py-2.5 px-3 text-center">Trades</th>
-                  <th className="py-2.5 px-3 text-center">Win Rate</th>
-                  <th className="py-2.5 px-3 text-right">P&L</th>
+                  <th className="py-2.5 px-3">Ngày</th>
+                  <th className="py-2.5 px-3 text-center">Số lệnh</th>
+                  <th className="py-2.5 px-3 text-center">Tỷ lệ Thắng</th>
+                  <th className="py-2.5 px-3 text-right">Lãi/Lỗ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#1f283e]">
@@ -228,12 +228,12 @@ export const BreakdownTab: React.FC<BreakdownTabProps> = ({ session }) => {
                       <span>{item.date}</span>
                       {item.isBest && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                          BEST DAY
+                          NGÀY TỐT NHẤT
                         </span>
                       )}
                       {item.isWorst && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30">
-                          WORST DAY
+                          NGÀY KÉM NHẤT
                         </span>
                       )}
                     </td>
@@ -266,27 +266,27 @@ export const BreakdownTab: React.FC<BreakdownTabProps> = ({ session }) => {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Clock className="w-4 h-4 text-blue-500" />
-              <span>Performance by Holding Time</span>
+              <span>Hiệu suất theo Thời gian Nắm giữ</span>
             </h3>
-            <span className="text-xs text-slate-400">Trade duration analysis</span>
+            <span className="text-xs text-slate-400">Phân tích thời lượng giữ lệnh</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-[#253047] pb-2">
                 <tr>
-                  <th className="py-2.5 px-3">Duration</th>
-                  <th className="py-2.5 px-3 text-center">Trades</th>
-                  <th className="py-2.5 px-3 text-center">Win Rate</th>
-                  <th className="py-2.5 px-3 text-right">Avg P&L</th>
-                  <th className="py-2.5 px-3 text-right">Total P&L</th>
+                  <th className="py-2.5 px-3">Thời gian giữ</th>
+                  <th className="py-2.5 px-3 text-center">Số lệnh</th>
+                  <th className="py-2.5 px-3 text-center">Tỷ lệ Thắng</th>
+                  <th className="py-2.5 px-3 text-right">Lãi/Lỗ TB</th>
+                  <th className="py-2.5 px-3 text-right">Tổng Lãi/Lỗ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#1f283e]">
                 {holdingTimeData.map((item) => (
                   <tr key={item.range} className="hover:bg-slate-50/50 dark:hover:bg-[#161f31]/50">
                     <td className="py-3 px-3 font-semibold text-slate-800 dark:text-slate-200">
-                      {item.range}
+                      {item.label || item.range}
                     </td>
                     <td className="py-3 px-3 text-center text-slate-600 dark:text-slate-400">
                       {item.trades}
@@ -324,20 +324,20 @@ export const BreakdownTab: React.FC<BreakdownTabProps> = ({ session }) => {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Bookmark className="w-4 h-4 text-purple-500" />
-              <span>Performance by Strategy / Setup Tag</span>
+              <span>Hiệu suất theo Chiến lược / Setup</span>
             </h3>
-            <span className="text-xs text-slate-400">Playbook breakdown</span>
+            <span className="text-xs text-slate-400">Phân loại theo chiến lược</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-[#253047] pb-2">
                 <tr>
-                  <th className="py-2.5 px-3">Strategy</th>
-                  <th className="py-2.5 px-3 text-center">Trades</th>
-                  <th className="py-2.5 px-3 text-center">Win Rate</th>
-                  <th className="py-2.5 px-3 text-right">Avg P&L</th>
-                  <th className="py-2.5 px-3 text-right">Total P&L</th>
+                  <th className="py-2.5 px-3">Chiến lược</th>
+                  <th className="py-2.5 px-3 text-center">Số lệnh</th>
+                  <th className="py-2.5 px-3 text-center">Tỷ lệ Thắng</th>
+                  <th className="py-2.5 px-3 text-right">Lãi/Lỗ TB</th>
+                  <th className="py-2.5 px-3 text-right">Tổng Lãi/Lỗ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#1f283e]">

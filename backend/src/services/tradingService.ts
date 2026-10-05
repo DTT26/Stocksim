@@ -661,10 +661,9 @@ export class TradingService {
   }
 
   /**
-   * Lấy lịch sử giao dịch theo loại tài khoản hiện tại
+   * Lấy lịch sử giao dịch của user (giữ nguyên toàn bộ lịch sử trước đó và trong bài thi)
    */
   static async getTransactions(userId: string) {
-    const ctx = await this.getActiveContext(userId);
-    return await Transaction.find({ userId, accountType: ctx.accountType }).sort({ createdAt: -1 });
+    return await Transaction.find({ userId }).sort({ createdAt: -1 });
   }
 }

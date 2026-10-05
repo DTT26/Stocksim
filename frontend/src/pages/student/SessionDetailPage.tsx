@@ -61,8 +61,8 @@ export const SessionDetailPage: React.FC = () => {
   if (error || !session) {
     return (
       <JournalErrorState
-        title="Session not found"
-        message="The requested trading session could not be loaded or does not exist."
+        title="Không tìm thấy phiên giao dịch"
+        message="Phiên giao dịch được yêu cầu không thể tải hoặc không tồn tại."
         onRetry={() => navigate('/student/journal')}
       />
     );
