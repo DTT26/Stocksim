@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, BarChart2, Play, Pause, Square, ChevronRight, ChevronDown, CandlestickChart, RefreshCcw, Undo2, Redo2 } from 'lucide-react';
+import { Search, BarChart2, Play, Pause, Square, ChevronRight, ChevronDown, CandlestickChart, RefreshCcw, Undo2, Redo2, Scissors } from 'lucide-react';
 import { TIMEFRAMES, getPricePrecision, type Stock } from '../data';
 import { AssetAvatar, ExchangeBadge } from './AssetAvatar';
 import { useI18n } from '../../../contexts/I18nContext';
@@ -33,7 +33,7 @@ interface TickerHeaderProps {
   onRedo?: () => void;
 }
 
-export const TickerHeader = ({ 
+export const TickerHeader = ({
   stock, activeTab, onTabChange, activeTimeframe, onTimeframeChange, isReplaying, isSelectingReplayStart, replayTime, totalBars = 1000,
   isChallengeActive = false,
   onStartReplay, onCancelReplay, onReplayNext, onStopReplay, onGoToRealtime, onOpenSearch, onOpenIndicator, activeIndicatorCount,
@@ -48,8 +48,8 @@ export const TickerHeader = ({
   const replayRef = useRef<HTMLDivElement>(null);
 
   const isExtraActive = EXTRA_TIMEFRAMES.includes(activeTimeframe);
-  const visibleTimeframes = isExtraActive 
-    ? [...PRIMARY_TIMEFRAMES, activeTimeframe] 
+  const visibleTimeframes = isExtraActive
+    ? [...PRIMARY_TIMEFRAMES, activeTimeframe]
     : PRIMARY_TIMEFRAMES;
 
   useEffect(() => {
@@ -156,7 +156,7 @@ export const TickerHeader = ({
 
   return (
     <div className="flex flex-col bg-white dark:bg-[#131722] border-b border-[#e6e8ea] dark:border-[#2a2e39] text-xs shrink-0 w-full transition-colors">
-      
+
       {/* ─── Row 1: Ticker Info ─── */}
       <div className="flex items-center px-2 sm:px-4 py-1.5 sm:py-2 overflow-x-auto hide-scrollbar">
         <div 
@@ -226,32 +226,32 @@ export const TickerHeader = ({
 
       {/* ─── Row 2: Tabs & Tools ─── */}
       <div className="flex items-center px-2 sm:px-3 justify-between border-t border-b border-[#e6e8ea] dark:border-[#2a2e39] bg-[#f8f9fa] dark:bg-[#1e222d] overflow-x-auto no-scrollbar gap-2 sm:gap-3">
-        
+
         {/* Left Side: Tabs */}
         <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-[13px] font-medium text-[#787b86] pt-1.5 shrink-0 whitespace-nowrap">
-          <button 
+          <button
             onClick={() => onTabChange('chart')}
             className={`pb-1.5 border-b-2 ${activeTab === 'chart' ? 'text-[#1e2329] dark:text-[#d1d4dc] border-blue-500 font-semibold' : 'border-transparent hover:text-[#1e2329] dark:hover:text-[#d1d4dc]'}`}
           >
             {t('tab.chart', 'Biểu đồ')}
           </button>
-          <button 
+          <button
             onClick={() => onTabChange('coin_info')}
             className={`pb-1.5 border-b-2 ${activeTab === 'coin_info' ? 'text-[#1e2329] dark:text-[#d1d4dc] border-blue-500 font-semibold' : 'border-transparent hover:text-[#1e2329] dark:hover:text-[#d1d4dc]'}`}
           >
-            {stock.market === 'Tiền điện tử (Crypto)' 
-              ? t('tab.coinInfo', 'Thông Tin Coin') 
+            {stock.market === 'Tiền điện tử (Crypto)'
+              ? t('tab.coinInfo', 'Thông Tin Coin')
               : stock.market === 'Cổ phiếu'
-              ? t('tab.stockInfo', 'Thông Tin Cổ phiếu')
-              : stock.market === 'Hàng hóa'
-              ? t('tab.commodityInfo', 'Thông Tin Hàng Hóa')
-              : stock.market === 'Ngoại hối (Forex)'
-              ? t('tab.forexInfo', 'Thông Tin Ngoại Hối')
-              : stock.market === 'Chỉ số'
-              ? t('tab.indexInfo', 'Thông Tin Chỉ Số')
-              : t('tab.assetInfo', 'Thông Tin Cơ Bản')}
+                ? t('tab.stockInfo', 'Thông Tin Cổ phiếu')
+                : stock.market === 'Hàng hóa'
+                  ? t('tab.commodityInfo', 'Thông Tin Hàng Hóa')
+                  : stock.market === 'Ngoại hối (Forex)'
+                    ? t('tab.forexInfo', 'Thông Tin Ngoại Hối')
+                    : stock.market === 'Chỉ số'
+                      ? t('tab.indexInfo', 'Thông Tin Chỉ Số')
+                      : t('tab.assetInfo', 'Thông Tin Cơ Bản')}
           </button>
-          <button 
+          <button
             onClick={() => onTabChange('info')}
             className={`pb-1.5 border-b-2 ${activeTab === 'info' ? 'text-[#1e2329] dark:text-[#d1d4dc] border-blue-500 font-semibold' : 'border-transparent hover:text-[#1e2329] dark:hover:text-[#d1d4dc]'}`}
           >
@@ -267,9 +267,8 @@ export const TickerHeader = ({
               <button
                 key={tf}
                 onClick={() => onTimeframeChange(tf)}
-                className={`px-1.5 py-0.5 rounded text-xs transition-colors whitespace-nowrap ${
-                  activeTimeframe === tf ? 'text-blue-600 dark:text-blue-400 font-semibold bg-blue-50 dark:bg-blue-900/20' : 'hover:text-[#1e2329] dark:hover:text-[#d1d4dc] hover:bg-[#e6e8ea] dark:hover:bg-[#2a2e39]'
-                }`}
+                className={`px-1.5 py-0.5 rounded text-xs transition-colors whitespace-nowrap ${activeTimeframe === tf ? 'text-blue-600 dark:text-blue-400 font-semibold bg-blue-50 dark:bg-blue-900/20' : 'hover:text-[#1e2329] dark:hover:text-[#d1d4dc] hover:bg-[#e6e8ea] dark:hover:bg-[#2a2e39]'
+                  }`}
               >
                 {tf}
               </button>
@@ -284,7 +283,7 @@ export const TickerHeader = ({
                 <ChevronDown className="w-3 h-3" />
               </button>
               {tfDropdownOpen && (
-                <div 
+                <div
                   className="absolute top-full right-0 sm:left-0 mt-1 z-50 bg-white dark:bg-[#1e222d] border border-[#e6e8ea] dark:border-[#2a2e39] rounded shadow-lg py-1 flex flex-col min-w-[70px]"
                 >
                   {EXTRA_TIMEFRAMES.map(tf => (
@@ -294,9 +293,8 @@ export const TickerHeader = ({
                         onTimeframeChange(tf);
                         setTfDropdownOpen(false);
                       }}
-                      className={`px-3 py-1 text-left text-xs hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] transition-colors ${
-                        activeTimeframe === tf ? 'text-blue-600 dark:text-blue-400 font-semibold bg-blue-50/50 dark:bg-blue-900/10' : 'text-[#1e2329] dark:text-[#d1d4dc]'
-                      }`}
+                      className={`px-3 py-1 text-left text-xs hover:bg-[#f0f3fa] dark:hover:bg-[#2a2e39] transition-colors ${activeTimeframe === tf ? 'text-blue-600 dark:text-blue-400 font-semibold bg-blue-50/50 dark:bg-blue-900/10' : 'text-[#1e2329] dark:text-[#d1d4dc]'
+                        }`}
                     >
                       {tf}
                     </button>
@@ -305,7 +303,7 @@ export const TickerHeader = ({
               )}
             </div>
           </div>
-          
+
           <div className="w-px h-4 bg-[#e6e8ea] dark:bg-[#2a2e39] mx-0.5" />
 
           {/* Replay Controller (Prominently placed, never covered) */}
@@ -314,7 +312,7 @@ export const TickerHeader = ({
               <span className="text-blue-700 dark:text-blue-300 text-xs font-semibold">
                 Nhấp nến để chọn điểm bắt đầu
               </span>
-              <button 
+              <button
                 onClick={onCancelReplay}
                 className="ml-1 text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 px-2 py-0.5 rounded text-gray-800 dark:text-gray-200 transition-colors"
               >
@@ -341,7 +339,7 @@ export const TickerHeader = ({
               <span>Replay</span>
             </button>
           ) : (
-            <div 
+            <div
               ref={replayRef}
               className="flex items-center gap-1 bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700/60 rounded px-1.5 py-0.5 shrink-0 shadow-sm"
             >
@@ -355,9 +353,9 @@ export const TickerHeader = ({
                 )}
               </span>
               {!reachedEnd && !autoPlay && (
-                <button 
-                  onClick={onReplayNext} 
-                  title="Nến tiếp theo (Bước tiếp)" 
+                <button
+                  onClick={onReplayNext}
+                  title="Nến tiếp theo (Bước tiếp)"
                   className="p-1 text-orange-600 dark:text-orange-200 hover:bg-orange-200 dark:hover:bg-orange-700/40 rounded transition-colors"
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -365,8 +363,17 @@ export const TickerHeader = ({
               )}
               {!reachedEnd && (
                 <button 
-                  onClick={autoPlay ? stopAutoPlay : startAutoPlay} 
-                  title={autoPlay ? "Tạm dừng" : "Phát tự động"} 
+                  onClick={onStartReplay} 
+                  title="Chuyển đến... (Chọn lại điểm bắt đầu)" 
+                  className="p-1 text-orange-600 dark:text-orange-200 hover:bg-orange-200 dark:hover:bg-orange-700/40 rounded transition-colors"
+                >
+                  <Scissors className="w-3.5 h-3.5" />
+                </button>
+              )}
+              {!reachedEnd && (
+                <button
+                  onClick={autoPlay ? stopAutoPlay : startAutoPlay}
+                  title={autoPlay ? "Tạm dừng" : "Phát tự động"}
                   className="p-1 text-orange-600 dark:text-orange-200 hover:bg-orange-200 dark:hover:bg-orange-700/40 rounded transition-colors"
                 >
                   {autoPlay ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
@@ -394,9 +401,9 @@ export const TickerHeader = ({
                 </div>
               )}
 
-              <button 
-                onClick={handleStopReplay} 
-                title="Thoát chế độ Replay" 
+              <button
+                onClick={handleStopReplay}
+                title="Thoát chế độ Replay"
                 className="p-1 text-red-600 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/40 rounded transition-colors ml-0.5"
               >
                 <Square className="w-3.5 h-3.5" />
@@ -411,7 +418,7 @@ export const TickerHeader = ({
             <CandlestickChart className="w-4 h-4" />
           </button>
 
-          <button 
+          <button
             onClick={onOpenIndicator}
             className="flex items-center gap-1 hover:bg-[#e6e8ea] dark:hover:bg-[#2a2e39] px-1.5 py-1 rounded transition-colors relative"
             title="Chỉ báo"
@@ -445,10 +452,10 @@ export const TickerHeader = ({
               <Redo2 className="w-4 h-4" />
             </button>
           </div>
-          
+
           <div className="w-px h-4 bg-[#e6e8ea] dark:bg-[#2a2e39] mx-0.5 hidden sm:block" />
-          
-          <button 
+
+          <button
             onClick={onGoToRealtime}
             title="Đến biểu đồ thời gian thực"
             className="hover:bg-[#e6e8ea] dark:hover:bg-[#2a2e39] p-1 rounded transition-colors hidden sm:block"
