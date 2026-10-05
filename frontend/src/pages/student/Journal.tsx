@@ -263,7 +263,7 @@ export const StudentJournal: React.FC = () => {
           tp: t.metadata?.takeProfit,
           setupTag: isClose ? 'Đã đóng vị thế' : 'Vị thế đang mở'
         };
-      }).sort((a, b) => new Date(b.entryTime || 0).getTime() - new Date(a.entryTime || 0).getTime());
+      }).sort((a: any, b: any) => new Date(b.entryTime || 0).getTime() - new Date(a.entryTime || 0).getTime());
 
       // Construct challenge items
       const challengeItems: ChallengeHistoryItem[] = [];
@@ -275,7 +275,7 @@ export const StudentJournal: React.FC = () => {
         
         // Trades occurring during this active attempt
         const chalTrades = allChallengeTrades.filter(tr => {
-          const tTime = new Date(tr.entryTime).getTime();
+          const tTime = new Date(tr.entryTime || 0).getTime();
           return tTime >= startTime;
         });
 
@@ -304,11 +304,11 @@ export const StudentJournal: React.FC = () => {
       if (chalRes && chalRes.success && chalRes.challenge?.history && Array.isArray(chalRes.challenge.history)) {
         const hist = chalRes.challenge.history;
         hist.forEach((h: any, idx: number) => {
-          const startTime = new Date(h.startedAt).getTime() - 60000;
+          const startTime = new Date(h.startedAt || 0).getTime() - 60000;
           const endTime = h.endedAt ? (new Date(h.endedAt).getTime() + 60000) : Infinity;
 
           let hTrades = allChallengeTrades.filter(tr => {
-            const tTime = new Date(tr.entryTime).getTime();
+            const tTime = new Date(tr.entryTime || 0).getTime();
             return tTime >= startTime && tTime <= endTime;
           });
 
@@ -316,7 +316,7 @@ export const StudentJournal: React.FC = () => {
           // attach recent challenge trades so user sees their executed orders
           if (idx === hist.length - 1 && chalRes.challenge.status === 'NOT_STARTED' && hTrades.length === 0) {
             hTrades = allChallengeTrades.filter(tr => {
-              const tTime = new Date(tr.entryTime).getTime();
+              const tTime = new Date(tr.entryTime || 0).getTime();
               return tTime >= startTime;
             });
             if (hTrades.length === 0 && allChallengeTrades.length > 0) {

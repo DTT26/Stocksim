@@ -82,7 +82,7 @@ export const CinematicLiveMarket: React.FC = () => {
             return {
               time,
               price: k.close,
-              volume: Math.round(k.volume / 1000) || 500,
+              volume: Math.round((k.volume ?? 0) / 1000) || 500,
             };
           });
           setRealKlinesMap(prev => ({ ...prev, [selectedSymbol]: points }));
