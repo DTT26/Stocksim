@@ -302,14 +302,6 @@ export const BottomPanel = ({
                       <td className="px-2 xl:px-4 py-2 text-center flex items-center justify-center gap-1">
                         <button 
                           onClick={() => {
-                            if (isChallengeActive) {
-                              showAlert({
-                                title: 'AI bị khóa khi thi quỹ',
-                                message: 'Tính năng Đánh giá lệnh bằng AI bị khóa trong thời gian làm bài thi Thử Thách Quỹ nhằm đánh giá trung thực năng lực của thí sinh.',
-                                type: 'warning'
-                              });
-                              return;
-                            }
                             setReviewTradeData({
                               symbol: p.symbol || selectedSymbol || 'BTCUSDT',
                               side: (p.side === 'LONG' ? 'BUY' : 'SELL') as any,
@@ -326,13 +318,10 @@ export const BottomPanel = ({
                               reason: p.sl ? 'Vào lệnh chủ động có quản trị rủi ro' : 'Vào lệnh trực tiếp chưa có SL/TP'
                             });
                           }}
-                          className={isChallengeActive 
-                            ? "bg-gray-500/10 text-gray-400 border border-gray-500/20 px-1.5 py-1 rounded text-[11px] font-semibold flex items-center gap-0.5 cursor-pointer opacity-60 hover:opacity-100"
-                            : "bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 px-1.5 py-1 rounded text-[11px] font-semibold transition-colors flex items-center gap-0.5"
-                          }
-                          title={isChallengeActive ? "Tính năng AI bị khóa khi đang thi quỹ" : "Đánh giá quy trình lệnh bằng AI"}
+                          className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 px-1.5 py-1 rounded text-[11px] font-semibold transition-colors flex items-center gap-0.5 cursor-pointer"
+                          title="Đánh giá quy trình lệnh bằng AI"
                         >
-                          {isChallengeActive ? <Lock className="w-3 h-3 text-amber-500" /> : <Sparkles className="w-3 h-3" />} AI
+                          <Sparkles className="w-3 h-3" /> AI
                         </button>
                         <button 
                           onClick={async () => {
@@ -883,14 +872,6 @@ export const BottomPanel = ({
                       <td className="px-4 py-2 text-right">
                         <button
                           onClick={() => {
-                            if (isChallengeActive) {
-                              showAlert({
-                                title: t('panel.aiLockedTitle', 'AI bị khóa khi thi quỹ'),
-                                message: t('panel.aiLockedDesc', 'Tính năng AI Review bị khóa trong thời gian làm bài thi Thử Thách Quỹ nhằm đánh giá trung thực năng lực của thí sinh.'),
-                                type: 'warning'
-                              });
-                              return;
-                            }
                             const payload = getTradeReviewPayload();
                             if (payload) {
                               setReviewTradeData({
@@ -908,13 +889,10 @@ export const BottomPanel = ({
                               });
                             }
                           }}
-                          className={isChallengeActive
-                            ? "px-2 py-0.5 rounded bg-gray-500/10 text-gray-400 border border-gray-500/20 text-[10px] font-semibold inline-flex items-center gap-1 cursor-pointer opacity-60 hover:opacity-100"
-                            : "px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[10px] font-semibold inline-flex items-center gap-1 transition-colors"
-                          }
-                          title={isChallengeActive ? (lang === 'vi' ? "AI Review bị khóa khi đang thi quỹ" : "AI Review is locked during Challenge") : (lang === 'vi' ? "Review trade với AI" : "Review trade with AI")}
+                          className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[10px] font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                          title={lang === 'vi' ? "Review trade với AI" : "Review trade with AI"}
                         >
-                          {isChallengeActive ? <Lock className="w-2.5 h-2.5 text-amber-500" /> : <Sparkles className="w-2.5 h-2.5" />} Review
+                          <Sparkles className="w-2.5 h-2.5" /> Review
                         </button>
                       </td>
                     </tr>
