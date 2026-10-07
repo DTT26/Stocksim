@@ -159,7 +159,8 @@ export const TickerHeader = ({
 
       {/* ─── Row 1: Ticker Info ─── */}
       <div className="flex items-center px-2 sm:px-4 py-1.5 sm:py-2 overflow-x-auto hide-scrollbar">
-        <div
+        <div 
+          data-tour="ticker-search"
           onClick={onOpenSearch}
           className="flex items-center gap-2 sm:gap-4 pr-3 sm:pr-6 border-r border-[#e6e8ea] dark:border-[#2a2e39] shrink-0 cursor-pointer hover:bg-[#f5f5f5] dark:hover:bg-[#2a2e39]/50 rounded p-1 -ml-1 transition-colors group"
         >
@@ -329,6 +330,7 @@ export const TickerHeader = ({
             </button>
           ) : !isReplaying ? (
             <button
+              data-tour="bar-replay-btn"
               onClick={onStartReplay}
               className="flex items-center gap-1 hover:bg-[#e6e8ea] dark:hover:bg-[#2a2e39] px-2 py-0.5 rounded transition-colors text-orange-600 dark:text-orange-400 font-medium"
               title="Chế độ phát lại nến (Replay)"

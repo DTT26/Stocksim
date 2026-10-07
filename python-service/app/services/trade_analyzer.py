@@ -176,11 +176,13 @@ class TradeAnalyzer:
             raw_drawings = trade.model_extra.get('drawings')
         
         drawings_list = raw_drawings if isinstance(raw_drawings, list) else []
+        system_prefixes = ('__sys_', 'pending_', 'preview_', 'active_', 'tpsl_', 'pos_')
+        system_names = {'shift_measure', 'tpslZone', 'orderTpslLine', 'aiCorrectionZone', 'aiCorrectionBox', 'zoomInBox'}
         valid_drawings = [
             d for d in drawings_list 
-            if isinstance(d, dict) and not str(d.get('id', '')).startswith('__sys_') 
-            and not str(d.get('id', '')).startswith('pending_order_') 
-            and d.get('name') != 'shift_measure'
+            if isinstance(d, dict) 
+            and not any(str(d.get('id', '')).startswith(p) for p in system_prefixes)
+            and d.get('name') not in system_names
         ]
         has_user_drawings = len(valid_drawings) > 0
 
@@ -188,27 +190,34 @@ class TradeAnalyzer:
         has_drawn_mss = False
         has_drawn_pd_array = False
         has_drawn_poi = False
+        has_drawn_bias_range = False
 
         if has_user_drawings:
             for d in valid_drawings:
                 d_name = str(d.get('name', '')).lower()
                 d_data = str(d.get('extendData', '')).lower()
-                text_content = f"{d_name} {d_data}"
+                d_labels = " ".join(str(d.get(k, '') or '') for k in ('label', 'userLabel', 'tag', 'detectedConcept')).lower()
+                text_content = f"{d_name} {d_data} {d_labels}"
                 if any(k in text_content for k in ['sweep', 'liquidity', 'ssl', 'bsl', 'thanh khoản']):
                     has_drawn_sweep = True
-                if any(k in text_content for k in ['cisd', 'mss', 'choch', 'bos', 'horizontalstraightline', 'horizontalray']):
+                if any(k in text_content for k in ['cisd', 'mss', 'choch', 'bos', 'horizontalstraightline', 'horizontalray', 'segment', 'trendline']):
                     has_drawn_mss = True
                 if any(k in text_content for k in ['fvg', 'ob', 'order block', 'breaker', 'rect', 'imbalance', 'vùng']):
                     has_drawn_pd_array = True
                 if any(k in text_content for k in ['poi', 'htf', 'key level', 'cản']):
                     has_drawn_poi = True
+                if any(k in text_content for k in ['fibonacci', 'fibonacciline', 'discount', 'premium', 'equilibrium', 'range', 'pricechannelline']):
+                    has_drawn_bias_range = True
+
             if not has_drawn_pd_array and any(d.get('name') == 'rect' for d in valid_drawings):
                 has_drawn_pd_array = True
-            if not has_drawn_mss and any(d.get('name') in ['horizontalStraightLine', 'horizontalRay', 'priceLine', 'trendLine', 'straightLine'] for d in valid_drawings):
+            if not has_drawn_mss and any(d.get('name') in ['horizontalStraightLine', 'horizontalRay', 'priceLine', 'trendLine', 'straightLine', 'segment'] for d in valid_drawings):
                 has_drawn_mss = True
+            if not has_drawn_bias_range and any(d.get('name') in ['fibonacciLine', 'priceChannelLine', 'rect'] for d in valid_drawings):
+                has_drawn_bias_range = True
 
         if not has_user_drawings:
-            execution_issues.append("Sai ở Thao tác biểu đồ: Bạn chưa vẽ bất kỳ công cụ SMC/ICT nào trên biểu đồ. Các phần liên quan đến hình vẽ (HTF POI, Sweep, MSS/CISD, PD Array) bị chấm 0 điểm.")
+            execution_issues.append("Chưa phát hiện hình vẽ phân tích kỹ thuật: Bạn chưa vẽ các công cụ SMC/ICT trên biểu đồ. Các tiêu chí đòi hỏi hình vẽ (Daily Bias, HTF POI, Sweep, MSS, PD Array) được chấm 0 điểm.")
 
         # ---------------------------------------------------------------------
         # PHẦN 1: BỐI CẢNH KHUNG CAO & ĐỊNH HƯỚNG (25 ĐIỂM) — [D1 / H4]
@@ -220,17 +229,21 @@ class TradeAnalyzer:
             pd_location_valid = False
             is_bias_aligned = False
 
-        if pd_location_valid and is_bias_aligned:
+        if not has_user_drawings:
+            score_1_1 = 0
+            desc_1_1 = "Chưa vẽ xác định vùng giá Dealing Range (Discount / Premium) trên biểu đồ."
+            strategy_issues.append(desc_1_1)
+        elif pd_location_valid and is_bias_aligned and (has_drawn_bias_range or has_drawn_pd_array):
             score_1_1 = 10
             desc_1_1 = (
-                "Điểm MUA nằm ở vùng Discount (nửa dưới 50% Dealing Range) chuẩn xác theo Daily Bullish Bias (+10đ)."
+                "Điểm MUA nằm ở vùng Discount (<50% Dealing Range) chuẩn xác theo Daily Bullish Bias."
                 if is_buy else
-                "Điểm BÁN nằm ở vùng Premium (nửa trên 50% Dealing Range) chuẩn xác theo Daily Bearish Bias (+10đ)."
+                "Điểm BÁN nằm ở vùng Premium (>50% Dealing Range) chuẩn xác theo Daily Bearish Bias."
             )
             strengths.append(desc_1_1)
         else:
             score_1_1 = 0
-            desc_1_1 = "Sai ở Phân vùng giá: Mua đuổi tại Premium hoặc Bán đuổi tại Discount (0/10đ). Điểm vào lệnh nằm sai nửa Dealing Range."
+            desc_1_1 = "Chưa vẽ công cụ Dealing Range hoặc vào lệnh sai phân vùng (Mua ở Premium / Bán ở Discount)."
             strategy_issues.append(desc_1_1)
 
         # 1.2 Draw on Liquidity (DOL) (10đ)
@@ -240,17 +253,22 @@ class TradeAnalyzer:
         )
         if has_logical_dol:
             score_1_2 = 10
-            desc_1_2 = "Điểm Chốt lời (TP) hướng thẳng về bể thanh khoản mở (Open Draw / DOL: Old Highs/Lows, EQH/EQL) chưa bị càn quét (+10đ)."
+            desc_1_2 = "Điểm Chốt lời (TP) hướng thẳng về bể thanh khoản mở (Old Highs/Lows, EQH/EQL)."
             strengths.append(desc_1_2)
         else:
             score_1_2 = 0
-            desc_1_2 = "Sai ở Mục tiêu Take Profit (DOL): Chưa thiết lập TP logic hoặc TP lơ lửng giữa khoảng giá No Man's Land, thiếu Draw on Liquidity (0/10đ)."
+            desc_1_2 = "Chưa thiết lập TP theo vùng thanh khoản mục tiêu (DOL) hoặc TP chưa rõ ràng."
             execution_issues.append(desc_1_2)
             if not has_tp:
-                rule_violations.append("Sai ở Chốt lời: Thiếu Take Profit định vị theo thanh khoản (Missing DOL).")
+                rule_violations.append("Thiếu Take Profit định vị theo thanh khoản (Missing DOL).")
 
         is_market_direct = any(k in notes_combined for k in ["lệnh thị trường", "thực thi trực tiếp", "chưa cài", "no pre-set", "chưa có sl/tp"])
-        has_explicit_notes = bool(trade.reason and len(trade.reason.strip()) > 15 and not is_market_direct)
+        is_template_reason = any(t in str(trade.reason or '').lower() for t in [
+            'quét thanh khoản cản cũ',
+            'chạm điểm thanh lý',
+            'thực thi lệnh theo kế hoạch'
+        ])
+        has_explicit_notes = bool(trade.reason and len(trade.reason.strip()) > 15 and not is_template_reason and not is_market_direct)
 
         # 1.3 Phản ứng tại HTF POI (5đ) - YÊU CẦU CÓ HÌNH VẼ HOẶC XÁC NHẬN POI
         has_htf_poi = (
@@ -260,15 +278,15 @@ class TradeAnalyzer:
         )
         if not has_user_drawings:
             score_1_3 = 0
-            desc_1_3 = "Sai ở Hình vẽ HTF POI: Bạn chưa vẽ trạm đón HTF POI / Key Level nào trên biểu đồ (0/5đ). Cần dùng công cụ hình chữ nhật hoặc đường cản vẽ trạm đón D1/H4."
+            desc_1_3 = "Chưa vẽ trạm đón HTF POI / Key Level (D1/H4) làm bối cảnh định hướng trên biểu đồ."
             strategy_issues.append(desc_1_3)
         elif has_htf_poi:
             score_1_3 = 5
-            desc_1_3 = "Giá xuất phát và bật nảy tại trạm đón HTF Key Level (Daily/H4 OB, FVG hoặc Rejection Block) (+5đ)."
+            desc_1_3 = "Giá xuất phát và bật nảy tại trạm đón HTF Key Level (Daily/H4 OB hoặc FVG)."
             strengths.append(desc_1_3)
         else:
             score_1_3 = 0
-            desc_1_3 = "Sai ở Trạm đón HTF: Chưa xác nhận điểm xuất phát từ trạm đón HTF POI uy tín trên biểu đồ (0/5đ)."
+            desc_1_3 = "Chưa xác nhận điểm xuất phát từ trạm đón HTF POI uy tín trên biểu đồ."
             strategy_issues.append(desc_1_3)
 
         part1_score = score_1_1 + score_1_2 + score_1_3
@@ -284,11 +302,11 @@ class TradeAnalyzer:
         # 2.1 Cửa sổ Khung giờ Vàng (Kill Zone & Macro Timing) (10đ)
         if timing_hit:
             score_2_1 = 10
-            desc_2_1 = f"Lệnh được kích hoạt chuẩn xác trong cửa sổ Khung giờ Vàng ({detected_session} hoặc Silver Bullet) (+10đ)."
+            desc_2_1 = f"Lệnh khớp chuẩn xác trong khung giờ vàng ({detected_session} hoặc Silver Bullet)."
             strengths.append(desc_2_1)
         else:
             score_2_1 = 0
-            desc_2_1 = "Sai ở Khung giờ giao dịch: Lệnh bấm ngoài cửa sổ Kill Zone / Macro (0/10đ), thanh khoản và dòng tiền thể chế có thể suy yếu."
+            desc_2_1 = "Lệnh mở ngoài cửa sổ Kill Zone / Macro (thanh khoản và độ biến động có thể suy yếu)."
             execution_issues.append(desc_2_1)
 
         # 2.2 Phân kỳ Liên thị trường (SMT Divergence) (10đ)
@@ -298,11 +316,11 @@ class TradeAnalyzer:
         )
         if has_smt:
             score_2_2 = 10
-            desc_2_2 = "Có phân kỳ SMT Divergence giữa các tài sản tương quan xác nhận đỉnh/đáy được thể chế bảo vệ vững chắc (+10đ)."
+            desc_2_2 = "Có phân kỳ SMT Divergence giữa các tài sản tương quan xác nhận đỉnh/đáy được bảo vệ."
             strengths.append(desc_2_2)
         else:
             score_2_2 = 0
-            desc_2_2 = "Chưa có Phân kỳ SMT: Chưa ghi nhận tín hiệu phân kỳ SMT Divergence giữa bộ ba tài sản tương quan (0/10đ)."
+            desc_2_2 = "Chưa ghi nhận tín hiệu phân kỳ SMT Divergence giữa các tài sản tương quan."
             strategy_issues.append(desc_2_2)
 
         part2_score = score_2_1 + score_2_2
@@ -325,15 +343,15 @@ class TradeAnalyzer:
         )
         if not has_user_drawings:
             score_3_1 = 0
-            desc_3_1 = "Sai ở Hình vẽ Liquidity Sweep: Người dùng chưa vẽ xác định nhịp Quét Thanh khoản (Liquidity Sweep SSL/BSL) trên biểu đồ (0/10đ). Hãy dùng công cụ vẽ đường kẻ hoặc mũi tên để đánh dấu đáy/đỉnh bị quét."
+            desc_3_1 = "Chưa vẽ đánh dấu nhịp Quét Thanh khoản (Liquidity Sweep SSL/BSL) trên biểu đồ."
             strategy_issues.append(desc_3_1)
-        elif has_sweep:
+        elif has_sweep and has_drawn_sweep:
             score_3_1 = 10
-            desc_3_1 = "Giá thực hiện cú đâm râu quét sạch bể thanh khoản gần nhất (Liquidity Sweep SSL/BSL) rồi rút chân dứt khoát (+10đ)."
+            desc_3_1 = "Giá thực hiện cú đâm râu quét sạch thanh khoản (Liquidity Sweep SSL/BSL) rồi rút chân dứt khoát."
             strengths.append(desc_3_1)
         else:
             score_3_1 = 0
-            desc_3_1 = "Sai ở Nhịp Quét Thanh Khoản: Không có nhịp quét thanh khoản (Liquidity Sweep) rõ ràng hoặc chưa vẽ đường Sweep trước khi vào lệnh (0/10đ)."
+            desc_3_1 = "Chưa có nhịp quét thanh khoản rõ ràng hoặc chưa vẽ đường Sweep trước khi vào lệnh."
             strategy_issues.append(desc_3_1)
 
         # 3.2 Lực đẩy Dứt khoát (Displacement & MSS / CISD) (10đ)
@@ -346,15 +364,15 @@ class TradeAnalyzer:
         )
         if not has_user_drawings:
             score_3_2 = 0
-            desc_3_2 = "Sai ở Hình vẽ MSS / CISD: Người dùng chưa vẽ xác định đường cấu trúc MSS / CISD hoặc nến Displacement trên biểu đồ (0/10đ). Hãy dùng đường kẻ ngang đánh dấu đỉnh/đáy bị phá vỡ."
+            desc_3_2 = "Chưa vẽ đường xác nhận dịch chuyển cấu trúc thị trường (MSS / CISD) trên biểu đồ."
             execution_issues.append(desc_3_2)
-        elif has_disp:
+        elif has_disp and has_drawn_mss:
             score_3_2 = 10
-            desc_3_2 = "Xuất hiện chuỗi nến thân lớn dứt khoát (Displacement) tạo ra sự phá vỡ cấu trúc thị trường (MSS / CISD) được xác nhận trên biểu đồ (+10đ)."
+            desc_3_2 = "Xuất hiện chuỗi nến thân lớn dứt khoát (Displacement) phá vỡ cấu trúc thị trường MSS/CISD."
             strengths.append(desc_3_2)
         else:
             score_3_2 = 0
-            desc_3_2 = "Sai ở Cấu trúc thị trường: Chưa xác nhận lực đẩy Displacement hoặc chưa vẽ đường chuyển dịch cấu trúc MSS/CISD dứt khoát (0/10đ)."
+            desc_3_2 = "Chưa xác nhận lực đẩy Displacement hoặc chưa vẽ đường chuyển dịch cấu trúc MSS."
             execution_issues.append(desc_3_2)
 
         # 3.3 Chất lượng trạm đón PD Array (5đ)
@@ -367,15 +385,15 @@ class TradeAnalyzer:
         )
         if not has_user_drawings:
             score_3_3 = 0
-            desc_3_3 = "Sai ở Hình vẽ PD Array: Người dùng chưa vẽ hộp PD Array (FVG, Order Block, Breaker) trên biểu đồ (0/5đ). Hãy dùng công cụ hình chữ nhật (Rectangle) đánh dấu trạm đón vào lệnh."
+            desc_3_3 = "Chưa vẽ hộp trạm đón PD Array (FVG / Order Block / Breaker) trên biểu đồ."
             execution_issues.append(desc_3_3)
-        elif has_pd_array:
+        elif has_pd_array and has_drawn_pd_array:
             score_3_3 = 5
-            desc_3_3 = "Điểm vào lệnh đón chuẩn xác tại vùng PD Array hợp lệ (FVG M15, Order Block, Breaker, iFVG) sinh ra từ Displacement (+5đ)."
+            desc_3_3 = "Điểm vào lệnh đón chuẩn xác tại vùng PD Array hợp lệ (FVG, Order Block hoặc Breaker)."
             strengths.append(desc_3_3)
         else:
             score_3_3 = 0
-            desc_3_3 = "Sai ở Trạm đón PD Array: Điểm vào lệnh không nằm tại PD Array hợp lệ hoặc chưa vẽ hộp FVG/OB (0/5đ)."
+            desc_3_3 = "Điểm vào lệnh không nằm tại PD Array hợp lệ hoặc chưa vẽ hộp FVG/OB."
             execution_issues.append(desc_3_3)
 
         part3_score = score_3_1 + score_3_2 + score_3_3
@@ -391,43 +409,43 @@ class TradeAnalyzer:
         # 4.1 Tỷ lệ Lợi nhuận / Rủi ro (Payoff Ratio R:R) (10đ)
         if planned_rr >= 2.0:
             score_4_1 = 10
-            desc_4_1 = f"Tỷ lệ Lời/Lỗ (Payoff Ratio R:R) đạt chuẩn tối ưu: 1 : {planned_rr} (>= 1:2) đo về mốc DOL (+10đ)."
+            desc_4_1 = f"Tỷ lệ Lời/Lỗ (Payoff R:R) đạt chuẩn tối ưu: 1 : {planned_rr} (≥ 1:2) về mốc DOL."
             strengths.append(desc_4_1)
         elif planned_rr >= 1.5:
             score_4_1 = 5
-            desc_4_1 = f"Tỷ lệ Lời/Lỗ (R:R) ở mức trung bình: 1 : {planned_rr} (chưa đạt ngưỡng tối ưu 1:2) (+5đ)."
+            desc_4_1 = f"Tỷ lệ Lời/Lỗ (R:R) ở mức 1 : {planned_rr} (chưa đạt ngưỡng tối ưu 1:2)."
             strategy_issues.append(desc_4_1)
         else:
             score_4_1 = 0
-            desc_4_1 = f"Sai ở Tỷ lệ Payoff R:R: Tỷ lệ R:R {planned_rr} < 1:1.5 không đạt chuẩn tối thiểu 1:2 hoặc chưa cài đặt SL/TP (0/10đ)."
+            desc_4_1 = f"Tỷ lệ Payoff R:R ({planned_rr}R) chưa đạt tối thiểu 1:2 hoặc chưa thiết lập đủ SL/TP."
             risk_issues.append(desc_4_1)
 
         # 4.2 Đặt Stop-Loss Logic (5đ)
         if not has_sl:
             score_4_2 = 0
-            desc_4_2 = "Sai ở Stop Loss: Chưa cài đặt Stop Loss bảo vệ tài khoản (0/5đ). Lệnh không có điểm Invalidation phòng vệ."
-            rule_violations.append("Sai ở Quản trị Rủi ro: Chưa cài đặt Stop Loss trước khi mở vị thế.")
+            desc_4_2 = "Chưa cài đặt Stop Loss bảo vệ tài khoản khi mở vị thế."
+            rule_violations.append("Thiếu Stop Loss bảo vệ vị thế.")
             risk_issues.append("Rủi ro không xác định được vì chưa cài Stop Loss.")
         elif mae_r >= 0.85:
             score_4_2 = 2
-            desc_4_2 = f"Sai ở Vị trí Stop Loss: Stop Loss đặt hơi sát (Drawdown {mae_r}R), có nguy cơ bị quét râu nến ngẫu nhiên (+2/5đ)."
+            desc_4_2 = f"Stop Loss đặt hơi sát (Drawdown {mae_r}R), dễ bị tổn thương bởi nhiễu râu nến."
             execution_issues.append(desc_4_2)
         else:
             score_4_2 = 5
-            desc_4_2 = "Stop-Loss (SL) được đặt an toàn phía sau râu nến của cú Sweep (Protected High/Low Invalidation) (+5đ)."
+            desc_4_2 = "Stop-Loss (SL) được đặt an toàn phía sau râu nến cú Sweep (Protected High/Low)."
             strengths.append(desc_4_2)
 
         # 4.3 Quản lý Khối lượng Lệnh (Position Sizing) (5đ)
         if not has_sl:
             score_4_3 = 0
-            desc_4_3 = "Sai ở Khối lượng lệnh: Không thể tính toán tỷ lệ rủi ro do thiếu Stop Loss (0/5đ)."
+            desc_4_3 = "Chưa thể tính toán tỷ lệ rủi ro do thiếu Stop Loss."
         elif risk_pct <= 1.0:
             score_4_3 = 5
-            desc_4_3 = f"Khối lượng lệnh được tính toán cố định đúng mức rủi ro chuẩn ({risk_pct}% <= 1.0% tài khoản) (+5đ)."
+            desc_4_3 = f"Khối lượng vị thế quản lý rủi ro chuẩn ({risk_pct}% ≤ 1.0% tài khoản)."
             strengths.append(desc_4_3)
         else:
             score_4_3 = 0
-            desc_4_3 = f"Sai ở Quy mô vị thế: Rủi ro vị thế {risk_pct}% vượt quá trần an toàn (> 1.0% tài khoản) (0/5đ)."
+            desc_4_3 = f"Rủi ro vị thế {risk_pct}% vượt quá mức an toàn cho phép (> 1.0% tài khoản)."
             risk_issues.append(desc_4_3)
 
         part4_score = score_4_1 + score_4_2 + score_4_3
@@ -444,18 +462,18 @@ class TradeAnalyzer:
         has_fomo = any(k in notes_combined for k in ["fomo", "trả thù", "revenge", "tất tay", "all in"])
         if has_fomo or (has_sl and risk_pct > 3.0):
             score_5_1 = 0
-            desc_5_1 = "Sai ở Kỷ luật cảm xúc: Vi phạm quy tắc cấm (Guardrails) do có dấu hiệu FOMO, giao dịch trả thù hoặc đòn bẩy quá lớn (0/5đ)."
+            desc_5_1 = "Vi phạm quy tắc cấm (Guardrails) do có dấu hiệu FOMO, giao dịch trả thù hoặc rủi ro quá lớn."
             rule_violations.append("Vi phạm giới hạn kỷ luật rủi ro / FOMO.")
         else:
             score_5_1 = 5
-            desc_5_1 = "Tuân thủ nghiêm ngặt quy tắc cấm (Guardrails), bảo toàn giới hạn lỗ tối đa trong ngày (Daily Loss Limit) (+5đ)."
+            desc_5_1 = "Tuân thủ nghiêm ngặt quy tắc cấm (Guardrails), bảo toàn giới hạn lỗ tối đa trong ngày."
             strengths.append(desc_5_1)
 
         # 5.2 Yếu tố Hợp lưu Nâng cao (Confluence Bonus) (5đ)
         confluences = []
-        if has_drawn_pd_array: confluences.append("Vẽ PD Array (OB/FVG)")
-        if has_drawn_mss: confluences.append("Vẽ MSS/CISD")
-        if has_drawn_sweep: confluences.append("Vẽ Liquidity Sweep")
+        if has_drawn_pd_array: confluences.append("PD Array (OB/FVG)")
+        if has_drawn_mss: confluences.append("MSS/CISD")
+        if has_drawn_sweep: confluences.append("Liquidity Sweep")
         if any(k in notes_combined for k in ["breaker", "breaker block"]): confluences.append("Breaker Block")
         if any(k in notes_combined for k in ["fvg", "inversion", "ifvg"]): confluences.append("FVG / iFVG")
         if any(k in notes_combined for k in ["ob", "order block"]): confluences.append("Order Block")
@@ -465,15 +483,15 @@ class TradeAnalyzer:
 
         if not has_user_drawings:
             score_5_2 = 0
-            desc_5_2 = "Sai ở Hợp lưu hình vẽ: Chưa có các hình vẽ công cụ thể chế (Breaker Block, FVG, SMT) trên biểu đồ (0/5đ)."
+            desc_5_2 = "Chưa có các hình vẽ công cụ thể chế (Breaker Block, FVG, SMT) trên biểu đồ."
         elif len(confluences) >= 3 or "unicorn" in notes_combined:
             score_5_2 = 5
             tools_str = ", ".join(confluences[:3]) if confluences else "Breaker + FVG + Killzone"
-            desc_5_2 = f"Đạt hợp lưu cao cấp từ 3 công cụ thể chế trở lên ({tools_str}) (Unicorn Setup Confluence) (+5đ)."
+            desc_5_2 = f"Đạt hợp lưu cao cấp từ 3 công cụ thể chế trở lên ({tools_str})."
             strengths.append(desc_5_2)
         else:
             score_5_2 = 0
-            desc_5_2 = "Chưa đạt đủ 3 yếu tố hợp lưu đồng thời (cần phối hợp hình vẽ Breaker, FVG, SMT, Kill Zone) (0/5đ)."
+            desc_5_2 = "Chưa đạt đủ 3 yếu tố hợp lưu đồng thời (Breaker, FVG, SMT, Kill Zone)."
 
         part5_score = score_5_1 + score_5_2
         part5_items = [
@@ -530,7 +548,7 @@ class TradeAnalyzer:
             "htfD1W1": {
                 "timeframe": "D1 / W1",
                 "title": "Khung Cao - HTF Context & Daily Bias",
-                "role": "Xác định xu hướng chính (Bias: Bullish hay Bearish), khung giá đang giao dịch (Dealing Range), phân vùng Premium/Discount (50% Equilibrium) và các trạm cản HTF POI.",
+                "role": "Định hướng Daily Bias, Dealing Range & trạm cản HTF POI.",
                 "bias": "Bullish Bias" if is_buy else "Bearish Bias",
                 "zone": "Discount (Nửa dưới 50% Dealing Range)" if is_buy else "Premium (Nửa trên 50% Dealing Range)",
                 "poi": "HTF Key POI Active" if has_htf_poi else "Cần đối chiếu trạm cản D1/H4"
@@ -538,21 +556,21 @@ class TradeAnalyzer:
             "mtfH4H1": {
                 "timeframe": "H4 / H1",
                 "title": "Khung Trung gian - Liquidity & Draw on Liquidity",
-                "role": "Xác định mục tiêu thanh khoản chính (Draw on Liquidity - DOL) mà giá đang hướng tới (Old Highs/Lows, ERL), các bể thanh khoản chưa bị càn quét (Open Draw) và theo dõi cú quét thanh khoản (Sweep).",
+                "role": "Xác định mục tiêu Draw on Liquidity (DOL) & nhịp Liquidity Sweep.",
                 "dol": f"DOL: {'Old High / BSL' if is_buy else 'Old Low / SSL'} (${tp:,.2f})" if has_tp else "Chưa xác định mục tiêu DOL",
                 "sweep": "Đã quét sạch bể thanh khoản SSL/BSL" if has_sweep else "Chưa xuất hiện Sweep rõ ràng"
             },
             "ltfM15M5": {
                 "timeframe": "M15 / M5",
                 "title": "Khung Cấu Trúc - Structure & Execution",
-                "role": "Tìm tín hiệu dịch chuyển giá mạnh mẽ (Displacement), xác nhận sự thay đổi cấu trúc (MSS / CHoCH / CISD) và định vị trạm đón PD Array (FVG, Order Block, Breaker, iFVG).",
+                "role": "Bắt nhịp Displacement, xác nhận MSS/CISD & đón tại PD Array.",
                 "structure": "MSS Shift to Bullish" if is_buy else "MSS Shift to Bearish",
                 "pdArray": "PD Array FVG/OB M15 hợp lệ" if has_pd_array else "Chưa đón tại PD Array chuẩn"
             },
             "microM1M3": {
                 "timeframe": "M1 / M3",
                 "title": "Khung Tinh Chỉnh - LTF Entry Refinement",
-                "role": "Tinh chỉnh điểm cắt lỗ (SL) thắt chặt, kiểm tra tín hiệu phân kỳ SMT Divergence và bắt điểm vào lệnh chính xác trong các cửa sổ giờ Macro / Silver Bullet.",
+                "role": "Tinh chỉnh SL thắt chặt, kiểm tra SMT Divergence & khung giờ Kill Zone.",
                 "slRefinement": f"Protected SL tại ${sl:,.2f}" if has_sl else "Thiếu Protected SL",
                 "smtStatus": "SMT Divergence Confirmed" if has_smt else "No SMT",
                 "macroWindow": f"{detected_session}" if timing_hit else "Ngoài khung giờ Kill Zone"
@@ -560,7 +578,7 @@ class TradeAnalyzer:
         }
 
         # ---------------------------------------------------------------------
-        # MARKET STRUCTURE & LIQUIDITY CONTEXT (CỰC KỲ CHI TIẾT VÀ RÕ RÀNG)
+        # MARKET STRUCTURE & LIQUIDITY CONTEXT (SÚC TÍCH, CÔ ĐỌNG, DỄ ĐỌC)
         # ---------------------------------------------------------------------
         swing_ref = round(entry * 1.004 if is_buy else entry * 0.996, 2)
         old_pool_ref = round(sl if has_sl else (entry * 0.992 if is_buy else entry * 1.008), 2)
@@ -568,24 +586,20 @@ class TradeAnalyzer:
 
         ms_title = "MSS Shift to Bullish" if is_buy else "MSS Shift to Bearish"
         ms_detail = (
-            f"Thị trường xác nhận Market Structure Shift (MSS) sang Bullish khi nến Displacement bứt phá vượt qua đỉnh dẫn dắt (Swing High gần nhất tại ${swing_ref:,.2f}), "
-            f"kết thúc chuỗi giảm Lower High → Lower Low. Điểm vào lệnh Buy tại ${entry:,.2f} đón đúng pha hồi (Retracement) về vùng Discount. "
-            f"Cấu trúc tăng được bảo vệ an toàn bởi đáy Invalidation tại ${old_pool_ref:,.2f}."
+            f"Xác nhận MSS Bullish khi nến Displacement bứt phá qua đỉnh dẫn dắt (${swing_ref:,.2f}). "
+            f"Điểm Buy tại ${entry:,.2f} đón đúng nhịp hồi Discount; bảo vệ an toàn bởi đáy Invalidation ${old_pool_ref:,.2f}."
             if is_buy else
-            f"Thị trường xác nhận Market Structure Shift (MSS) sang Bearish khi nến Displacement đâm thủng đáy dẫn dắt (Swing Low gần nhất tại ${swing_ref:,.2f}), "
-            f"kết thúc chuỗi tăng Higher High → Higher Low. Điểm vào lệnh Sell tại ${entry:,.2f} đón đúng pha hồi (Retracement) về vùng Premium. "
-            f"Cấu trúc giảm được bảo vệ an toàn bởi đỉnh Invalidation tại ${old_pool_ref:,.2f}."
+            f"Xác nhận MSS Bearish khi nến Displacement đâm thủng đáy dẫn dắt (${swing_ref:,.2f}). "
+            f"Điểm Sell tại ${entry:,.2f} đón đúng nhịp hồi Premium; bảo vệ an toàn bởi đỉnh Invalidation ${old_pool_ref:,.2f}."
         )
 
         liq_title = "Sell-side Liquidity (SSL) swept" if is_buy else "Buy-side Liquidity (BSL) swept"
         liq_detail = (
-            f"Dòng tiền thông minh đã thực hiện cú đâm râu quét sạch bể thanh khoản bán (Sell-side Liquidity - SSL) bên dưới đáy cũ Old Low tại ${old_pool_ref:,.2f} "
-            f"(kích hoạt toàn bộ Stop Loss của phe Mua cũ) rồi rút chân dứt khoát. Sau khi thanh khoản đáy được dọn sạch, mục tiêu tiếp theo (Draw on Liquidity - DOL) "
-            f"hướng thẳng về bể thanh khoản mua (Buy-side Liquidity - BSL) tại đỉnh ${dol_target_ref:,.2f}."
+            f"Quét sạch bể thanh khoản bán (SSL) dưới đáy cũ ${old_pool_ref:,.2f} rồi rút chân dứt khoát. "
+            f"Mục tiêu kế tiếp (DOL) hướng thẳng về bể thanh khoản mua (BSL) tại đỉnh ${dol_target_ref:,.2f}."
             if is_buy else
-            f"Dòng tiền thông minh đã thực hiện cú đâm râu vượt đỉnh cũ Old High tại ${old_pool_ref:,.2f} để quét sạch Buy-side Liquidity (BSL) "
-            f"(kích hoạt toàn bộ Buy Stop của phe Bán cũ) rồi rút râu đảo chiều mạnh. Sau khi dọn sạch BSL, mục tiêu tiếp theo (Draw on Liquidity - DOL) "
-            f"hướng thẳng về bể thanh khoản bán (Sell-side Liquidity - SSL) tại đáy ${dol_target_ref:,.2f}."
+            f"Quét sạch bể thanh khoản mua (BSL) trên đỉnh cũ ${old_pool_ref:,.2f} rồi rút râu đảo chiều mạnh. "
+            f"Mục tiêu kế tiếp (DOL) hướng thẳng về bể thanh khoản bán (SSL) tại đáy ${dol_target_ref:,.2f}."
         )
 
         # Market Context summary

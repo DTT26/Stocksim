@@ -78,10 +78,10 @@ export const LecturerDashboard = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Good afternoon, {user?.name || 'Lecturer'}
+            Xin chào, {user?.name || 'Giảng viên'}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1 sm:mt-2 text-sm sm:text-base">
-            Manage your simulations, assignments and student performance.
+            Quản lý kỳ thi mô phỏng, bài tập và theo dõi hiệu suất sinh viên.
           </p>
         </div>
         <button 
@@ -89,7 +89,7 @@ export const LecturerDashboard = () => {
           className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 rounded-lg transition-colors shadow-lg shadow-indigo-600/20 flex items-center gap-2 cursor-pointer text-sm sm:text-base"
         >
           <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-          Create Simulation
+          Tạo kỳ thi mô phỏng
         </button>
       </div>
 
@@ -99,10 +99,10 @@ export const LecturerDashboard = () => {
           <div className="absolute top-0 right-0 p-3 sm:p-4 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
             <Activity className="w-12 h-12 sm:w-16 sm:h-16 text-indigo-500" />
           </div>
-          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Active Simulations</p>
+          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Kỳ thi đang diễn ra</p>
           <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white relative z-10">{loading ? '-' : stats.simulations}</h3>
           <div className="mt-3 sm:mt-4 flex items-center gap-2 relative z-10">
-            <span className="text-xs text-slate-400 dark:text-slate-500">Currently running</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500">Đang hoạt động</span>
           </div>
         </div>
 
@@ -110,10 +110,10 @@ export const LecturerDashboard = () => {
           <div className="absolute top-0 right-0 p-3 sm:p-4 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
             <Users className="w-12 h-12 sm:w-16 sm:h-16 text-emerald-500" />
           </div>
-          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Total Students</p>
+          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Tổng số sinh viên</p>
           <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white relative z-10">{loading ? '-' : stats.students}</h3>
           <div className="mt-3 sm:mt-4 flex items-center gap-2 relative z-10">
-            <span className="text-xs text-slate-400 dark:text-slate-500">Registered in system</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500">Đã đăng ký trong hệ thống</span>
           </div>
         </div>
 
@@ -121,10 +121,10 @@ export const LecturerDashboard = () => {
           <div className="absolute top-0 right-0 p-3 sm:p-4 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
             <BookOpen className="w-12 h-12 sm:w-16 sm:h-16 text-amber-500" />
           </div>
-          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Active Assignments</p>
+          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Bài tập đang mở</p>
           <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white relative z-10">{loading ? '-' : stats.assignments}</h3>
           <div className="mt-3 sm:mt-4 flex items-center gap-2 relative z-10">
-            <span className="text-xs text-slate-400 dark:text-slate-500">Pending completion</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500">Đang chờ hoàn thành</span>
           </div>
         </div>
 
@@ -132,12 +132,12 @@ export const LecturerDashboard = () => {
           <div className="absolute top-0 right-0 p-3 sm:p-4 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
             <TrendingUp className="w-12 h-12 sm:w-16 sm:h-16 text-rose-500" />
           </div>
-          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Avg Student Return</p>
+          <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mb-1 relative z-10">Tỷ suất sinh lời TB</p>
           <h3 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-slate-300 relative z-10">
             {loading ? '-' : (stats.avgReturn > 0 ? `+${stats.avgReturn}%` : '0.00%')}
           </h3>
           <div className="mt-3 sm:mt-4 flex items-center gap-2 relative z-10">
-            <span className="text-xs text-slate-400 dark:text-slate-500 italic">Across active simulations</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500 italic">Trên các kỳ thi đang diễn ra</span>
           </div>
         </div>
       </div>
@@ -150,14 +150,14 @@ export const LecturerDashboard = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-6">
               <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-indigo-500 dark:text-indigo-400 shrink-0" />
-                Student Performance Overview
+                Tổng quan hiệu suất sinh viên
               </h2>
               <div className="flex bg-slate-100 dark:bg-[#172033] rounded-lg p-1 border border-slate-200 dark:border-[#253047] self-start sm:self-auto">
-                {['7D', '30D', '3M', '1Y'].map(range => (
+                {['7N', '30N', '3T', '1Năm'].map(range => (
                   <button
                     key={range}
                     className={`px-2.5 sm:px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
-                      range === '30D' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                      range === '30N' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                   >
                     {range}
@@ -169,9 +169,9 @@ export const LecturerDashboard = () => {
             {(!dashboardStats.chartData || dashboardStats.chartData.length === 0) ? (
               <div className="h-[200px] sm:h-[250px] w-full flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-[#253047] rounded-xl bg-slate-50 dark:bg-[#172033]/50 p-4 text-center">
                 <AlertCircle className="w-8 h-8 sm:w-10 sm:h-10 text-slate-400 dark:text-slate-500 mb-2 sm:mb-3" />
-                <p className="text-slate-600 dark:text-slate-400 font-medium text-sm sm:text-base">No Data Available</p>
+                <p className="text-slate-600 dark:text-slate-400 font-medium text-sm sm:text-base">Chưa có dữ liệu</p>
                 <p className="text-slate-400 dark:text-slate-500 text-xs sm:text-sm mt-1 max-w-sm">
-                  There is currently no return rate data for your simulations.
+                  Hiện chưa có dữ liệu tỷ suất sinh lời cho các kỳ thi mô phỏng của bạn.
                 </p>
               </div>
             ) : (
@@ -207,15 +207,15 @@ export const LecturerDashboard = () => {
             <div className="flex justify-between items-center mb-4 sm:mb-6">
               <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Target className="w-5 h-5 text-emerald-500 dark:text-emerald-400 shrink-0" />
-                Active Simulations
+                Kỳ thi đang diễn ra
               </h2>
             </div>
             
             {loading ? (
-              <div className="text-center py-10 sm:py-12 text-slate-400 dark:text-slate-500 text-sm">Loading simulations...</div>
+              <div className="text-center py-10 sm:py-12 text-slate-400 dark:text-slate-500 text-sm">Đang tải kỳ thi mô phỏng...</div>
             ) : simulations.length === 0 ? (
               <div className="text-center py-10 sm:py-12 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-[#172033] rounded-xl border border-slate-200 dark:border-[#253047] text-sm">
-                No active simulations.
+                Không có kỳ thi nào đang diễn ra.
               </div>
             ) : (
               <div className="space-y-3 sm:space-y-4">
@@ -226,25 +226,25 @@ export const LecturerDashboard = () => {
                         <div className="flex items-center gap-2 mb-1.5">
                           <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider flex items-center gap-1.5 border border-emerald-500/20">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            LIVE
+                            ĐANG DIỄN RA
                           </span>
                           <span className="text-[11px] text-slate-500 bg-slate-100 dark:bg-[#111827] px-2 py-0.5 rounded border border-slate-200 dark:border-[#253047]">
-                            {sim.market || 'Vietnam'}
+                            {sim.market || 'Việt Nam'}
                           </span>
                         </div>
                         <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">{sim.name}</h3>
                         <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1.5 mt-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                          <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> ? Students</span>
+                          <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> ? Sinh viên</span>
                           <span className="flex items-center gap-1"><Activity className="w-3.5 h-3.5" /> ${(sim.initialBalance >= 1000000 ? (sim.initialBalance / 1000) : (sim.initialBalance || 10000)).toLocaleString('en-US')}</span>
-                          <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Ends {new Date(sim.endDate).toLocaleDateString()}</span>
+                          <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Kết thúc {new Date(sim.endDate).toLocaleDateString('vi-VN')}</span>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 md:flex md:flex-col gap-2 shrink-0 pt-2 md:pt-0 w-full md:w-auto">
                         <Link to={`/lecturer/simulations`} className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors text-center shadow-lg shadow-indigo-600/20">
-                          Manage
+                          Quản lý
                         </Link>
                         <Link to={`/lecturer/simulations/${sim._id}/results`} className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-[#253047] dark:hover:bg-[#2a3655] text-slate-800 dark:text-white text-xs sm:text-sm font-medium rounded-lg transition-colors text-center border border-slate-300 dark:border-[#3b4b72]">
-                          Results
+                          Kết quả
                         </Link>
                       </div>
                     </div>
@@ -255,7 +255,7 @@ export const LecturerDashboard = () => {
             
             <div className="mt-4 sm:mt-6 text-center">
               <Link to="/lecturer/simulations" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium text-xs sm:text-sm flex items-center justify-center gap-1 transition-colors">
-                View All Simulations <ChevronRight className="w-4 h-4" />
+                Xem tất cả kỳ thi <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
           </div>
@@ -268,15 +268,15 @@ export const LecturerDashboard = () => {
             <div className="flex justify-between items-center mb-4 sm:mb-6">
               <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0" />
-                Active Assignments
+                Bài tập đang mở
               </h2>
             </div>
             
             {activeAssignments.length === 0 ? (
               <div className="text-center py-8 sm:py-12 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-[#172033] rounded-xl border border-slate-200 dark:border-[#253047] text-xs sm:text-sm p-4">
-                No active assignments currently.
+                Hiện không có bài tập nào.
                 <br />
-                <Link to="/lecturer/assignments" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 text-xs sm:text-sm font-medium mt-2 inline-block">Create Assignment</Link>
+                <Link to="/lecturer/assignments" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 text-xs sm:text-sm font-medium mt-2 inline-block">Tạo bài tập mới</Link>
               </div>
             ) : (
               <div className="space-y-3">
@@ -285,10 +285,10 @@ export const LecturerDashboard = () => {
                     <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors line-clamp-1">{assignment.title}</h3>
                     <div className="flex justify-between items-center mt-2 gap-2">
                       <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 shrink-0">
-                        <Clock className="w-3 h-3" /> Due {new Date(assignment.deadline).toLocaleDateString()}
+                        <Clock className="w-3 h-3" /> Hạn nộp {new Date(assignment.deadline).toLocaleDateString('vi-VN')}
                       </span>
                       <span className="text-[10px] sm:text-xs bg-amber-500/10 text-amber-600 dark:text-amber-500 px-2 py-0.5 rounded border border-amber-500/20 font-medium shrink-0">
-                        {assignment.status}
+                        {assignment.status === 'OPEN' ? 'Đang mở' : assignment.status}
                       </span>
                     </div>
                   </Link>
@@ -302,13 +302,13 @@ export const LecturerDashboard = () => {
             <div className="flex justify-between items-center mb-4 sm:mb-6">
               <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Clock className="w-5 h-5 text-rose-500 dark:text-rose-400 shrink-0" />
-                Recent Activity
+                Hoạt động gần đây
               </h2>
             </div>
             
             {(!dashboardStats.recentActivity || dashboardStats.recentActivity.length === 0) ? (
               <div className="text-center py-8 sm:py-12 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-[#172033] rounded-xl border border-slate-200 dark:border-[#253047] text-xs sm:text-sm">
-                <p>No recent activity found.</p>
+                <p>Không có hoạt động gần đây.</p>
               </div>
             ) : (
               <div className="space-y-3 sm:space-y-4">

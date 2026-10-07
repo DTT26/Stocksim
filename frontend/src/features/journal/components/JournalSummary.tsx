@@ -2,12 +2,14 @@ import React from 'react';
 import { Calendar, Hash, Target, TrendingUp, TrendingDown } from 'lucide-react';
 import { formatMoneyVND, formatPercent } from '../../../utils/tradingAnalytics';
 import type { JournalSummaryStats } from '../types/journalTypes';
+import { useI18n } from '../../../contexts/I18nContext';
 
 interface JournalSummaryProps {
   stats: JournalSummaryStats;
 }
 
 export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
+  const { lang, t } = useI18n();
   const isProfit = stats.netPnL >= 0;
 
   return (
@@ -16,7 +18,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
       <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-3.5 sm:p-5 shadow-sm min-w-0">
         <div className="flex items-center justify-between text-slate-400 dark:text-slate-500 mb-1.5 sm:mb-2">
           <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
-            Total Sessions
+            {t('journal.totalSessions', 'Tổng số phiên')}
           </span>
           <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500 shrink-0" />
         </div>
@@ -24,7 +26,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
           {stats.totalSessions}
         </div>
         <div className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mt-0.5 sm:mt-1 font-medium truncate">
-          Recorded sessions
+          {t('journal.recordedSessions', 'Phiên đã ghi nhận')}
         </div>
       </div>
 
@@ -32,7 +34,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
       <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-3.5 sm:p-5 shadow-sm min-w-0">
         <div className="flex items-center justify-between text-slate-400 dark:text-slate-500 mb-1.5 sm:mb-2">
           <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
-            Total Trades
+            {t('journal.totalTrades', 'Tổng số lệnh')}
           </span>
           <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500 shrink-0" />
         </div>
@@ -40,7 +42,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
           {stats.totalTrades}
         </div>
         <div className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mt-0.5 sm:mt-1 font-medium truncate">
-          Executed orders
+          {t('journal.executedTrades', 'Lệnh đã thực thi')}
         </div>
       </div>
 
@@ -48,7 +50,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
       <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-3.5 sm:p-5 shadow-sm min-w-0">
         <div className="flex items-center justify-between text-slate-400 dark:text-slate-500 mb-1.5 sm:mb-2">
           <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
-            Win Rate
+            {t('journal.winRate', 'Tỷ lệ thắng')}
           </span>
           <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 shrink-0" />
         </div>
@@ -56,7 +58,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
           {formatPercent(stats.winRate, false)}
         </div>
         <div className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mt-0.5 sm:mt-1 font-medium truncate">
-          Profitable trades ratio
+          {t('journal.winRateDesc', 'Tỷ lệ lệnh có lãi')}
         </div>
       </div>
 
@@ -64,7 +66,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
       <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-[#253047] rounded-xl p-3.5 sm:p-5 shadow-sm min-w-0">
         <div className="flex items-center justify-between text-slate-400 dark:text-slate-500 mb-1.5 sm:mb-2">
           <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
-            Net P&L
+            {t('journal.netPnL', 'Lợi nhuận ròng (P&L)')}
           </span>
           {isProfit ? (
             <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 shrink-0" />
@@ -82,7 +84,7 @@ export const JournalSummary: React.FC<JournalSummaryProps> = ({ stats }) => {
           {formatMoneyVND(stats.netPnL, true)}
         </div>
         <div className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mt-0.5 sm:mt-1 font-medium truncate">
-          Realized cumulative
+          {lang === 'vi' ? 'Lũy kế thực tế' : 'Cumulative P&L'}
         </div>
       </div>
     </div>

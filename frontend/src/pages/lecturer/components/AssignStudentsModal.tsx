@@ -131,9 +131,9 @@ export const AssignStudentsModal = ({ isOpen, onClose, assignment, onSaved }: As
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              Assign to Students
+              Giao bài tập cho sinh viên
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Assignment: <span className="text-slate-900 dark:text-white font-medium">{assignment?.title}</span></p>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Bài tập: <span className="text-slate-900 dark:text-white font-medium">{assignment?.title}</span></p>
           </div>
           <button 
             onClick={onClose} 
@@ -149,7 +149,7 @@ export const AssignStudentsModal = ({ isOpen, onClose, assignment, onSaved }: As
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
             <input 
               type="text" 
-              placeholder="Search students by name or email..." 
+              placeholder="Tìm kiếm sinh viên theo tên hoặc email..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#262626] rounded-xl py-2.5 pl-10 pr-4 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500"
@@ -162,13 +162,13 @@ export const AssignStudentsModal = ({ isOpen, onClose, assignment, onSaved }: As
               <div className="w-6 h-6 rounded-md bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs font-bold font-mono">
                 {selectedIds.length}
               </div>
-              Students Selected
+              Sinh viên đã chọn
             </span>
             <button 
               onClick={toggleAll}
               className="text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium transition-colors cursor-pointer"
             >
-              {allFilteredSelected ? 'Deselect All Filtered' : 'Select All Filtered'}
+              {allFilteredSelected ? 'Bỏ chọn tất cả kết quả' : 'Chọn tất cả kết quả'}
             </button>
           </div>
 
@@ -177,13 +177,13 @@ export const AssignStudentsModal = ({ isOpen, onClose, assignment, onSaved }: As
             {loading ? (
               <div className="flex flex-col justify-center items-center h-full min-h-[200px] text-slate-400 dark:text-slate-500">
                 <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-                Loading students...
+                Đang tải danh sách sinh viên...
               </div>
             ) : filteredStudents.length === 0 ? (
               <div className="flex flex-col justify-center items-center h-full min-h-[200px] text-slate-400 dark:text-slate-500 p-6 text-center">
                 <ShieldAlert className="w-10 h-10 mb-3 opacity-20" />
-                <p>No students found.</p>
-                {searchTerm && <p className="text-sm mt-1">Try adjusting your search query.</p>}
+                <p>Không tìm thấy sinh viên nào.</p>
+                {searchTerm && <p className="text-sm mt-1">Thử nhập từ khóa tìm kiếm khác.</p>}
               </div>
             ) : (
               <ul className="divide-y divide-slate-200 dark:divide-[#262626]">
@@ -191,7 +191,7 @@ export const AssignStudentsModal = ({ isOpen, onClose, assignment, onSaved }: As
                   const isSelected = selectedIds.includes(student._id);
                   return (
                     <li 
-                      key={student._id}
+                      key={student._id} 
                       onClick={() => toggleStudent(student._id)}
                       className={`flex items-center gap-4 p-3.5 sm:p-4 cursor-pointer transition-colors ${
                         isSelected 
@@ -219,7 +219,7 @@ export const AssignStudentsModal = ({ isOpen, onClose, assignment, onSaved }: As
                         </div>
                         <div className="flex flex-col">
                           <span className={`font-semibold text-sm ${isSelected ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-white'}`}>
-                            {student.name || 'Unknown User'}
+                            {student.name || 'Người dùng'}
                           </span>
                           <span className="text-slate-500 dark:text-slate-400 text-xs">{student.email}</span>
                         </div>
@@ -238,7 +238,7 @@ export const AssignStudentsModal = ({ isOpen, onClose, assignment, onSaved }: As
             onClick={onClose}
             className="px-5 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
           >
-            Cancel
+            Hủy bỏ
           </button>
           <button 
             onClick={handleSave}
@@ -250,7 +250,7 @@ export const AssignStudentsModal = ({ isOpen, onClose, assignment, onSaved }: As
             ) : (
               <Check className="w-4 h-4" />
             )}
-            Save Assignments
+            Lưu phân bổ bài tập
           </button>
         </div>
       </div>

@@ -45,7 +45,7 @@ export const AdminDashboard = () => {
         }
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
-        setError('Unable to load dashboard data.');
+        setError('Không thể tải dữ liệu bảng điều khiển.');
       } finally {
         setLoading(false);
       }
@@ -69,11 +69,11 @@ export const AdminDashboard = () => {
 
   // Mock activities — no backend endpoint
   const activities = [
-    { icon: <UserPlus className="w-4 h-4 text-blue-400" />, text: 'New user registered', time: '2 minutes ago' },
-    { icon: <ShieldAlert className="w-4 h-4 text-amber-400" />, text: 'User role updated to Lecturer', time: '1 hour ago' },
-    { icon: <Play className="w-4 h-4 text-emerald-400" />, text: 'Simulation started: VN30 Trading', time: '3 hours ago' },
-    { icon: <CheckCircle className="w-4 h-4 text-slate-400" />, text: 'Simulation completed: US Market', time: 'Yesterday' },
-    { icon: <AlertTriangle className="w-4 h-4 text-rose-400" />, text: 'User account suspended', time: '2 days ago' },
+    { icon: <UserPlus className="w-4 h-4 text-blue-400" />, text: 'Người dùng mới đăng ký', time: '2 phút trước' },
+    { icon: <ShieldAlert className="w-4 h-4 text-amber-400" />, text: 'Cập nhật vai trò người dùng thành Giảng viên', time: '1 giờ trước' },
+    { icon: <Play className="w-4 h-4 text-emerald-400" />, text: 'Kỳ thi bắt đầu: Giao dịch VN30', time: '3 giờ trước' },
+    { icon: <CheckCircle className="w-4 h-4 text-slate-400" />, text: 'Kỳ thi hoàn thành: Thị trường Mỹ', time: 'Hôm qua' },
+    { icon: <AlertTriangle className="w-4 h-4 text-rose-400" />, text: 'Tài khoản người dùng bị tạm khóa', time: '2 ngày trước' },
   ];
 
   const getRoleBadge = (role: string) => {
@@ -89,10 +89,10 @@ export const AdminDashboard = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-slate-400 gap-4 p-4 text-center">
         <AlertTriangle className="w-12 h-12 text-rose-500 opacity-80" />
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Something went wrong</h2>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Đã có lỗi xảy ra</h2>
         <p className="text-sm">{error}</p>
         <button onClick={() => window.location.reload()} className="mt-4 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors cursor-pointer text-sm">
-          Try Again
+          Thử lại
         </button>
       </div>
     );
@@ -119,24 +119,24 @@ export const AdminDashboard = () => {
   };
 
   const roleData = totalUsers > 0 ? [
-    { label: 'Students', count: studentsCount, pct: (studentsCount / totalUsers) * 100, color: '#3B82F6' },
-    { label: 'Lecturers', count: lecturersCount, pct: (lecturersCount / totalUsers) * 100, color: '#A855F7' },
-    { label: 'Admins', count: adminsCount, pct: (adminsCount / totalUsers) * 100, color: '#F59E0B' },
+    { label: 'Học viên', count: studentsCount, pct: (studentsCount / totalUsers) * 100, color: '#3B82F6' },
+    { label: 'Giảng viên', count: lecturersCount, pct: (lecturersCount / totalUsers) * 100, color: '#A855F7' },
+    { label: 'Quản trị viên', count: adminsCount, pct: (adminsCount / totalUsers) * 100, color: '#F59E0B' },
   ] : [];
 
   const simStatusData = simulations.length > 0 ? [
-    { label: 'Live', count: liveCount, color: '#10B981' },
-    { label: 'Upcoming', count: upcomingCount, color: '#3B82F6' },
-    { label: 'Completed', count: completedCount, color: '#6B7280' },
+    { label: 'Đang diễn ra', count: liveCount, color: '#10B981' },
+    { label: 'Sắp diễn ra', count: upcomingCount, color: '#3B82F6' },
+    { label: 'Đã kết thúc', count: completedCount, color: '#6B7280' },
   ] : [];
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-500 pb-10 min-w-0">
       {/* Header */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Admin Dashboard</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Bảng điều khiển Quản trị</h1>
         <p className="text-slate-500 dark:text-slate-400 mt-1 sm:mt-2 text-sm sm:text-base">
-          Welcome back, <span className="text-blue-600 dark:text-blue-400 font-medium">{currentUser?.name || 'Admin'}</span>. Here's what's happening with StockSim.
+          Chào mừng trở lại, <span className="text-blue-600 dark:text-blue-400 font-medium">{currentUser?.name || 'Quản trị viên'}</span>. Dưới đây là tình hình hoạt động tổng quan của StockSim.
         </p>
       </div>
 
@@ -172,10 +172,10 @@ export const AdminDashboard = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {[
-          { label: 'Total Users', value: totalUsers, icon: <Users className="w-5 h-5 sm:w-6 sm:h-6" />, color: 'blue', sub: `${users.filter(u => u.status === 'active' || u.status === 'ACTIVE').length} active` },
-          { label: 'Students', value: studentsCount, icon: <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6" />, color: 'blue', sub: null },
-          { label: 'Lecturers', value: lecturersCount, icon: <Shield className="w-5 h-5 sm:w-6 sm:h-6" />, color: 'purple', sub: null },
-          { label: 'Simulations', value: simulations.length, icon: <Target className="w-5 h-5 sm:w-6 sm:h-6" />, color: 'emerald', sub: liveCount > 0 ? `${liveCount} Live` : null },
+          { label: 'Tổng người dùng', value: totalUsers, icon: <Users className="w-5 h-5 sm:w-6 sm:h-6" />, color: 'blue', sub: `${users.filter(u => u.status === 'active' || u.status === 'ACTIVE').length} đang hoạt động` },
+          { label: 'Học viên', value: studentsCount, icon: <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6" />, color: 'blue', sub: null },
+          { label: 'Giảng viên', value: lecturersCount, icon: <Shield className="w-5 h-5 sm:w-6 sm:h-6" />, color: 'purple', sub: null },
+          { label: 'Kỳ thi mô phỏng', value: simulations.length, icon: <Target className="w-5 h-5 sm:w-6 sm:h-6" />, color: 'emerald', sub: liveCount > 0 ? `${liveCount} Đang diễn ra` : null },
         ].map((card, idx) => (
           <div key={idx} className="bg-white dark:bg-[#111827] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-[#1e293b] shadow-sm dark:shadow-lg hover:border-blue-500/30 transition-colors group relative overflow-hidden">
             <div className={`absolute top-0 right-0 w-16 h-16 sm:w-20 sm:h-20 bg-${card.color}-500/5 rounded-bl-full group-hover:bg-${card.color}-500/10 transition-colors pointer-events-none`}></div>
@@ -201,7 +201,7 @@ export const AdminDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Users by Role Donut */}
         <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-[#1e293b] shadow-sm dark:shadow-lg p-4 sm:p-6 transition-colors min-w-0">
-          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-4 sm:mb-6">Users by Role</h2>
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-4 sm:mb-6">Người dùng theo vai trò</h2>
           {loading ? (
             <div className="flex items-center justify-center h-44 sm:h-48">
               <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -209,7 +209,7 @@ export const AdminDashboard = () => {
           ) : totalUsers === 0 ? (
             <div className="flex flex-col items-center justify-center h-44 sm:h-48 text-slate-400 dark:text-slate-500">
               <Users className="w-10 h-10 opacity-20 mb-2" />
-              <p className="text-sm">No users yet</p>
+              <p className="text-sm">Chưa có người dùng nào</p>
             </div>
           ) : (
             <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-8 justify-center sm:justify-start">
@@ -225,7 +225,7 @@ export const AdminDashboard = () => {
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <span className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{totalUsers}</span>
-                  <span className="text-[10px] text-slate-400 uppercase font-medium">Total</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-medium">Tổng</span>
                 </div>
               </div>
               <div className="flex flex-col gap-2.5 sm:gap-3 w-full sm:flex-1">
@@ -248,7 +248,7 @@ export const AdminDashboard = () => {
 
         {/* Simulation Status Bar Chart */}
         <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-[#1e293b] shadow-sm dark:shadow-lg p-4 sm:p-6 transition-colors min-w-0">
-          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-4 sm:mb-6">Simulation Status</h2>
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-4 sm:mb-6">Trạng thái kỳ thi</h2>
           {loading ? (
             <div className="flex items-center justify-center h-44 sm:h-48">
               <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -256,7 +256,7 @@ export const AdminDashboard = () => {
           ) : simulations.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-44 sm:h-48 text-slate-400 dark:text-slate-500">
               <Target className="w-10 h-10 opacity-20 mb-2" />
-              <p className="text-sm">No simulations yet</p>
+              <p className="text-sm">Chưa có kỳ thi nào</p>
             </div>
           ) : (
             <div className="space-y-4 sm:space-y-5">
@@ -281,7 +281,7 @@ export const AdminDashboard = () => {
                 );
               })}
               <div className="pt-3 border-t border-slate-200 dark:border-[#1e293b] flex justify-between items-center text-xs sm:text-sm">
-                <span className="text-slate-500 dark:text-slate-400">Total Simulations</span>
+                <span className="text-slate-500 dark:text-slate-400">Tổng số kỳ thi</span>
                 <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">{simulations.length}</span>
               </div>
             </div>
@@ -294,9 +294,9 @@ export const AdminDashboard = () => {
         {/* Recent Users */}
         <div className="lg:col-span-2 bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-[#1e293b] shadow-sm dark:shadow-lg overflow-hidden transition-colors min-w-0">
           <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] flex justify-between items-center bg-slate-50 dark:bg-[#172033]">
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Recent Users</h2>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Người dùng gần đây</h2>
             <Link to="/admin/users" className="text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1 transition-colors">
-              View All Users <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              Xem tất cả người dùng <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Link>
           </div>
 
@@ -310,7 +310,7 @@ export const AdminDashboard = () => {
                 </div>
               ))
             ) : recentUsers.length === 0 ? (
-              <div className="p-6 text-center text-slate-400 dark:text-slate-500 text-sm">No users found.</div>
+              <div className="p-6 text-center text-slate-400 dark:text-slate-500 text-sm">Không tìm thấy người dùng nào.</div>
             ) : (
               recentUsers.map(u => (
                 <div key={u._id} className="p-3.5 flex flex-col gap-2 hover:bg-slate-50/60 dark:hover:bg-[#172033]/50 transition-colors">
@@ -324,12 +324,12 @@ export const AdminDashboard = () => {
                         </div>
                       )}
                       <div className="min-w-0">
-                        <p className="font-medium text-slate-900 dark:text-white text-sm truncate">{u.name || 'Unknown'}</p>
+                        <p className="font-medium text-slate-900 dark:text-white text-sm truncate">{u.name || 'Chưa đặt tên'}</p>
                         <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{u.email}</p>
                       </div>
                     </div>
                     <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border shrink-0 ${getRoleBadge(u.role)}`}>
-                      {u.role}
+                      {u.role === 'student' ? 'Học viên' : u.role === 'lecturer' ? 'Giảng viên' : u.role === 'admin' ? 'Quản trị viên' : u.role}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100/70 dark:border-[#1e293b]/70">
@@ -339,10 +339,10 @@ export const AdminDashboard = () => {
                         : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
                     }`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${(u.status === 'active' || u.status === 'ACTIVE') ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                      {u.status || 'active'}
+                      {(u.status === 'active' || u.status === 'ACTIVE') ? 'Hoạt động' : 'Tạm khóa'}
                     </span>
                     <span className="text-slate-400 dark:text-slate-500 text-[11px]">
-                      {u.createdAt ? new Date(u.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                      {u.createdAt ? new Date(u.createdAt).toLocaleDateString('vi-VN') : '—'}
                     </span>
                   </div>
                 </div>
@@ -355,10 +355,10 @@ export const AdminDashboard = () => {
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50/80 dark:bg-[#172033]/50 border-b border-slate-200 dark:border-[#1e293b] text-slate-500 dark:text-slate-400 uppercase tracking-wider text-xs">
                 <tr>
-                  <th className="px-5 py-3 font-semibold">User</th>
-                  <th className="px-5 py-3 font-semibold">Role</th>
-                  <th className="px-5 py-3 font-semibold">Status</th>
-                  <th className="px-5 py-3 font-semibold text-right">Joined</th>
+                  <th className="px-5 py-3 font-semibold">Người dùng</th>
+                  <th className="px-5 py-3 font-semibold">Vai trò</th>
+                  <th className="px-5 py-3 font-semibold">Trạng thái</th>
+                  <th className="px-5 py-3 font-semibold text-right">Ngày tham gia</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#1e293b]">
@@ -372,7 +372,7 @@ export const AdminDashboard = () => {
                   ))
                 ) : recentUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-5 py-10 text-center text-slate-400 dark:text-slate-500">No users found.</td>
+                    <td colSpan={4} className="px-5 py-10 text-center text-slate-400 dark:text-slate-500">Không tìm thấy người dùng nào.</td>
                   </tr>
                 ) : (
                   recentUsers.map(u => (
@@ -387,14 +387,14 @@ export const AdminDashboard = () => {
                             </div>
                           )}
                           <div className="min-w-0">
-                            <p className="font-medium text-slate-900 dark:text-white text-sm truncate">{u.name || 'Unknown'}</p>
+                            <p className="font-medium text-slate-900 dark:text-white text-sm truncate">{u.name || 'Chưa đặt tên'}</p>
                             <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{u.email}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-5 py-3.5">
                         <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border ${getRoleBadge(u.role)}`}>
-                          {u.role}
+                          {u.role === 'student' ? 'Học viên' : u.role === 'lecturer' ? 'Giảng viên' : u.role === 'admin' ? 'Quản trị viên' : u.role}
                         </span>
                       </td>
                       <td className="px-5 py-3.5">
@@ -404,11 +404,11 @@ export const AdminDashboard = () => {
                             : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
                         }`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${(u.status === 'active' || u.status === 'ACTIVE') ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                          {u.status || 'active'}
+                          {(u.status === 'active' || u.status === 'ACTIVE') ? 'Hoạt động' : 'Tạm khóa'}
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-right text-slate-500 dark:text-slate-400 text-xs font-medium">
-                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString('vi-VN') : '—'}
                       </td>
                     </tr>
                   ))
@@ -421,7 +421,7 @@ export const AdminDashboard = () => {
         {/* Recent Activities */}
         <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-[#1e293b] shadow-sm dark:shadow-lg overflow-hidden transition-colors min-w-0">
           <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#172033]">
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Recent Activities</h2>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Hoạt động gần đây</h2>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-[#1e293b]">
             {activities.map((act, i) => (

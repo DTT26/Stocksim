@@ -154,7 +154,7 @@ export const ParticipantsModal = ({ isOpen, onClose, simulation }: ParticipantsM
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              Manage Participants
+              Quản lý thí sinh tham gia
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">{simulation.name}</p>
           </div>
@@ -189,7 +189,7 @@ export const ParticipantsModal = ({ isOpen, onClose, simulation }: ParticipantsM
                         {p.userId?.name ? p.userId.name.charAt(0).toUpperCase() : <User className="w-3 h-3" />}
                       </div>
                       <div>
-                        <p className="font-bold text-slate-900 dark:text-white text-sm">{p.userId?.name || 'Student'}</p>
+                        <p className="font-bold text-slate-900 dark:text-white text-sm">{p.userId?.name || 'Thí sinh'}</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">{p.userId?.email}</p>
                       </div>
                     </div>
@@ -218,14 +218,14 @@ export const ParticipantsModal = ({ isOpen, onClose, simulation }: ParticipantsM
           {/* Add Student Section */}
           {!isEnded && (
             <div className="bg-slate-50 dark:bg-[#121214] p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-[#262626]">
-              <label className="block text-sm font-bold text-slate-900 dark:text-white mb-3">Add Student Directly</label>
+              <label className="block text-sm font-bold text-slate-900 dark:text-white mb-3">Thêm sinh viên trực tiếp</label>
             
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
                   <input
                     type="text"
-                    placeholder="Search available students..."
+                    placeholder="Tìm kiếm sinh viên khả dụng..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#09090b] border border-slate-200 dark:border-[#262626] rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm transition-all"
@@ -254,7 +254,7 @@ export const ParticipantsModal = ({ isOpen, onClose, simulation }: ParticipantsM
                       ))}
                     </ul>
                   ) : (
-                    <div className="px-4 py-3 text-sm text-slate-400 dark:text-slate-500 text-center">No students found matching "{searchQuery}"</div>
+                    <div className="px-4 py-3 text-sm text-slate-400 dark:text-slate-500 text-center">Không tìm thấy sinh viên nào khớp với "{searchQuery}"</div>
                   )}
                 </div>
               )}
@@ -270,7 +270,7 @@ export const ParticipantsModal = ({ isOpen, onClose, simulation }: ParticipantsM
                   ) : (
                     <UserPlus className="w-4 h-4" />
                   )}
-                  Add Selected Student
+                  Thêm sinh viên đã chọn
                 </button>
               </div>
             </div>
@@ -279,7 +279,7 @@ export const ParticipantsModal = ({ isOpen, onClose, simulation }: ParticipantsM
           {/* Current Active Participants List */}
           <div className="flex-1 flex flex-col min-h-0">
             <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-              Active Participants 
+              Thí sinh đang tham gia
               <span className="bg-slate-100 dark:bg-[#262626] text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full text-xs font-mono font-semibold">{activeParticipants.length}</span>
             </h3>
             
@@ -287,12 +287,12 @@ export const ParticipantsModal = ({ isOpen, onClose, simulation }: ParticipantsM
               {loading ? (
                 <div className="p-12 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
                   <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                  Loading participants...
+                  Đang tải danh sách thí sinh...
                 </div>
               ) : activeParticipants.length === 0 ? (
                 <div className="p-12 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
                   <Users className="w-12 h-12 mb-4 opacity-20" />
-                  <p>No active participants yet.</p>
+                  <p>Chưa có thí sinh nào tham gia.</p>
                 </div>
               ) : (
                 <ul className="divide-y divide-slate-200 dark:divide-[#262626] overflow-y-auto">
@@ -303,27 +303,23 @@ export const ParticipantsModal = ({ isOpen, onClose, simulation }: ParticipantsM
                           {p.userId?.name ? p.userId.name.charAt(0).toUpperCase() : <User className="w-5 h-5" />}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-900 dark:text-white">{p.userId?.name || 'Unknown User'}</p>
+                          <p className="font-bold text-slate-900 dark:text-white">{p.userId?.name || 'Người dùng'}</p>
                           <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
                             <Mail className="w-3 h-3" /> {p.userId?.email}
                           </p>
                         </div>
                       </div>
                       <div className="sm:text-right flex items-center sm:block bg-white dark:bg-[#09090b] sm:bg-transparent sm:dark:bg-transparent p-2 sm:p-0 rounded-lg border border-slate-200 dark:border-[#262626] sm:border-none">
-                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500 mr-2 sm:mr-0 sm:block sm:mb-1">Joined</span>
+                        <span className="text-xs font-medium text-slate-400 dark:text-slate-500 mr-2 sm:mr-0 sm:block sm:mb-1">Tham gia</span>
                         <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                          {new Date(p.joinedAt || p.createdAt).toLocaleDateString(undefined, {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
+                          {new Date(p.joinedAt || p.createdAt).toLocaleDateString('vi-VN')}
                         </p>
                       </div>
                       {!isEnded && (
                         <button 
                           onClick={() => setConfirmState({ isOpen: true, studentId: p.userId?._id || p.userId })}
                           className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors ml-2 cursor-pointer"
-                          title="Remove student"
+                          title="Xóa khỏi kỳ thi"
                         >
                           <Trash2 className="w-5 h-5" />
                         </button>
@@ -345,9 +341,9 @@ export const ParticipantsModal = ({ isOpen, onClose, simulation }: ParticipantsM
             handleRemoveStudent(confirmState.studentId);
           }
         }}
-        title="Remove Student"
-        message="Are you sure you want to remove this student from the simulation? This action cannot be undone."
-        confirmText="Remove Student"
+        title="Xóa thí sinh"
+        message="Bạn có chắc chắn muốn xóa sinh viên này khỏi kỳ thi mô phỏng? Hành động này không thể hoàn tác."
+        confirmText="Xác nhận xóa"
         type="danger"
       />
     </div>

@@ -110,16 +110,17 @@ function App() {
         </Route>
       </Route>
 
-      {/* App Shell Routes (shared/fallback) */}
-      <Route path="/" element={<AppLayout />}>
-        {/* Default route based on role */}
-        <Route index element={
-          !user ? <Navigate to="/trade/btcusdt" replace /> :
-          user.role === 'admin' ? <Navigate to="/admin" /> :
-          user.role === 'lecturer' ? <Navigate to="/lecturer" /> :
-          <Navigate to="/student" />
-        } />
+      {/* Homepage Route */}
+      <Route path="/" element={
+        !user ? <LandingPage /> :
+        user.role === 'admin' ? <Navigate to="/admin" /> :
+        user.role === 'lecturer' ? <Navigate to="/lecturer" /> :
+        <Navigate to="/student" />
+      } />
+      <Route path="/landing" element={<LandingPage />} />
 
+      {/* App Shell Routes (shared/fallback) */}
+      <Route element={<AppLayout />}>
         {/* Learning Dashboard direct route */}
         <Route path="learning-dashboard" element={<AiLearningDashboard />} />
 

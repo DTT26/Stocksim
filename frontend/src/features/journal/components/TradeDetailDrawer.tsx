@@ -1,7 +1,8 @@
 import React from 'react';
-import { X, Clock, ShieldAlert, Target, Award, ArrowUpRight, ArrowDownRight, Tag } from 'lucide-react';
+import { X, Clock, ShieldAlert, Target, ArrowUpRight, ArrowDownRight, Tag } from 'lucide-react';
 import type { JournalTrade } from '../types/journalTypes';
 import { formatMoneyVND, formatPercent, formatHoldingTime } from '../../../utils/tradingAnalytics';
+import { useI18n } from '../../../contexts/I18nContext';
 
 interface TradeDetailDrawerProps {
   trade: JournalTrade | null;
@@ -9,18 +10,20 @@ interface TradeDetailDrawerProps {
 }
 
 export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onClose }) => {
+  const { lang } = useI18n();
+
   if (!trade) return null;
 
   const isLong = trade.side === 'LONG' || trade.side === 'BUY';
   const isProfit = trade.pnl >= 0;
 
   const entryTimeFormatted = trade.entryTime || trade.openTime
-    ? new Date((trade.entryTime || trade.openTime)!).toLocaleString('vi-VN')
+    ? new Date((trade.entryTime || trade.openTime)!).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')
     : 'N/A';
 
   const exitTimeFormatted = trade.exitTime || trade.closeTime
-    ? new Date((trade.exitTime || trade.closeTime)!).toLocaleString('vi-VN')
-    : 'Open position';
+    ? new Date((trade.exitTime || trade.closeTime)!).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')
+    : (lang === 'vi' ? 'Vị thế đang mở' : 'Open position');
 
   let durationMins = trade.holdingTimeMinutes;
   if (durationMins === undefined && (trade.entryTime || trade.openTime) && (trade.exitTime || trade.closeTime)) {
@@ -64,7 +67,7 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -82,7 +85,7 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
           >
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider block text-slate-500 dark:text-slate-400">
-                Realized Net P&L
+                {lang === 'vi' ? 'Lợi nhuận Ròng Thực tế' : 'Realized Net P&L'}
               </span>
               <div className="text-2xl font-extrabold mt-0.5">
                 {formatMoneyVND(trade.pnl, true)}
@@ -98,30 +101,38 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
           {/* Pricing & Volume Details */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-              Execution Prices & Volume
+              {lang === 'vi' ? 'Giá Khớp lệnh & Khối lượng' : 'Execution & Volume Details'}
             </h4>
             <div className="bg-slate-50 dark:bg-[#161f31] rounded-xl p-4 border border-slate-200/60 dark:border-[#253047]/60 space-y-3 text-xs sm:text-sm">
               <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Entry Price</span>
+                <span className="text-slate-500 dark:text-slate-400">
+                  {lang === 'vi' ? 'Giá Mở vị thế' : 'Entry Price'}
+                </span>
                 <span className="font-bold text-slate-900 dark:text-white">
                   {formatMoneyVND(trade.entryPrice)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Exit Price</span>
+                <span className="text-slate-500 dark:text-slate-400">
+                  {lang === 'vi' ? 'Giá Đóng vị thế' : 'Exit Price'}
+                </span>
                 <span className="font-bold text-slate-900 dark:text-white">
-                  {trade.exitPrice ? formatMoneyVND(trade.exitPrice) : 'Open'}
+                  {trade.exitPrice ? formatMoneyVND(trade.exitPrice) : (lang === 'vi' ? 'Đang mở' : 'Open')}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Quantity / Lot</span>
+                <span className="text-slate-500 dark:text-slate-400">
+                  {lang === 'vi' ? 'Khối lượng / Lot' : 'Volume / Lots'}
+                </span>
                 <span className="font-semibold text-slate-900 dark:text-white font-mono">
                   {trade.quantity || trade.lot || '1'}
                 </span>
               </div>
               {trade.closeReason && (
                 <div className="flex justify-between pt-2 border-t border-slate-200/40 dark:border-slate-700/40">
-                  <span className="text-slate-500 dark:text-slate-400">Close Reason</span>
+                  <span className="text-slate-500 dark:text-slate-400">
+                    {lang === 'vi' ? 'Lý do Đóng lệnh' : 'Exit Reason'}
+                  </span>
                   <span className="font-bold text-blue-600 dark:text-blue-400">
                     {trade.closeReason}
                   </span>
@@ -134,25 +145,25 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
           {(trade.sl || trade.tp) && (
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-                Risk Orders
+                {lang === 'vi' ? 'Lệnh Quản trị Rủi ro' : 'Risk Management Orders'}
               </h4>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-50 dark:bg-[#161f31] rounded-xl p-3 border border-slate-200/60 dark:border-[#253047]/60">
                   <div className="flex items-center gap-1.5 text-xs text-rose-500 font-semibold mb-1">
                     <ShieldAlert className="w-3.5 h-3.5" />
-                    <span>Stop Loss</span>
+                    <span>{lang === 'vi' ? 'Cắt lỗ (SL)' : 'Stop Loss (SL)'}</span>
                   </div>
                   <span className="font-bold text-slate-900 dark:text-white text-sm">
-                    {trade.sl ? formatMoneyVND(trade.sl) : 'None'}
+                    {trade.sl ? formatMoneyVND(trade.sl) : (lang === 'vi' ? 'Không có' : 'None')}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-[#161f31] rounded-xl p-3 border border-slate-200/60 dark:border-[#253047]/60">
                   <div className="flex items-center gap-1.5 text-xs text-emerald-500 font-semibold mb-1">
                     <Target className="w-3.5 h-3.5" />
-                    <span>Take Profit</span>
+                    <span>{lang === 'vi' ? 'Chốt lời (TP)' : 'Take Profit (TP)'}</span>
                   </div>
                   <span className="font-bold text-slate-900 dark:text-white text-sm">
-                    {trade.tp ? formatMoneyVND(trade.tp) : 'None'}
+                    {trade.tp ? formatMoneyVND(trade.tp) : (lang === 'vi' ? 'Không có' : 'None')}
                   </span>
                 </div>
               </div>
@@ -162,19 +173,25 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
           {/* Timing & Holding */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-              Timing & Duration
+              {lang === 'vi' ? 'Thời gian & Thời lượng' : 'Timing & Duration'}
             </h4>
             <div className="bg-slate-50 dark:bg-[#161f31] rounded-xl p-4 border border-slate-200/60 dark:border-[#253047]/60 space-y-2.5 text-xs">
               <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Entry Time</span>
+                <span className="text-slate-500 dark:text-slate-400">
+                  {lang === 'vi' ? 'Thời gian Mở lệnh' : 'Open Time'}
+                </span>
                 <span className="font-medium text-slate-700 dark:text-slate-300">{entryTimeFormatted}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Exit Time</span>
+                <span className="text-slate-500 dark:text-slate-400">
+                  {lang === 'vi' ? 'Thời gian Đóng lệnh' : 'Close Time'}
+                </span>
                 <span className="font-medium text-slate-700 dark:text-slate-300">{exitTimeFormatted}</span>
               </div>
               <div className="flex justify-between pt-1 border-t border-slate-200/40 dark:border-slate-700/40">
-                <span className="text-slate-500 dark:text-slate-400">Holding Duration</span>
+                <span className="text-slate-500 dark:text-slate-400">
+                  {lang === 'vi' ? 'Thời gian Giữ lệnh' : 'Holding Duration'}
+                </span>
                 <span className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5" />
                   {formatHoldingTime(durationMins)}
@@ -187,7 +204,7 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
           {trade.setupTag && (
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                Setup Tag
+                {lang === 'vi' ? 'Chiến lược / Setup' : 'Strategy / Setup'}
               </h4>
               <div className="flex items-center gap-2 p-3 bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl text-sm font-semibold">
                 <Tag className="w-4 h-4" />
@@ -201,9 +218,9 @@ export const TradeDetailDrawer: React.FC<TradeDetailDrawerProps> = ({ trade, onC
         <div className="p-4 border-t border-slate-200 dark:border-[#253047] bg-slate-50 dark:bg-[#161f31]/50">
           <button
             onClick={onClose}
-            className="w-full py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-semibold text-sm transition-colors"
+            className="w-full py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-semibold text-sm transition-colors cursor-pointer"
           >
-            Close
+            {lang === 'vi' ? 'Đóng' : 'Close'}
           </button>
         </div>
       </div>

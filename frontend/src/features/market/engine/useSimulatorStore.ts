@@ -195,13 +195,13 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => ({
 
   loadSession: (session, positions, orders, history, initialPrice) => {
     const initP = initialPrice && initialPrice > 0 ? initialPrice : 0;
-    const spread = session.config.spread > 0 ? session.config.spread : 0.2;
+    const spread = (session.config && session.config.spread > 0) ? session.config.spread : 0.2;
     set({
       isActive: true,
       session,
-      positions,
-      orders,
-      history,
+      positions: positions || [],
+      orders: orders || [],
+      history: history || [],
       currentPrice: initP,
       currentBid: initP,
       currentAsk: initP > 0 ? initP + spread : 0,

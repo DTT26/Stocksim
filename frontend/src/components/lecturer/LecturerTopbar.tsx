@@ -153,7 +153,7 @@ export const LecturerTopbar = ({ mobileOpen, setMobileOpen }: LecturerTopbarProp
           </div>
           <input 
             type="text" 
-            placeholder="Search simulations, students, assignments..." 
+            placeholder="Tìm kiếm kỳ thi, sinh viên, bài tập..." 
             className="w-full bg-slate-100 dark:bg-[#172033] border border-slate-200 dark:border-[#253047] text-slate-900 dark:text-white text-sm rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-[#172033] focus:ring-1 focus:ring-indigo-500 transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
         </div>
@@ -292,13 +292,13 @@ export const LecturerTopbar = ({ mobileOpen, setMobileOpen }: LecturerTopbarProp
           >
             <UserAvatar 
               src={user?.picture} 
-              name={user?.name || 'Lecturer'} 
+              name={user?.name || 'Giảng viên'} 
               size="w-8 h-8" 
               className="border border-slate-200 dark:border-[#253047]" 
             />
             <div className="hidden sm:block text-left">
-              <p className="text-sm font-medium text-slate-900 dark:text-white line-clamp-1">{user?.name || 'Lecturer'}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Lecturer</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-white line-clamp-1">{user?.name || 'Giảng viên'}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Giảng viên</p>
             </div>
             <ChevronDown className="w-4 h-4 text-slate-400 hidden sm:block" />
           </button>
@@ -311,12 +311,12 @@ export const LecturerTopbar = ({ mobileOpen, setMobileOpen }: LecturerTopbarProp
               </div>
               <div className="p-2">
                 <Link to="/lecturer/profile" onClick={() => setShowProfileMenu(false)} className="block px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors">
-                  My Profile
+                  Hồ sơ cá nhân
                 </Link>
               </div>
               <div className="p-2 border-t border-slate-200 dark:border-[#253047]">
                 <button onClick={() => logout()} className="w-full text-left px-3 py-2 text-sm text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer">
-                  Sign Out
+                  Đăng xuất
                 </button>
               </div>
             </div>

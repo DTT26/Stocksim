@@ -33,6 +33,8 @@ import { ChallengeModal } from '../challenge/ChallengeModal';
 import { useModal } from '../../contexts/ModalContext';
 import { AiTutorDrawer } from '../ai/AiTutorDrawer';
 import { BacktestRuleCard } from './components/BacktestRuleCard';
+import { InteractiveTradingGuideModal } from './components/InteractiveTradingGuideModal';
+import { SpotlightOnboardingTour } from './components/SpotlightOnboardingTour';
 
 const MAX_RESETS_PER_WEEK = 4;
 
@@ -84,6 +86,8 @@ export const TradingTerminal = () => {
   const [editingSymbol, setEditingSymbol] = useState<string | null>(null);
 
   const [activeRightPanel, setActiveRightPanel] = useState<'watchlist' | 'order' | 'simulation' | 'calculator' | 'journal' | null>('watchlist');
+  const [simulationView, setSimulationView] = useState<'list' | 'trading'>('list');
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
 
   const { user, login } = useAuth();
   const { addNotification } = useNotificationStore();
@@ -1020,6 +1024,7 @@ export const TradingTerminal = () => {
           };
           setTradeOrders(prev => [...prev, order]);
           setTradeCount(c => c + 1);
+          window.dispatchEvent(new Event('trading-transaction-created'));
           addNotification?.({ title: 'Mở vị thế LONG', message: `Đã mở LONG ${selectedStock.symbol} tại giá ${price.toLocaleString('vi-VN')} đòn bẩy ${leverage}x.`, type: 'success' });
           return { success: true, message: `✅ Mở LONG ${selectedStock.symbol} thành công` };
         }
@@ -1046,6 +1051,7 @@ export const TradingTerminal = () => {
           };
           setTradeOrders(prev => [...prev, order]);
           setTradeCount(c => c + 1);
+          window.dispatchEvent(new Event('trading-transaction-created'));
           addNotification?.({ title: 'Mở vị thế SHORT', message: `Đã mở SHORT ${selectedStock.symbol} tại giá ${price.toLocaleString('vi-VN')} đòn bẩy ${leverage}x.`, type: 'success' });
           return { success: true, message: `✅ Mở SHORT ${selectedStock.symbol} thành công` };
         }
@@ -1117,6 +1123,7 @@ export const TradingTerminal = () => {
       if (res.success) {
         await fetchPortfolio();
         setTradeCount(c => c + 1);
+        window.dispatchEvent(new Event('trading-transaction-created'));
         addNotification?.({ title: 'Đóng vị thế', message: `Đã chốt vị thế ${pos.side} mã ${symbolToClose}.`, type: 'success' });
         return { success: true, message: `✅ Đã chốt vị thế ${symbolToClose} thành công` };
       }
@@ -1331,6 +1338,7 @@ export const TradingTerminal = () => {
     <div className="flex flex-col flex-1 overflow-hidden bg-white dark:bg-[#131722] text-[#1e2329] dark:text-[#d1d4dc]">
       <ToolbarNavbar
         balance={balance}
+        onOpenGuide={() => setIsGuideModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onOpenChallenge={() => setIsChallengeModalOpen(true)}
         onOpenAiTutor={() => {
@@ -1584,9 +1592,9 @@ export const TradingTerminal = () => {
                   }}
                 />
               </div>
-              {store.isActive && store.session ? (
+              {activeRightPanel === 'simulation' && simulationView === 'trading' && store.isActive && store.session ? (
                 <PositionsManager currentPrice={selectedStock.price} />
-              ) : (
+              ) : isChallengeActive ? (
                 <BottomPanel
                   balance={balance}
                   totalEquity={totalEquity}
@@ -1601,6 +1609,7 @@ export const TradingTerminal = () => {
                       if (res.success) {
                         await fetchPortfolio();
                         setTradeCount(c => c + 1);
+                        window.dispatchEvent(new Event('trading-transaction-created'));
                         setPreviewTPSL(null);
                         setDraggedTPSL(null);
                         addNotification?.({
@@ -1639,7 +1648,7 @@ export const TradingTerminal = () => {
                   }}
                   refreshTrigger={tradeCount}
                 />
-              )}
+              ) : null}
             </div>
           )}
 
@@ -1707,6 +1716,8 @@ export const TradingTerminal = () => {
               onSelectStock={handleStockSelect}
               onPreviewTPSLChange={setPreviewTPSL}
               draggedTPSL={draggedTPSL}
+              view={simulationView}
+              onViewChange={setSimulationView}
             />
           )}
 
@@ -1816,6 +1827,8 @@ export const TradingTerminal = () => {
                   onSelectStock={handleStockSelect}
                   onPreviewTPSLChange={setPreviewTPSL}
                   draggedTPSL={draggedTPSL}
+                  view={simulationView}
+                  onViewChange={setSimulationView}
                 />
               )}
 
@@ -1969,6 +1982,19 @@ export const TradingTerminal = () => {
           volume: currentTicker?.volume24h
         }}
         onStartBacktestReplay={handleStartBacktestReplayFromAi}
+      />
+      <InteractiveTradingGuideModal
+        isOpen={false}
+        onClose={() => setIsGuideModalOpen(false)}
+        onGoToJournal={() => navigate('/student/journal')}
+      />
+      <SpotlightOnboardingTour
+        isOpen={isGuideModalOpen}
+        onClose={() => setIsGuideModalOpen(false)}
+        isReplaying={isReplaying}
+        onSetRightPanel={(panel) => setActiveRightPanel(panel)}
+        onNavigateToJournal={() => navigate('/student/journal')}
+        onTriggerReplayStart={() => setIsSelectingReplayStart(true)}
       />
     </div>
   );

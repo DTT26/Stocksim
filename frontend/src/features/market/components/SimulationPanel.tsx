@@ -30,6 +30,8 @@ interface SimulationPanelProps {
   onSelectStock?: (stock: Stock) => void;
   onPreviewTPSLChange?: (tpsl: { tp?: number; sl?: number; side?: 'LONG' | 'SHORT'; enabled: boolean; orderPrice?: number; orderType?: 'LIMIT' | 'STOP'; quantity?: number; lot?: number; actualQty?: number } | null) => void;
   draggedTPSL?: { tp?: number; sl?: number; orderPrice?: number } | null;
+  view?: 'list' | 'trading';
+  onViewChange?: (view: 'list' | 'trading') => void;
 }
 
 export interface SimulationConfig {
@@ -68,13 +70,23 @@ export const SimulationPanel = ({
   onStartReplay,
   onSelectStock,
   onPreviewTPSLChange,
-  draggedTPSL
+  draggedTPSL,
+  view,
+  onViewChange
 }: SimulationPanelProps) => {
   const { user } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const store = useSimulatorStore();
   const [activeTab, setActiveTab] = useState<'running' | 'completed'>('running');
-  const [currentView, setCurrentView] = useState<'list' | 'trading'>('list');
+  const [internalView, setInternalView] = useState<'list' | 'trading'>('list');
+  const currentView = view !== undefined ? view : internalView;
+
+  const updateCurrentView = (v: 'list' | 'trading') => {
+    setInternalView(v);
+    onViewChange?.(v);
+  };
+
   const [isCreating, setIsCreating] = useState(false);
   const [showReplayWarning, setShowReplayWarning] = useState(false);
   
@@ -134,7 +146,6 @@ export const SimulationPanel = ({
       let sessionTimeframe = store.session?.timeframe || targetSession.timeframe || activeTimeframe || '1m';
 
       if (!store.isActive || store.session?._id !== session._id) {
-        const { getSessionDetails } = await import('../../../services/marketApi');
         const data = await getSessionDetails(session._id);
         targetSession = data.session;
         resumeTimeStr = targetSession.replayCurrentTime || targetSession.replayStartTime;
@@ -144,34 +155,37 @@ export const SimulationPanel = ({
           ? currentPrice 
           : (STOCKS.find((s: Stock) => s.symbol === data.session.symbol)?.price || 100);
 
+        const sessCfg = data.session.config || {};
+        const sessionConfig = {
+          initialBalance: data.session.initialBalance ?? sessCfg.initialBalance ?? 100000,
+          leverage: data.session.leverage ?? sessCfg.leverage ?? 10,
+          minLot: data.session.minLot ?? sessCfg.minLot ?? 0.01,
+          lotStep: data.session.lotStep ?? sessCfg.lotStep ?? 0.01,
+          maxMarginPercent: data.session.maxMarginPercent ?? sessCfg.maxMarginPercent ?? 100,
+          spread: data.session.spread ?? sessCfg.spread ?? 0.2,
+          commission: data.session.commission ?? sessCfg.commission ?? 0,
+          swapLong: data.session.swapLong ?? sessCfg.swapLong ?? 0,
+          swapShort: data.session.swapShort ?? sessCfg.swapShort ?? 0
+        };
+
         store.loadSession(
           {
             _id: data.session._id,
             name: data.session.name,
             symbol: data.session.symbol,
             timeframe: sessionTimeframe,
-            config: {
-              initialBalance: data.session.initialBalance,
-              leverage: data.session.leverage,
-              minLot: data.session.minLot,
-              lotStep: data.session.lotStep,
-              maxMarginPercent: data.session.maxMarginPercent,
-              spread: data.session.spread,
-              commission: data.session.commission,
-              swapLong: data.session.swapLong,
-              swapShort: data.session.swapShort
-            },
-            balance: data.session.balance,
-            equity: data.session.equity,
-            usedMargin: data.session.usedMargin,
-            freeMargin: data.session.freeMargin,
+            config: sessionConfig,
+            balance: data.session.balance ?? data.session.initialBalance ?? 100000,
+            equity: data.session.equity ?? data.session.balance ?? 100000,
+            usedMargin: data.session.usedMargin || 0,
+            freeMargin: data.session.freeMargin ?? data.session.balance ?? 100000,
             replayStartTime: data.session.replayStartTime,
             replayCurrentTime: data.session.replayCurrentTime,
-            status: data.session.status
+            status: data.session.status || 'running'
           },
-          data.positions,
-          data.orders,
-          data.history,
+          (data.positions || []).map((p: any) => ({ ...p, id: p.id || p._id })),
+          (data.orders || []).map((o: any) => ({ ...o, id: o.id || o._id })),
+          (data.history || []).map((h: any) => ({ ...h, id: h.id || h._id })),
           effectiveStockPrice
         );
       } else {
@@ -187,7 +201,7 @@ export const SimulationPanel = ({
         if (matchStock) onSelectStock(matchStock);
       }
 
-      setCurrentView('trading');
+      updateCurrentView('trading');
     } catch (error) {
       console.error("Failed to continue session", error);
     }
@@ -208,7 +222,7 @@ export const SimulationPanel = ({
       }
       await fetchSessions();
       if (currentView === 'trading' && store.session?._id === session._id) {
-        setCurrentView('list');
+        updateCurrentView('list');
       }
     } catch (error) {
       console.error("Failed to complete session", error);
@@ -288,7 +302,6 @@ export const SimulationPanel = ({
     };
   }, [user]);
 
-  const store = useSimulatorStore();
 
   // Filters for completed sessions
   const [symbolFilter, setSymbolFilter] = useState<string>('');
@@ -397,7 +410,7 @@ export const SimulationPanel = ({
       const resumeTimestamp = (replayTime && !isNaN(replayTime)) ? replayTime : new Date(sessionReplayTime).getTime();
       onResumeSession?.(newSession, resumeTimestamp, sessionTimeframe);
 
-      setCurrentView('trading');
+      updateCurrentView('trading');
     } catch (error) {
       console.error("Failed to create session", error);
     }
@@ -560,6 +573,7 @@ export const SimulationPanel = ({
             HỦY
           </button>
           <button 
+            data-tour="sim-start-create-btn"
             onClick={handleStart}
             className="flex-1 bg-[#089981] hover:bg-[#089981]/90 text-white font-bold py-2.5 rounded-md transition-colors text-sm cursor-pointer shadow-sm"
           >
@@ -579,7 +593,7 @@ export const SimulationPanel = ({
           onBack={async () => {
             await store.flushSync();
             await fetchSessions();
-            setCurrentView('list');
+            updateCurrentView('list');
           }}
           onPreviewTPSLChange={onPreviewTPSLChange}
           draggedTPSL={draggedTPSL}
@@ -638,6 +652,7 @@ export const SimulationPanel = ({
       {activeTab === 'running' && (
         <div className="flex flex-col px-4 flex-1 overflow-hidden">
           <button 
+            data-tour="sim-new-session-btn"
             onClick={() => {
               if (!isReplaying) {
                 setShowReplayWarning(true);
@@ -740,6 +755,7 @@ export const SimulationPanel = ({
                     {/* Action buttons: Tiếp tục & Hoàn thành */}
                     <div className="flex items-center gap-2 pt-2 border-t border-[#e6e8ea] dark:border-[#2a2e39]/60">
                       <button
+                        data-tour="sim-continue-btn"
                         onClick={() => handleContinueSession(session)}
                         className="flex-1 py-2 px-3 rounded-lg border border-[#089981]/30 dark:border-[#089981]/50 bg-[#089981]/10 hover:bg-[#089981]/15 dark:bg-[#0e2722] dark:hover:bg-[#133730] text-[#089981] dark:text-[#26a69a] font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                       >
@@ -747,6 +763,7 @@ export const SimulationPanel = ({
                         Tiếp tục
                       </button>
                       <button
+                        data-tour="sim-finish-session-btn"
                         onClick={(e) => handleCompleteSession(session, e)}
                         className="flex-1 py-2 px-3 rounded-lg border border-[#f23645]/30 dark:border-[#f23645]/40 bg-[#f23645]/10 hover:bg-[#f23645]/15 dark:bg-[#2b1723] dark:hover:bg-[#3d1e31] text-[#f23645] font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                       >

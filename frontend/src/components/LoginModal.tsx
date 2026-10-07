@@ -18,6 +18,7 @@ import {
 import { isInAppBrowser, isIOS, isSafari } from '../utils/browserUtils';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
+import { useI18n } from '../contexts/I18nContext';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export const LoginModal = ({
   onClearGoogleError
 }: LoginModalProps) => {
   const { loginWithEmail, registerRequest, verifyOtp, resendOtp, forgotPassword, verifyForgotOtp, resetPassword } = useAuth();
+  const { lang, t } = useI18n();
 
   const [tab, setTab] = useState<AuthTab>('login');
   const [registerStep, setRegisterStep] = useState<RegisterStep>('form');
@@ -186,7 +188,7 @@ export const LoginModal = ({
       // khiến trình duyệt Safari chặn Popup Google Login ngay lập tức!
       onLoginGoogle('');
     } catch (err: any) {
-      setErrorMsg('Không thể khởi tạo đăng nhập Google. Vui lòng thử lại.');
+      setErrorMsg(lang === 'vi' ? 'Không thể khởi tạo đăng nhập Google. Vui lòng thử lại.' : 'Could not initialize Google sign in. Please try again.');
     }
   };
 
@@ -194,7 +196,7 @@ export const LoginModal = ({
   const handleEmailLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginEmail.trim() || !loginPassword) {
-      setErrorMsg('Vui lòng điền đầy đủ Email và Mật khẩu.');
+      setErrorMsg(lang === 'vi' ? 'Vui lòng điền đầy đủ Email và Mật khẩu.' : 'Please enter both Email and Password.');
       return;
     }
 
@@ -206,10 +208,10 @@ export const LoginModal = ({
       if (result.success) {
         onClose();
       } else {
-        setErrorMsg(result.message || 'Email hoặc mật khẩu không chính xác.');
+        setErrorMsg(result.message || (lang === 'vi' ? 'Email hoặc mật khẩu không chính xác.' : 'Incorrect email or password.'));
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Đăng nhập không thành công.');
+      setErrorMsg(err.message || (lang === 'vi' ? 'Đăng nhập không thành công.' : 'Sign in failed.'));
     } finally {
       setLoading(false);
     }
@@ -221,23 +223,23 @@ export const LoginModal = ({
     setErrorMsg('');
 
     if (!regName.trim()) {
-      setErrorMsg('Vui lòng nhập họ và tên của bạn.');
+      setErrorMsg(lang === 'vi' ? 'Vui lòng nhập họ và tên của bạn.' : 'Please enter your full name.');
       return;
     }
     if (!regEmail.trim()) {
-      setErrorMsg('Vui lòng nhập địa chỉ email (Gmail).');
+      setErrorMsg(lang === 'vi' ? 'Vui lòng nhập địa chỉ email (Gmail).' : 'Please enter your email address.');
       return;
     }
     if (!hasMinLength || !hasUpper || !hasLower || !hasNum) {
-      setErrorMsg('Mật khẩu chưa đáp ứng đầy đủ yêu cầu bảo mật.');
+      setErrorMsg(lang === 'vi' ? 'Mật khẩu chưa đáp ứng đầy đủ yêu cầu bảo mật.' : 'Password does not meet security requirements.');
       return;
     }
     if (regPassword !== regConfirmPassword) {
-      setErrorMsg('Mật khẩu xác nhận không khớp.');
+      setErrorMsg(lang === 'vi' ? 'Mật khẩu xác nhận không khớp.' : 'Confirm password does not match.');
       return;
     }
     if (!regTermsAccepted) {
-      setErrorMsg('Vui lòng tick chọn đồng ý với Điều khoản dịch vụ & Chính sách của sàn.');
+      setErrorMsg(lang === 'vi' ? 'Vui lòng tick chọn đồng ý với Điều khoản dịch vụ & Chính sách của sàn.' : 'Please agree to our Terms of Service & Privacy Policy.');
       return;
     }
 
@@ -251,12 +253,12 @@ export const LoginModal = ({
         setCountdown(60);
         setCanResend(false);
         setOtpDigits(['', '', '', '', '', '']);
-        setSuccessMsg(result.message || 'Mã OTP đã được gửi về email của bạn.');
+        setSuccessMsg(result.message || (lang === 'vi' ? 'Mã OTP đã được gửi về email của bạn.' : 'OTP code has been sent to your email.'));
       } else {
-        setErrorMsg(result.message || 'Không thể gửi yêu cầu đăng ký.');
+        setErrorMsg(result.message || (lang === 'vi' ? 'Không thể gửi yêu cầu đăng ký.' : 'Could not send registration request.'));
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Đã có lỗi xảy ra.');
+      setErrorMsg(err.message || (lang === 'vi' ? 'Đã có lỗi xảy ra.' : 'An error occurred.'));
     } finally {
       setLoading(false);
     }
@@ -326,7 +328,7 @@ export const LoginModal = ({
     e.preventDefault();
     const otpCode = otpDigits.join('');
     if (!otpCode || otpCode.length < 6) {
-      setErrorMsg('Vui lòng nhập đủ 6 chữ số mã OTP.');
+      setErrorMsg(lang === 'vi' ? 'Vui lòng nhập đủ 6 chữ số mã OTP.' : 'Please enter all 6 digits of the OTP code.');
       return;
     }
 
@@ -337,10 +339,10 @@ export const LoginModal = ({
       if (result.success) {
         onClose();
       } else {
-        setErrorMsg(result.message || 'Mã OTP không hợp lệ hoặc đã hết hạn.');
+        setErrorMsg(result.message || (lang === 'vi' ? 'Mã OTP không hợp lệ hoặc đã hết hạn.' : 'Invalid or expired OTP code.'));
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Xác thực OTP thất bại.');
+      setErrorMsg(err.message || (lang === 'vi' ? 'Xác thực OTP thất bại.' : 'OTP verification failed.'));
     } finally {
       setLoading(false);
     }
@@ -357,15 +359,15 @@ export const LoginModal = ({
         setCountdown(60);
         setCanResend(false);
         setOtpDigits(['', '', '', '', '', '']);
-        setSuccessMsg('Đã gửi lại mã OTP mới vào email của bạn.');
+        setSuccessMsg(lang === 'vi' ? 'Đã gửi lại mã OTP mới vào email của bạn.' : 'A new OTP code has been resent to your email.');
         setTimeout(() => {
           otpInputsRef.current[0]?.focus();
         }, 100);
       } else {
-        setErrorMsg(result.message || 'Không thể gửi lại mã OTP.');
+        setErrorMsg(result.message || (lang === 'vi' ? 'Không thể gửi lại mã OTP.' : 'Could not resend OTP code.'));
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi khi gửi lại OTP.');
+      setErrorMsg(err.message || (lang === 'vi' ? 'Lỗi khi gửi lại OTP.' : 'Error resending OTP.'));
     } finally {
       setLoading(false);
     }
@@ -375,7 +377,7 @@ export const LoginModal = ({
   const handleForgotEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!forgotEmail.trim()) {
-      setErrorMsg('Vui lòng nhập địa chỉ Email.');
+      setErrorMsg(lang === 'vi' ? 'Vui lòng nhập địa chỉ Email.' : 'Please enter your email address.');
       return;
     }
 
@@ -390,12 +392,12 @@ export const LoginModal = ({
         setForgotCountdown(60);
         setForgotCanResend(false);
         setForgotOtpDigits(['', '', '', '', '', '']);
-        setSuccessMsg(result.message || 'Mã xác thực OTP đã được gửi đến email của bạn.');
+        setSuccessMsg(result.message || (lang === 'vi' ? 'Mã xác thực OTP đã được gửi đến email của bạn.' : 'OTP verification code has been sent to your email.'));
       } else {
-        setErrorMsg(result.message || 'Không tìm thấy tài khoản hoặc có lỗi xảy ra.');
+        setErrorMsg(result.message || (lang === 'vi' ? 'Không tìm thấy tài khoản hoặc có lỗi xảy ra.' : 'Account not found or an error occurred.'));
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi khi gửi yêu cầu khôi phục mật khẩu.');
+      setErrorMsg(err.message || (lang === 'vi' ? 'Lỗi khi gửi yêu cầu khôi phục mật khẩu.' : 'Error sending password reset request.'));
     } finally {
       setLoading(false);
     }
@@ -446,15 +448,15 @@ export const LoginModal = ({
         setForgotCountdown(60);
         setForgotCanResend(false);
         setForgotOtpDigits(['', '', '', '', '', '']);
-        setSuccessMsg('Đã gửi lại mã OTP mới vào email của bạn.');
+        setSuccessMsg(lang === 'vi' ? 'Đã gửi lại mã OTP mới vào email của bạn.' : 'A new OTP code has been resent to your email.');
         setTimeout(() => {
           forgotOtpInputsRef.current[0]?.focus();
         }, 100);
       } else {
-        setErrorMsg(result.message || 'Không thể gửi lại mã OTP.');
+        setErrorMsg(result.message || (lang === 'vi' ? 'Không thể gửi lại mã OTP.' : 'Could not resend OTP code.'));
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi khi gửi lại OTP.');
+      setErrorMsg(err.message || (lang === 'vi' ? 'Lỗi khi gửi lại OTP.' : 'Error resending OTP.'));
     } finally {
       setLoading(false);
     }
@@ -465,7 +467,7 @@ export const LoginModal = ({
     e.preventDefault();
     const otpCode = forgotOtpDigits.join('');
     if (!otpCode || otpCode.length < 6) {
-      setErrorMsg('Vui lòng nhập đủ 6 chữ số mã OTP.');
+      setErrorMsg(lang === 'vi' ? 'Vui lòng nhập đủ 6 chữ số mã OTP.' : 'Please enter all 6 digits of the OTP code.');
       return;
     }
 
@@ -478,10 +480,10 @@ export const LoginModal = ({
         setForgotStep('new_password');
         setSuccessMsg('');
       } else {
-        setErrorMsg(result.message || 'Mã xác thực OTP không chính xác hoặc đã hết hạn.');
+        setErrorMsg(result.message || (lang === 'vi' ? 'Mã xác thực OTP không chính xác hoặc đã hết hạn.' : 'Invalid or expired OTP verification code.'));
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi khi kiểm tra mã OTP.');
+      setErrorMsg(err.message || (lang === 'vi' ? 'Lỗi khi kiểm tra mã OTP.' : 'Error verifying OTP code.'));
     } finally {
       setLoading(false);
     }
@@ -492,23 +494,23 @@ export const LoginModal = ({
     e.preventDefault();
     const otpCode = forgotOtpDigits.join('');
     if (!otpCode || otpCode.length < 6) {
-      setErrorMsg('Mã OTP không hợp lệ hoặc đã thiếu. Vui lòng quay lại nhập lại mã OTP.');
+      setErrorMsg(lang === 'vi' ? 'Mã OTP không hợp lệ hoặc đã thiếu. Vui lòng quay lại nhập lại mã OTP.' : 'Invalid or missing OTP code. Please go back and enter OTP.');
       setForgotStep('otp');
       return;
     }
 
     if (forgotNewPassword.length < 8) {
-      setErrorMsg('Mật khẩu mới phải có tối thiểu 8 ký tự.');
+      setErrorMsg(lang === 'vi' ? 'Mật khẩu mới phải có tối thiểu 8 ký tự.' : 'New password must be at least 8 characters.');
       return;
     }
 
     if (!hasForgotUpper || !hasForgotLower || !hasForgotNum) {
-      setErrorMsg('Mật khẩu mới phải bao gồm cả chữ hoa, chữ thường và chữ số.');
+      setErrorMsg(lang === 'vi' ? 'Mật khẩu mới phải bao gồm cả chữ hoa, chữ thường và chữ số.' : 'New password must contain uppercase, lowercase and numbers.');
       return;
     }
 
     if (forgotNewPassword !== forgotConfirmPassword) {
-      setErrorMsg('Mật khẩu xác nhận không khớp với mật khẩu mới.');
+      setErrorMsg(lang === 'vi' ? 'Mật khẩu xác nhận không khớp với mật khẩu mới.' : 'Confirm password does not match new password.');
       return;
     }
 
@@ -520,12 +522,12 @@ export const LoginModal = ({
       const result = await resetPassword(forgotEmail.trim(), otpCode, forgotNewPassword, captchaToken);
       if (result.success) {
         setForgotStep('success');
-        setSuccessMsg(result.message || 'Đặt lại mật khẩu thành công!');
+        setSuccessMsg(result.message || (lang === 'vi' ? 'Đặt lại mật khẩu thành công!' : 'Password reset successfully!'));
       } else {
-        setErrorMsg(result.message || 'Lỗi khi đặt lại mật khẩu.');
+        setErrorMsg(result.message || (lang === 'vi' ? 'Lỗi khi đặt lại mật khẩu.' : 'Error resetting password.'));
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi khi đặt lại mật khẩu.');
+      setErrorMsg(err.message || (lang === 'vi' ? 'Lỗi khi đặt lại mật khẩu.' : 'Error resetting password.'));
     } finally {
       setLoading(false);
     }
@@ -564,7 +566,7 @@ export const LoginModal = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">StockSim Authentication</h2>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">Nền tảng giao dịch mô phỏng chứng khoán</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">{lang === 'vi' ? 'Nền tảng giao dịch mô phỏng chứng khoán' : 'Simulated Stock Trading Platform'}</p>
             </div>
           </div>
           <button 
@@ -594,7 +596,7 @@ export const LoginModal = ({
                   : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/30'
               }`}
             >
-              Đăng nhập
+              {t('auth.login', 'Đăng nhập')}
             </button>
             <button
               type="button"
@@ -610,7 +612,7 @@ export const LoginModal = ({
                   : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/30'
               }`}
             >
-              Đăng ký tài khoản
+              {lang === 'vi' ? 'Đăng ký tài khoản' : 'Sign up'}
             </button>
           </div>
         ) : (
@@ -625,10 +627,10 @@ export const LoginModal = ({
               className="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
-              <span>Quay lại đăng nhập</span>
+              <span>{lang === 'vi' ? 'Quay lại đăng nhập' : 'Back to login'}</span>
             </button>
             <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
-              Khôi phục mật khẩu
+              {lang === 'vi' ? 'Khôi phục mật khẩu' : 'Reset password'}
             </span>
           </div>
         )}
@@ -641,9 +643,9 @@ export const LoginModal = ({
             <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2 animate-in fade-in">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
               <div className="space-y-0.5">
-                <span className="font-bold">Đang mở trong ứng dụng (Zalo/Facebook):</span>
+                <span className="font-bold">{lang === 'vi' ? 'Đang mở trong ứng dụng (Zalo/Facebook):' : 'In-App Browser detected:'}</span>
                 <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">
-                  Google hạn chế đăng nhập từ trình duyệt nội bộ của ứng dụng. Vui lòng bấm vào biểu tượng <strong>⋯</strong> hoặc <strong>⋮</strong> và chọn <strong>"Mở bằng trình duyệt Safari/Chrome"</strong> để đăng nhập.
+                  {lang === 'vi' ? 'Google hạn chế đăng nhập từ trình duyệt nội bộ của ứng dụng. Vui lòng bấm vào biểu tượng ⋯ hoặc ⋮ và chọn "Mở bằng trình duyệt Safari/Chrome" để đăng nhập.' : 'Google limits sign-in from in-app browsers. Please tap ⋯ or ⋮ and select "Open in Safari/Chrome" to continue.'}
                 </p>
               </div>
             </div>
@@ -670,7 +672,7 @@ export const LoginModal = ({
             <form onSubmit={handleEmailLoginSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Tài khoản Email / Gmail <span className="text-rose-500 dark:text-rose-400">*</span>
+                  {lang === 'vi' ? 'Tài khoản Email / Gmail' : 'Email / Gmail account'} <span className="text-rose-500 dark:text-rose-400">*</span>
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -688,7 +690,7 @@ export const LoginModal = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Mật khẩu <span className="text-rose-500 dark:text-rose-400">*</span>
+                    {lang === 'vi' ? 'Mật khẩu' : 'Password'} <span className="text-rose-500 dark:text-rose-400">*</span>
                   </label>
                   <button
                     type="button"
@@ -701,7 +703,7 @@ export const LoginModal = ({
                     }}
                     className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors cursor-pointer"
                   >
-                    Quên mật khẩu?
+                    {lang === 'vi' ? 'Quên mật khẩu?' : 'Forgot password?'}
                   </button>
                 </div>
                 <div className="relative">
@@ -730,7 +732,7 @@ export const LoginModal = ({
                 className="w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 active:scale-[0.99] text-white shadow-lg shadow-indigo-600/20 transition-all disabled:opacity-60 cursor-pointer"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                <span>Đăng nhập</span>
+                <span>{t('auth.login', 'Đăng nhập')}</span>
               </button>
 
               {/* Đường phân cách */}
@@ -740,7 +742,7 @@ export const LoginModal = ({
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
                   <span className="bg-white dark:bg-[#111827] px-3 text-slate-400 dark:text-slate-500 font-semibold tracking-wider transition-colors">
-                    Hoặc đăng nhập bằng
+                    {lang === 'vi' ? 'Hoặc đăng nhập bằng' : 'Or continue with'}
                   </span>
                 </div>
               </div>
@@ -755,12 +757,12 @@ export const LoginModal = ({
                 {isGoogleLoading || (loading && !loginEmail) ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin text-indigo-600 dark:text-indigo-400" />
-                    <span className="text-indigo-600 dark:text-indigo-400 font-bold">Đang kết nối Google...</span>
+                    <span className="text-indigo-600 dark:text-indigo-400 font-bold">{lang === 'vi' ? 'Đang kết nối Google...' : 'Connecting to Google...'}</span>
                   </>
                 ) : (
                   <>
                     <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
-                    <span>Tiếp tục bằng Google</span>
+                    <span>{lang === 'vi' ? 'Tiếp tục bằng Google' : 'Continue with Google'}</span>
                   </>
                 )}
               </button>
@@ -770,10 +772,10 @@ export const LoginModal = ({
                 <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs space-y-2 animate-in fade-in">
                   <div className="flex items-center gap-1.5 font-bold">
                     <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                    <span>Mẹo mở đăng nhập trên Safari:</span>
+                    <span>{lang === 'vi' ? 'Mẹo mở đăng nhập trên Safari:' : 'Safari login tip:'}</span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-300 pl-5">
-                    1. Bấm lại nút <strong>"Tiếp tục bằng Google"</strong> và chọn <strong>"Cho phép"</strong> nếu có hộp thoại hỏi.<br />
+                    1. Bấm lại nút <strong>"{lang === 'vi' ? 'Tiếp tục bằng Google' : 'Continue with Google'}"</strong> và chọn <strong>"{lang === 'vi' ? 'Cho phép' : 'Allow'}"</strong> nếu có hộp thoại hỏi.<br />
                     2. Hoặc vào <strong>Cài đặt iPhone &gt; Safari &gt; Tắt "Chặn cửa sổ bật lên"</strong>.<br />
                     3. Hoặc đăng nhập trực tiếp qua nút bên dưới:
                   </p>
@@ -783,7 +785,7 @@ export const LoginModal = ({
                         onSuccess={(cred) => {
                           if (cred.credential) onLoginGoogleCredential(cred.credential);
                         }}
-                        onError={() => setErrorMsg('Đăng nhập Google thất bại hoặc bị hủy.')}
+                        onError={() => setErrorMsg(lang === 'vi' ? 'Đăng nhập Google thất bại hoặc bị hủy.' : 'Google sign-in failed or was cancelled.')}
                         theme="outline"
                         size="large"
                         shape="rectangular"
@@ -797,7 +799,7 @@ export const LoginModal = ({
 
               <div className="text-center pt-2">
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Chưa có tài khoản?{' '}
+                  {lang === 'vi' ? 'Chưa có tài khoản?' : "Don't have an account?"}{' '}
                   <button
                     type="button"
                     onClick={() => {
@@ -806,7 +808,7 @@ export const LoginModal = ({
                     }}
                     className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold cursor-pointer"
                   >
-                    Đăng ký ngay
+                    {lang === 'vi' ? 'Đăng ký ngay' : 'Sign up now'}
                   </button>
                 </p>
               </div>
@@ -818,7 +820,7 @@ export const LoginModal = ({
             <form onSubmit={handleRegisterFormSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Họ và tên <span className="text-rose-500 dark:text-rose-400">*</span>
+                  {lang === 'vi' ? 'Họ và tên' : 'Full name'} <span className="text-rose-500 dark:text-rose-400">*</span>
                 </label>
                 <div className="relative">
                   <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -827,7 +829,7 @@ export const LoginModal = ({
                     required
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
-                    placeholder="Ví dụ: Nguyễn Văn A"
+                    placeholder={lang === 'vi' ? 'Ví dụ: Nguyễn Văn A' : 'e.g. John Doe'}
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-[#172033] border border-slate-200 dark:border-[#253047] rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:ring-1 dark:focus:ring-indigo-500 transition-all"
                   />
                 </div>
@@ -835,7 +837,7 @@ export const LoginModal = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Tên tài khoản (Email/Gmail) <span className="text-rose-500 dark:text-rose-400">*</span>
+                  {lang === 'vi' ? 'Tên tài khoản (Email/Gmail)' : 'Email / Gmail account'} <span className="text-rose-500 dark:text-rose-400">*</span>
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -852,7 +854,7 @@ export const LoginModal = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Mật khẩu <span className="text-rose-500 dark:text-rose-400">*</span>
+                  {lang === 'vi' ? 'Mật khẩu' : 'Password'} <span className="text-rose-500 dark:text-rose-400">*</span>
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -861,7 +863,7 @@ export const LoginModal = ({
                     required
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="Tối thiểu 8 ký tự (hoa, thường, số)"
+                    placeholder={lang === 'vi' ? 'Tối thiểu 8 ký tự (hoa, thường, số)' : 'At least 8 characters (upper, lower, number)'}
                     className="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-[#172033] border border-slate-200 dark:border-[#253047] rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:ring-1 dark:focus:ring-indigo-500 transition-all"
                   />
                   <button
@@ -876,7 +878,7 @@ export const LoginModal = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Xác nhận lại mật khẩu <span className="text-rose-500 dark:text-rose-400">*</span>
+                  {lang === 'vi' ? 'Xác nhận lại mật khẩu' : 'Confirm password'} <span className="text-rose-500 dark:text-rose-400">*</span>
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -885,7 +887,7 @@ export const LoginModal = ({
                     required
                     value={regConfirmPassword}
                     onChange={(e) => setRegConfirmPassword(e.target.value)}
-                    placeholder="Nhập lại mật khẩu vừa đặt"
+                    placeholder={lang === 'vi' ? 'Nhập lại mật khẩu vừa đặt' : 'Re-enter your password'}
                     className="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-[#172033] border border-slate-200 dark:border-[#253047] rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:ring-1 dark:focus:ring-indigo-500 transition-all"
                   />
                   <button
@@ -901,30 +903,30 @@ export const LoginModal = ({
               {/* Bảng kiểm tra tiêu chuẩn mật khẩu thời gian thực */}
               <div className="p-3 bg-slate-50 dark:bg-[#0d1424] border border-slate-200 dark:border-[#1e2a42] rounded-xl text-xs space-y-1.5 transition-colors">
                 <p className="font-semibold text-slate-500 dark:text-slate-400 text-[11px] uppercase tracking-wider mb-1">
-                  Yêu cầu mật khẩu an toàn:
+                  {lang === 'vi' ? 'Yêu cầu mật khẩu an toàn:' : 'Password requirements:'}
                 </p>
                 <div className="grid grid-cols-2 gap-1.5">
                   <div className={`flex items-center gap-1.5 ${hasMinLength ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-slate-400 dark:text-slate-500'}`}>
                     <Check className={`w-3.5 h-3.5 ${hasMinLength ? 'text-emerald-600 dark:text-emerald-400' : 'opacity-30'}`} />
-                    <span>Tối thiểu 8 ký tự</span>
+                    <span>{lang === 'vi' ? 'Tối thiểu 8 ký tự' : 'At least 8 characters'}</span>
                   </div>
                   <div className={`flex items-center gap-1.5 ${hasUpper ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-slate-400 dark:text-slate-500'}`}>
                     <Check className={`w-3.5 h-3.5 ${hasUpper ? 'text-emerald-600 dark:text-emerald-400' : 'opacity-30'}`} />
-                    <span>Có chữ in hoa (A-Z)</span>
+                    <span>{lang === 'vi' ? 'Có chữ in hoa (A-Z)' : 'Uppercase letter (A-Z)'}</span>
                   </div>
                   <div className={`flex items-center gap-1.5 ${hasLower ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-slate-400 dark:text-slate-500'}`}>
                     <Check className={`w-3.5 h-3.5 ${hasLower ? 'text-emerald-600 dark:text-emerald-400' : 'opacity-30'}`} />
-                    <span>Có chữ thường (a-z)</span>
+                    <span>{lang === 'vi' ? 'Có chữ thường (a-z)' : 'Lowercase letter (a-z)'}</span>
                   </div>
                   <div className={`flex items-center gap-1.5 ${hasNum ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-slate-400 dark:text-slate-500'}`}>
                     <Check className={`w-3.5 h-3.5 ${hasNum ? 'text-emerald-600 dark:text-emerald-400' : 'opacity-30'}`} />
-                    <span>Có chữ số (0-9)</span>
+                    <span>{lang === 'vi' ? 'Có chữ số (0-9)' : 'Number (0-9)'}</span>
                   </div>
                 </div>
                 {regConfirmPassword && (
                   <div className={`flex items-center gap-1.5 pt-1 border-t border-slate-200 dark:border-[#1e2a42] ${isMatch ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-rose-500 dark:text-rose-400 font-medium'}`}>
                     <Check className={`w-3.5 h-3.5 ${isMatch ? 'text-emerald-600 dark:text-emerald-400' : 'opacity-30'}`} />
-                    <span>{isMatch ? 'Mật khẩu xác nhận trùng khớp' : 'Mật khẩu xác nhận chưa khớp'}</span>
+                    <span>{isMatch ? (lang === 'vi' ? 'Mật khẩu xác nhận trùng khớp' : 'Passwords match') : (lang === 'vi' ? 'Mật khẩu xác nhận chưa khớp' : 'Passwords do not match')}</span>
                   </div>
                 )}
               </div>
@@ -940,9 +942,19 @@ export const LoginModal = ({
                   className="mt-1 w-4 h-4 rounded border-slate-300 dark:border-[#253047] text-indigo-600 focus:ring-indigo-500 bg-white dark:bg-[#172033] cursor-pointer"
                 />
                 <label htmlFor="regTerms" className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed cursor-pointer">
-                  Tôi đồng ý tham gia và chấp thuận{' '}
-                  <span className="text-indigo-600 dark:text-indigo-400 font-semibold underline">Điều khoản dịch vụ</span> &amp;{' '}
-                  <span className="text-indigo-600 dark:text-indigo-400 font-semibold underline">Chính sách bảo mật</span> của StockSim.
+                  {lang === 'vi' ? (
+                    <>
+                      Tôi đồng ý tham gia và chấp thuận{' '}
+                      <span className="text-indigo-600 dark:text-indigo-400 font-semibold underline">Điều khoản dịch vụ</span> &amp;{' '}
+                      <span className="text-indigo-600 dark:text-indigo-400 font-semibold underline">Chính sách bảo mật</span> của StockSim.
+                    </>
+                  ) : (
+                    <>
+                      I agree to join and accept the{' '}
+                      <span className="text-indigo-600 dark:text-indigo-400 font-semibold underline">Terms of Service</span> &amp;{' '}
+                      <span className="text-indigo-600 dark:text-indigo-400 font-semibold underline">Privacy Policy</span> of StockSim.
+                    </>
+                  )}
                 </label>
               </div>
 
@@ -952,18 +964,18 @@ export const LoginModal = ({
                 className="w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 dark:hover:from-blue-500 dark:hover:to-indigo-500 active:scale-[0.99] text-white shadow-lg shadow-indigo-600/25 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                <span>Tiếp tục &amp; Gửi mã OTP xác nhận</span>
+                <span>{lang === 'vi' ? 'Tiếp tục & Gửi mã OTP xác nhận' : 'Continue & Send OTP code'}</span>
               </button>
 
               <div className="text-center pt-2">
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Đã có tài khoản?{' '}
+                  {lang === 'vi' ? 'Đã có tài khoản?' : 'Already have an account?'}{' '}
                   <button
                     type="button"
                     onClick={() => setTab('login')}
                     className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold cursor-pointer"
                   >
-                    Đăng nhập
+                    {lang === 'vi' ? 'Đăng nhập' : 'Sign in'}
                   </button>
                 </p>
               </div>
@@ -977,17 +989,28 @@ export const LoginModal = ({
                 <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200/60 dark:border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto">
                   <KeyRound className="w-6 h-6 animate-bounce text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Xác thực mã OTP</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {lang === 'vi' ? 'Xác thực mã OTP' : 'Verify OTP code'}
+                </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
-                  Mã xác thực gồm 6 chữ số đã được gửi đến email: <br />
-                  <strong className="text-indigo-600 dark:text-indigo-400 font-mono text-sm">{regEmail}</strong>
+                  {lang === 'vi' ? (
+                    <>
+                      Mã xác thực gồm 6 chữ số đã được gửi đến email: <br />
+                      <strong className="text-indigo-600 dark:text-indigo-400 font-mono text-sm">{regEmail}</strong>
+                    </>
+                  ) : (
+                    <>
+                      A 6-digit verification code was sent to: <br />
+                      <strong className="text-indigo-600 dark:text-indigo-400 font-mono text-sm">{regEmail}</strong>
+                    </>
+                  )}
                 </p>
               </div>
 
               {/* 6 ô vuông nhập mã OTP */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-3 text-center">
-                  Nhập mã 6 chữ số (Hiệu lực trong 10 phút)
+                  {lang === 'vi' ? 'Nhập mã 6 chữ số (Hiệu lực trong 10 phút)' : 'Enter 6-digit code (Valid for 10 minutes)'}
                 </label>
                 <div className="flex items-center justify-center gap-2 sm:gap-3">
                   {otpDigits.map((digit, index) => (
@@ -1024,7 +1047,7 @@ export const LoginModal = ({
                 className="w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.99] text-white shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                <span>Xác nhận &amp; Hoàn tất đăng ký</span>
+                <span>{lang === 'vi' ? 'Xác nhận & Hoàn tất đăng ký' : 'Verify & Complete Registration'}</span>
               </button>
 
               {/* Nút gửi lại mã & Quay lại */}
@@ -1035,7 +1058,7 @@ export const LoginModal = ({
                   className="flex items-center gap-1 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
-                  <span>Sửa thông tin</span>
+                  <span>{lang === 'vi' ? 'Sửa thông tin' : 'Edit info'}</span>
                 </button>
 
                 <div>
@@ -1047,11 +1070,11 @@ export const LoginModal = ({
                       className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-semibold cursor-pointer"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                      <span>Gửi lại mã OTP</span>
+                      <span>{lang === 'vi' ? 'Gửi lại mã OTP' : 'Resend OTP'}</span>
                     </button>
                   ) : (
                     <span className="text-slate-400 dark:text-slate-500">
-                      Gửi lại sau: <strong className="font-mono text-slate-600 dark:text-slate-400">{countdown}s</strong>
+                      {lang === 'vi' ? 'Gửi lại sau:' : 'Resend in:'} <strong className="font-mono text-slate-600 dark:text-slate-400">{countdown}s</strong>
                     </span>
                   )}
                 </div>
@@ -1066,15 +1089,19 @@ export const LoginModal = ({
                 <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200/60 dark:border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto">
                   <KeyRound className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Quên mật khẩu đăng nhập?</h3>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {lang === 'vi' ? 'Quên mật khẩu đăng nhập?' : 'Forgot your password?'}
+                </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm mx-auto">
-                  Nhập địa chỉ email tài khoản của bạn để nhận mã xác thực OTP 6 chữ số và tạo mật khẩu mới.
+                  {lang === 'vi' 
+                    ? 'Nhập địa chỉ email tài khoản của bạn để nhận mã xác thực OTP 6 chữ số và tạo mật khẩu mới.'
+                    : 'Enter your registered email address to receive a 6-digit OTP code and create a new password.'}
                 </p>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Địa chỉ Email đã đăng ký <span className="text-rose-500 dark:text-rose-400">*</span>
+                  {lang === 'vi' ? 'Địa chỉ Email đã đăng ký' : 'Registered email address'} <span className="text-rose-500 dark:text-rose-400">*</span>
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -1095,7 +1122,7 @@ export const LoginModal = ({
                 className="w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 active:scale-[0.99] text-white shadow-lg shadow-indigo-600/20 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                <span>Gửi mã xác thực OTP</span>
+                <span>{lang === 'vi' ? 'Gửi mã xác thực OTP' : 'Send OTP verification code'}</span>
               </button>
 
               <div className="text-center pt-2">
@@ -1109,7 +1136,7 @@ export const LoginModal = ({
                   className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white inline-flex items-center gap-1 font-medium cursor-pointer"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Quay lại trang Đăng nhập</span>
+                  <span>{lang === 'vi' ? 'Quay lại trang Đăng nhập' : 'Back to sign in'}</span>
                 </button>
               </div>
             </form>
@@ -1122,17 +1149,28 @@ export const LoginModal = ({
                 <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200/60 dark:border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto">
                   <KeyRound className="w-6 h-6 animate-bounce text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Xác thực mã OTP</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {lang === 'vi' ? 'Xác thực mã OTP' : 'Verify OTP code'}
+                </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
-                  Mã xác thực gồm 6 chữ số đã được gửi tới: <br />
-                  <strong className="text-indigo-600 dark:text-indigo-400 font-mono text-sm">{forgotEmail}</strong>
+                  {lang === 'vi' ? (
+                    <>
+                      Mã xác thực gồm 6 chữ số đã được gửi tới: <br />
+                      <strong className="text-indigo-600 dark:text-indigo-400 font-mono text-sm">{forgotEmail}</strong>
+                    </>
+                  ) : (
+                    <>
+                      A 6-digit verification code was sent to: <br />
+                      <strong className="text-indigo-600 dark:text-indigo-400 font-mono text-sm">{forgotEmail}</strong>
+                    </>
+                  )}
                 </p>
               </div>
 
               {/* 6 ô vuông OTP */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-3 text-center">
-                  Nhập mã 6 chữ số (Hiệu lực đúng trong 10 phút)
+                  {lang === 'vi' ? 'Nhập mã 6 chữ số (Hiệu lực trong 10 phút)' : 'Enter 6-digit code (Valid for 10 minutes)'}
                 </label>
                 <div className="flex items-center justify-center gap-2 sm:gap-3">
                   {forgotOtpDigits.map((digit, index) => (
@@ -1169,7 +1207,7 @@ export const LoginModal = ({
                 className="w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 dark:hover:from-blue-500 dark:hover:to-indigo-500 active:scale-[0.99] text-white shadow-lg shadow-indigo-600/25 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                <span>Xác nhận mã OTP &amp; Tiếp tục</span>
+                <span>{lang === 'vi' ? 'Xác nhận mã OTP & Tiếp tục' : 'Verify OTP code & Continue'}</span>
               </button>
 
               {/* Gửi lại mã / Đổi email */}
@@ -1180,7 +1218,7 @@ export const LoginModal = ({
                   className="flex items-center gap-1 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
-                  <span>Đổi Email khác</span>
+                  <span>{lang === 'vi' ? 'Đổi Email khác' : 'Change email'}</span>
                 </button>
 
                 <div>
@@ -1192,11 +1230,11 @@ export const LoginModal = ({
                       className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-semibold cursor-pointer"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                      <span>Gửi lại mã OTP</span>
+                      <span>{lang === 'vi' ? 'Gửi lại mã OTP' : 'Resend OTP'}</span>
                     </button>
                   ) : (
                     <span className="text-slate-400 dark:text-slate-500">
-                      Gửi lại sau: <strong className="font-mono text-slate-600 dark:text-slate-400">{forgotCountdown}s</strong>
+                      {lang === 'vi' ? 'Gửi lại sau:' : 'Resend in:'} <strong className="font-mono text-slate-600 dark:text-slate-400">{forgotCountdown}s</strong>
                     </span>
                   )}
                 </div>
@@ -1211,17 +1249,28 @@ export const LoginModal = ({
                 <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200/60 dark:border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mx-auto">
                   <Lock className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Thiết lập mật khẩu mới</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {lang === 'vi' ? 'Thiết lập mật khẩu mới' : 'Set new password'}
+                </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Nhập mật khẩu đăng nhập mới cho tài khoản: <br />
-                  <strong className="text-indigo-600 dark:text-indigo-400 font-mono text-sm">{forgotEmail}</strong>
+                  {lang === 'vi' ? (
+                    <>
+                      Nhập mật khẩu đăng nhập mới cho tài khoản: <br />
+                      <strong className="text-indigo-600 dark:text-indigo-400 font-mono text-sm">{forgotEmail}</strong>
+                    </>
+                  ) : (
+                    <>
+                      Enter a new login password for account: <br />
+                      <strong className="text-indigo-600 dark:text-indigo-400 font-mono text-sm">{forgotEmail}</strong>
+                    </>
+                  )}
                 </p>
               </div>
 
               {/* Mật khẩu mới */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Mật khẩu mới <span className="text-rose-500 dark:text-rose-400">*</span>
+                  {lang === 'vi' ? 'Mật khẩu mới' : 'New password'} <span className="text-rose-500 dark:text-rose-400">*</span>
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -1230,7 +1279,7 @@ export const LoginModal = ({
                     required
                     value={forgotNewPassword}
                     onChange={(e) => setForgotNewPassword(e.target.value)}
-                    placeholder="Tối thiểu 8 ký tự (hoa, thường, số)"
+                    placeholder={lang === 'vi' ? 'Tối thiểu 8 ký tự (hoa, thường, số)' : 'At least 8 characters (upper, lower, number)'}
                     className="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-[#172033] border border-slate-200 dark:border-[#253047] rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:ring-1 dark:focus:ring-indigo-500 transition-all"
                   />
                   <button
@@ -1246,7 +1295,7 @@ export const LoginModal = ({
               {/* Xác nhận mật khẩu mới */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Xác nhận lại mật khẩu mới <span className="text-rose-500 dark:text-rose-400">*</span>
+                  {lang === 'vi' ? 'Xác nhận lại mật khẩu mới' : 'Confirm new password'} <span className="text-rose-500 dark:text-rose-400">*</span>
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -1255,7 +1304,7 @@ export const LoginModal = ({
                     required
                     value={forgotConfirmPassword}
                     onChange={(e) => setForgotConfirmPassword(e.target.value)}
-                    placeholder="Nhập lại mật khẩu mới vừa đặt"
+                    placeholder={lang === 'vi' ? 'Nhập lại mật khẩu mới vừa đặt' : 'Re-enter your new password'}
                     className="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-[#172033] border border-slate-200 dark:border-[#253047] rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:ring-1 dark:focus:ring-indigo-500 transition-all"
                   />
                   <button
@@ -1271,30 +1320,30 @@ export const LoginModal = ({
               {/* Bảng tiêu chuẩn mật khẩu */}
               <div className="p-3 bg-slate-50 dark:bg-[#0d1424] border border-slate-200 dark:border-[#1e2a42] rounded-xl text-xs space-y-1.5 transition-colors">
                 <p className="font-semibold text-slate-500 dark:text-slate-400 text-[11px] uppercase tracking-wider mb-1">
-                  Yêu cầu bảo mật mật khẩu:
+                  {lang === 'vi' ? 'Yêu cầu bảo mật mật khẩu:' : 'Password security requirements:'}
                 </p>
                 <div className="grid grid-cols-2 gap-1.5">
                   <div className={`flex items-center gap-1.5 ${hasForgotMinLength ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-slate-400 dark:text-slate-500'}`}>
                     <Check className={`w-3.5 h-3.5 ${hasForgotMinLength ? 'text-emerald-600 dark:text-emerald-400' : 'opacity-30'}`} />
-                    <span>Tối thiểu 8 ký tự</span>
+                    <span>{lang === 'vi' ? 'Tối thiểu 8 ký tự' : 'At least 8 characters'}</span>
                   </div>
                   <div className={`flex items-center gap-1.5 ${hasForgotUpper ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-slate-400 dark:text-slate-500'}`}>
                     <Check className={`w-3.5 h-3.5 ${hasForgotUpper ? 'text-emerald-600 dark:text-emerald-400' : 'opacity-30'}`} />
-                    <span>Có chữ in hoa (A-Z)</span>
+                    <span>{lang === 'vi' ? 'Có chữ in hoa (A-Z)' : 'Uppercase letter (A-Z)'}</span>
                   </div>
                   <div className={`flex items-center gap-1.5 ${hasForgotLower ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-slate-400 dark:text-slate-500'}`}>
                     <Check className={`w-3.5 h-3.5 ${hasForgotLower ? 'text-emerald-600 dark:text-emerald-400' : 'opacity-30'}`} />
-                    <span>Có chữ thường (a-z)</span>
+                    <span>{lang === 'vi' ? 'Có chữ thường (a-z)' : 'Lowercase letter (a-z)'}</span>
                   </div>
                   <div className={`flex items-center gap-1.5 ${hasForgotNum ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-slate-400 dark:text-slate-500'}`}>
                     <Check className={`w-3.5 h-3.5 ${hasForgotNum ? 'text-emerald-600 dark:text-emerald-400' : 'opacity-30'}`} />
-                    <span>Có chữ số (0-9)</span>
+                    <span>{lang === 'vi' ? 'Có chữ số (0-9)' : 'Number (0-9)'}</span>
                   </div>
                 </div>
                 {forgotConfirmPassword && (
                   <div className={`flex items-center gap-1.5 pt-1.5 border-t border-slate-200 dark:border-[#1e2a42] ${isForgotMatch ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-rose-500 dark:text-rose-400 font-medium'}`}>
                     <Check className={`w-3.5 h-3.5 ${isForgotMatch ? 'text-emerald-600 dark:text-emerald-400' : 'opacity-30'}`} />
-                    <span>{isForgotMatch ? 'Mật khẩu xác nhận trùng khớp' : 'Mật khẩu xác nhận chưa khớp'}</span>
+                    <span>{isForgotMatch ? (lang === 'vi' ? 'Mật khẩu xác nhận trùng khớp' : 'Passwords match') : (lang === 'vi' ? 'Mật khẩu xác nhận chưa khớp' : 'Passwords do not match')}</span>
                   </div>
                 )}
               </div>
@@ -1306,7 +1355,7 @@ export const LoginModal = ({
                 className="w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.99] text-white shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                <span>Cập nhật mật khẩu mới</span>
+                <span>{lang === 'vi' ? 'Cập nhật mật khẩu mới' : 'Update new password'}</span>
               </button>
 
               <div className="flex items-center justify-between pt-1 border-t border-slate-200 dark:border-[#253047] text-xs">
@@ -1316,7 +1365,7 @@ export const LoginModal = ({
                   className="flex items-center gap-1 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Quay lại nhập mã OTP</span>
+                  <span>{lang === 'vi' ? 'Quay lại nhập mã OTP' : 'Back to OTP entry'}</span>
                 </button>
               </div>
             </form>
@@ -1329,9 +1378,19 @@ export const LoginModal = ({
                 <Check className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Đặt lại mật khẩu thành công!</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {lang === 'vi' ? 'Đặt lại mật khẩu thành công!' : 'Password reset successfully!'}
+                </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
-                  Mật khẩu của tài khoản <strong>{forgotEmail}</strong> đã được cập nhật thành công. Bạn có thể đăng nhập ngay bây giờ.
+                  {lang === 'vi' ? (
+                    <>
+                      Mật khẩu của tài khoản <strong>{forgotEmail}</strong> đã được cập nhật thành công. Bạn có thể đăng nhập ngay bây giờ.
+                    </>
+                  ) : (
+                    <>
+                      The password for account <strong>{forgotEmail}</strong> has been updated successfully. You can sign in now.
+                    </>
+                  )}
                 </p>
               </div>
 
@@ -1343,11 +1402,11 @@ export const LoginModal = ({
                   setLoginEmail(forgotEmail);
                   setLoginPassword('');
                   setErrorMsg('');
-                  setSuccessMsg('Vui lòng đăng nhập bằng mật khẩu mới của bạn.');
+                  setSuccessMsg(lang === 'vi' ? 'Vui lòng đăng nhập bằng mật khẩu mới của bạn.' : 'Please sign in with your new password.');
                 }}
                 className="w-full py-2.5 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
               >
-                Đăng nhập ngay
+                {lang === 'vi' ? 'Đăng nhập ngay' : 'Sign in now'}
               </button>
             </div>
           )}
@@ -1357,7 +1416,7 @@ export const LoginModal = ({
         {/* Footer info badge */}
         <div className="px-6 py-3 bg-slate-50 dark:bg-[#0d1424] border-t border-slate-100 dark:border-[#253047] text-[11px] text-slate-500 dark:text-slate-400 text-center flex items-center justify-center gap-1.5 transition-colors">
           <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-          <span>Bảo mật tự động bởi <strong className="text-slate-600 dark:text-slate-400 font-semibold">Google reCAPTCHA v3</strong></span>
+          <span>{lang === 'vi' ? 'Bảo mật tự động bởi ' : 'Protected by '}<strong className="text-slate-600 dark:text-slate-400 font-semibold">Google reCAPTCHA v3</strong></span>
         </div>
       </div>
     </div>

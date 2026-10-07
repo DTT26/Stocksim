@@ -1,3 +1,4 @@
+import { useChallengeTranslation } from './useChallengeTranslation';
 import React from 'react';
 import { Award, ShieldCheck, CheckCircle2, Sparkles } from 'lucide-react';
 import type { PassedCertificate } from './types';
@@ -17,6 +18,7 @@ export const ChallengeCertificateModal: React.FC<ChallengeCertificateModalProps>
   onClose,
   userName = 'Trader',
 }) => {
+  const { tr, levelName, badge } = useChallengeTranslation();
   if (!certificate) return null;
 
   const currentTraderName = certificate.userName || userName;
@@ -44,7 +46,7 @@ export const ChallengeCertificateModal: React.FC<ChallengeCertificateModalProps>
                         : 'bg-slate-800/70 hover:bg-slate-700/80 text-slate-300 border border-slate-700/60 hover:text-white'
                     }`}
                   >
-                    <span>Cấp {cert.levelId}</span>
+                    <span>{tr("Cấp")} {cert.levelId}</span>
                     <span className="text-[10px] opacity-75 font-mono hidden sm:inline font-normal">({formattedCapital})</span>
                   </button>
                 );
@@ -111,12 +113,12 @@ export const ChallengeCertificateModal: React.FC<ChallengeCertificateModalProps>
 
               {/* Main Title - Pure clean font without broken Vietnamese diacritics */}
               <h1 className="text-2xl md:text-4xl lg:text-[40px] font-sans font-black tracking-wide uppercase leading-tight bg-gradient-to-r from-[#BF953F] via-[#FCF6BA] to-[#B38728] bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(245,158,11,0.25)]">
-                CHỨNG NHẬN TRADER QUỸ
+                {tr("CHỨNG NHẬN TRADER QUỸ")}
               </h1>
               
               <div className="flex items-center justify-center gap-2 mt-1.5">
                 <span className="text-[11px] md:text-xs font-sans font-bold tracking-widest text-amber-200/90 uppercase">
-                  Certificate of Prop Trading Achievement • {certificate.levelName} (Cấp {certificate.levelId})
+                  {tr("Chứng nhận thành tích giao dịch quỹ")} • {levelName(certificate.levelId, certificate.levelName)} ({badge(certificate.levelId)})
                 </span>
               </div>
             </div>
@@ -124,7 +126,7 @@ export const ChallengeCertificateModal: React.FC<ChallengeCertificateModalProps>
             {/* --- RECIPIENT BODY --- */}
             <div className="text-center my-3 md:my-5">
               <p className="text-xs md:text-sm text-slate-400 tracking-wider font-sans mb-1.5">
-                Vinh danh và chứng nhận nhà giao dịch tài chính:
+                {tr("Vinh danh và chứng nhận nhà giao dịch tài chính:")}
               </p>
               
               {/* Recipient Name with Luxury Gold Gradient */}
@@ -141,7 +143,7 @@ export const ChallengeCertificateModal: React.FC<ChallengeCertificateModalProps>
               </div>
 
               <p className="text-xs md:text-[13px] text-slate-300/90 max-w-xl mx-auto mt-2 leading-relaxed font-sans">
-                Đã chứng minh kỷ luật thép, kỹ năng kiểm soát rủi ro chuẩn quốc tế và hoàn thành xuất sắc bài kiểm tra đánh giá cấp vốn để chính thức trở thành <strong className="text-amber-300 font-bold">Trader Quỹ Chuyên Nghiệp</strong>.
+                {tr("Đã chứng minh kỷ luật thép, kỹ năng kiểm soát rủi ro chuẩn quốc tế và hoàn thành xuất sắc bài kiểm tra đánh giá cấp vốn để chính thức trở thành")} <strong className="text-amber-300 font-bold">{tr("Trader Quỹ Chuyên Nghiệp")}</strong>.
               </p>
             </div>
 
@@ -151,34 +153,34 @@ export const ChallengeCertificateModal: React.FC<ChallengeCertificateModalProps>
               {/* Plaque 1: Cấp độ */}
               <div className="bg-gradient-to-b from-amber-950/30 to-slate-900/60 border border-amber-500/40 rounded-xl p-2.5 md:p-3 text-center shadow-inner">
                 <span className="text-[10px] md:text-[11px] text-amber-300/80 uppercase tracking-wider block font-bold">
-                  Cấp Bậc Đạt Được
+                  {tr("Cấp Bậc Đạt Được")}
                 </span>
                 <span className="text-base md:text-xl font-black text-amber-400 font-sans tracking-tight">
-                  {certificate.levelName}
+                  {levelName(certificate.levelId, certificate.levelName)}
                 </span>
-                <span className="text-[10px] text-slate-400 block font-sans">Cấp {certificate.levelId}/6</span>
+                <span className="text-[10px] text-slate-400 block font-sans">{tr("Cấp")} {certificate.levelId}/6</span>
               </div>
 
               {/* Plaque 2: Hạn mức vốn */}
               <div className="bg-gradient-to-b from-amber-500/15 via-amber-500/5 to-slate-900/60 border-2 border-amber-400/60 rounded-xl p-2.5 md:p-3 text-center shadow-lg shadow-amber-500/10 scale-105">
                 <span className="text-[10px] md:text-[11px] text-yellow-300 uppercase tracking-wider block font-bold">
-                  Hạn Mức Cấp Vốn
+                  {tr("Hạn Mức Cấp Vốn")}
                 </span>
                 <span className="text-base md:text-2xl font-black text-white font-mono tracking-tight">
                   ${certificate.capitalUSD.toLocaleString('en-US')}
                 </span>
-                <span className="text-[10px] text-emerald-400 font-bold block font-sans">✓ Quản Lý Tài Khoản Live</span>
+                <span className="text-[10px] text-emerald-400 font-bold block font-sans">{tr("✓ Quản Lý Tài Khoản Live")}</span>
               </div>
 
               {/* Plaque 3: Chia sẻ lợi nhuận */}
               <div className="bg-gradient-to-b from-amber-950/30 to-slate-900/60 border border-amber-500/40 rounded-xl p-2.5 md:p-3 text-center shadow-inner">
                 <span className="text-[10px] md:text-[11px] text-amber-300/80 uppercase tracking-wider block font-bold">
-                  Chia Sẻ Lợi Nhuận
+                  {tr("Chia Sẻ Lợi Nhuận")}
                 </span>
                 <span className="text-base md:text-xl font-black text-amber-300 font-sans">
                   80% - 90%
                 </span>
-                <span className="text-[10px] text-slate-400 block font-sans">Rút Tiền Định Kỳ</span>
+                <span className="text-[10px] text-slate-400 block font-sans">{tr("Rút Tiền Định Kỳ")}</span>
               </div>
             </div>
 
@@ -205,14 +207,14 @@ export const ChallengeCertificateModal: React.FC<ChallengeCertificateModalProps>
                     <ShieldCheck className="w-3.5 h-3.5" />
                     <span>AITRADEX VERIFIED EVALUATION</span>
                   </div>
-                  <span className="text-[10px] text-slate-400 block">Hệ thống cấp vốn tự động AI</span>
+                  <span className="text-[10px] text-slate-400 block">{tr("Hệ thống cấp vốn tự động AI")}</span>
                 </div>
               </div>
 
               {/* Right: Issue Date */}
               <div className="text-right font-sans">
                 <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold mb-0.5">
-                  Ngày Cấp Chứng Nhận
+                  {tr("Ngày Cấp Chứng Nhận")}
                 </span>
                 <span className="text-xs md:text-sm font-bold text-amber-300 font-mono">
                   {certificate.date || '21/09/2026'}
@@ -228,14 +230,14 @@ export const ChallengeCertificateModal: React.FC<ChallengeCertificateModalProps>
         <div className="w-full max-w-4xl flex items-center justify-between mt-4 px-2">
           <div className="text-xs text-slate-400 flex items-center gap-1.5 font-sans">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>Chứng chỉ chính thức được ghi nhận vĩnh viễn trên hệ thống AITRADEX.</span>
+            <span>{tr("Chứng chỉ chính thức được ghi nhận vĩnh viễn trên hệ thống AITRADEX.")}</span>
           </div>
           <div>
             <button
               onClick={onClose}
               className="px-7 py-2.5 bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black rounded-xl text-sm transition-all shadow-lg shadow-amber-500/25 active:scale-95"
             >
-              Đóng
+              {tr("Đóng")}
             </button>
           </div>
         </div>
