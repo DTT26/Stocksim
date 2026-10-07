@@ -761,11 +761,15 @@ export const handleOverlayPreventRightClickRemove = (event: any) => {
   return true;
 };
 const rectDragStateMap: Record<string, {
-  handle: 'midTop' | 'midBottom' | 'midLeft' | 'midRight';
+  mode: 'resize' | 'move';
   orig0: { timestamp?: number; value?: number; dataIndex?: number };
   orig1: { timestamp?: number; value?: number; dataIndex?: number };
-  isP0Top: boolean;
-  isP0Left: boolean;
+  handle?: 'midTop' | 'midBottom' | 'midLeft' | 'midRight' | null;
+  isP0Top?: boolean;
+  isP0Left?: boolean;
+  startPrice?: number;
+  startDataIndex?: number;
+  startTimestamp?: number;
 }> = {};
 export const isOverlayInteracting = (overlay: any, chart?: any): boolean => {
   if (!overlay) return false;
@@ -825,20 +829,41 @@ export function handleRectPressedMoveStart(event: any) {
     Math.hypot(mouseX - coords[1].x, mouseY - coords[0].y)
   ];
   const minCornerDist = Math.min(...distToCorners);
+  if (minCornerDist <= 16) {
+    // Bấm trúng góc tròn -> để KlineCharts tự co giãn góc bằng eventPressedPointMove
+    delete rectDragStateMap[event.overlay.id];
+    return;
+  }
+
   const dist = (p: { x: number; y: number }) => Math.hypot(mouseX - p.x, mouseY - p.y);
   const dTop = dist(midTop);
   const dBottom = dist(midBottom);
   const dLeft = dist(midLeft);
   const dRight = dist(midRight);
   const minDist = Math.min(dTop, dBottom, dLeft, dRight);
-  const HIT_THRESHOLD = 25; // 25px vĂ¹ng cháº¡m quanh Ă´ vuĂ´ng
-  if (minDist <= HIT_THRESHOLD && minDist < minCornerDist) {
-    let handle: 'midTop' | 'midBottom' | 'midLeft' | 'midRight' = 'midTop';
+
+  let handle: 'midTop' | 'midBottom' | 'midLeft' | 'midRight' | null = null;
+  const figKey = event.figure?.key || event.figure?.attrs?.isHandle;
+  const isFigBorder = figKey === 'border' || event.figure?.type === 'line';
+
+  // Chỉ nhận là handle khi bấm trúng ô vuông handle (hoặc figKey khớp, hoặc khoảng cách gần handle)
+  if (['midTop', 'midBottom', 'midLeft', 'midRight'].includes(figKey)) {
+    handle = figKey;
+  } else if (!isFigBorder && minDist <= 16 && minDist < minCornerDist) {
     if (minDist === dTop) handle = 'midTop';
     else if (minDist === dBottom) handle = 'midBottom';
     else if (minDist === dLeft) handle = 'midLeft';
     else if (minDist === dRight) handle = 'midRight';
+  }
+
+  // Khóa eventPressedOtherMove nội bộ của Klinecharts để tránh trôi tự do
+  if (event.overlay) {
+    event.overlay.eventPressedOtherMove = () => {};
+  }
+
+  if (handle) {
     rectDragStateMap[event.overlay.id] = {
+      mode: 'resize',
       handle,
       orig0,
       orig1,
@@ -846,7 +871,31 @@ export function handleRectPressedMoveStart(event: any) {
       isP0Left: (orig0.timestamp ?? 0) <= (orig1.timestamp ?? 0)
     };
   } else {
-    delete rectDragStateMap[event.overlay.id];
+    // Bấm vào khung viền (border) -> di chuyển toàn bộ hình
+    let startPrice = event.value;
+    let startTimestamp = event.timestamp;
+    let startDataIndex = event.dataIndex;
+    if (typeof mouseX === 'number' && typeof mouseY === 'number') {
+      const converted = chart.convertFromPixel([{ x: mouseX, y: mouseY }], { paneId: 'candle_pane' });
+      const convPoint = Array.isArray(converted) ? converted[0] : converted;
+      if (convPoint) {
+        if (typeof convPoint.value === 'number') startPrice = convPoint.value;
+        if (typeof convPoint.timestamp === 'number') startTimestamp = convPoint.timestamp;
+        if (typeof convPoint.dataIndex === 'number') startDataIndex = convPoint.dataIndex;
+      }
+    }
+    const dataList = typeof chart.getDataList === 'function' ? chart.getDataList() : [];
+    if (typeof startDataIndex !== 'number' && typeof startTimestamp === 'number' && dataList && dataList.length > 0) {
+      startDataIndex = dataList.findIndex((d: any) => d.timestamp === startTimestamp);
+    }
+    rectDragStateMap[event.overlay.id] = {
+      mode: 'move',
+      orig0,
+      orig1,
+      startPrice,
+      startTimestamp,
+      startDataIndex
+    };
   }
 };
 export function handleRectPressedMoving(event: any) {
@@ -856,22 +905,112 @@ export function handleRectPressedMoving(event: any) {
   if (!state) return false;
   const chart = event.chart || (window as any).__currentKlineChart;
   if (!chart) return false;
-  const { handle, orig0, orig1, isP0Top, isP0Left } = state;
-  const mouseX = event.x;
-  const mouseY = event.y;
+  const { orig0, orig1 } = state;
+  const mouseX = event.x ?? event.clientX;
+  const mouseY = event.y ?? event.clientY;
   let mousePrice = event.value;
   let mouseTimestamp = event.timestamp;
+  let mouseDataIndex = event.dataIndex;
   if (typeof mouseX === 'number' && typeof mouseY === 'number') {
     const converted = chart.convertFromPixel([{ x: mouseX, y: mouseY }], { paneId: 'candle_pane' });
-    if (converted && converted[0]) {
-      if (typeof converted[0].value === 'number') mousePrice = converted[0].value;
-      if (typeof converted[0].timestamp === 'number') mouseTimestamp = converted[0].timestamp;
+    const convPoint = Array.isArray(converted) ? converted[0] : converted;
+    if (convPoint) {
+      if (typeof convPoint.value === 'number') mousePrice = convPoint.value;
+      if (typeof convPoint.timestamp === 'number') mouseTimestamp = convPoint.timestamp;
+      if (typeof convPoint.dataIndex === 'number') mouseDataIndex = convPoint.dataIndex;
     }
   }
-  if (typeof mousePrice !== 'number' || typeof mouseTimestamp !== 'number') return false;
+
+  // Tự suy diễn timestamp nếu mouse kéo ngoài biên phải (vùng tương lai) mà chỉ có dataIndex
+  const dataList = typeof chart.getDataList === 'function' ? chart.getDataList() : [];
+  if (typeof mouseTimestamp !== 'number' && typeof mouseDataIndex === 'number' && dataList && dataList.length > 0) {
+    if (mouseDataIndex >= 0 && mouseDataIndex < dataList.length) {
+      mouseTimestamp = dataList[mouseDataIndex]?.timestamp;
+    } else if (mouseDataIndex >= dataList.length && dataList.length >= 2) {
+      const lastIdx = dataList.length - 1;
+      const barInterval = (dataList[lastIdx].timestamp - dataList[lastIdx - 1].timestamp) || 60000;
+      mouseTimestamp = dataList[lastIdx].timestamp + (mouseDataIndex - lastIdx) * barInterval;
+    } else if (mouseDataIndex < 0 && dataList.length >= 2) {
+      const barInterval = (dataList[1].timestamp - dataList[0].timestamp) || 60000;
+      mouseTimestamp = dataList[0].timestamp + mouseDataIndex * barInterval;
+    }
+  }
+
   const p0 = { ...orig0 };
   const p1 = { ...orig1 };
+
+  if (state.mode === 'move') {
+    // 1. Di chuyển toàn bộ hình chữ nhật theo delta chuột
+    const { startPrice, startDataIndex, startTimestamp } = state;
+    if (typeof mousePrice === 'number' && typeof startPrice === 'number') {
+      const deltaPrice = mousePrice - startPrice;
+      if (typeof orig0.value === 'number') p0.value = orig0.value + deltaPrice;
+      if (typeof orig1.value === 'number') p1.value = orig1.value + deltaPrice;
+    }
+
+    let deltaIndex: number | null = null;
+    if (typeof mouseDataIndex === 'number' && typeof startDataIndex === 'number') {
+      deltaIndex = mouseDataIndex - startDataIndex;
+    }
+
+    if (deltaIndex !== null && dataList && dataList.length > 0) {
+      const getNewTimestamp = (origP: any) => {
+        let origIdx = origP.dataIndex;
+        if (typeof origIdx !== 'number' && typeof origP.timestamp === 'number') {
+          origIdx = dataList.findIndex((d: any) => d.timestamp === origP.timestamp);
+          if (origIdx === -1 && dataList.length >= 2) {
+            const lastIdx = dataList.length - 1;
+            const barInterval = (dataList[lastIdx].timestamp - dataList[lastIdx - 1].timestamp) || 60000;
+            origIdx = lastIdx + Math.round((origP.timestamp - dataList[lastIdx].timestamp) / barInterval);
+          }
+        }
+        if (typeof origIdx === 'number') {
+          const newIdx = Math.round(origIdx + deltaIndex!);
+          let newTs = origP.timestamp;
+          if (newIdx >= 0 && newIdx < dataList.length) {
+            newTs = dataList[newIdx]?.timestamp;
+          } else if (newIdx >= dataList.length && dataList.length >= 2) {
+            const lastIdx = dataList.length - 1;
+            const barInterval = (dataList[lastIdx].timestamp - dataList[lastIdx - 1].timestamp) || 60000;
+            newTs = dataList[lastIdx].timestamp + (newIdx - lastIdx) * barInterval;
+          } else if (newIdx < 0 && dataList.length >= 2) {
+            const barInterval = (dataList[1].timestamp - dataList[0].timestamp) || 60000;
+            newTs = dataList[0].timestamp + newIdx * barInterval;
+          }
+          return { dataIndex: newIdx, timestamp: newTs };
+        }
+        return null;
+      };
+
+      const res0 = getNewTimestamp(orig0);
+      if (res0) {
+        p0.dataIndex = res0.dataIndex;
+        if (res0.timestamp) p0.timestamp = res0.timestamp;
+      }
+      const res1 = getNewTimestamp(orig1);
+      if (res1) {
+        p1.dataIndex = res1.dataIndex;
+        if (res1.timestamp) p1.timestamp = res1.timestamp;
+      }
+    } else if (typeof mouseTimestamp === 'number' && typeof startTimestamp === 'number') {
+      const deltaTs = mouseTimestamp - startTimestamp;
+      if (typeof orig0.timestamp === 'number') p0.timestamp = orig0.timestamp + deltaTs;
+      if (typeof orig1.timestamp === 'number') p1.timestamp = orig1.timestamp + deltaTs;
+    }
+
+    event.overlay.points[0] = p0;
+    event.overlay.points[1] = p1;
+    chart.overrideOverlay({
+      id: event.overlay.id,
+      points: [p0, p1]
+    });
+    return true;
+  }
+
+  // 2. Chế độ co giãn handle (midTop, midBottom, midLeft, midRight)
+  const { handle, isP0Top, isP0Left } = state;
   if (handle === 'midTop') {
+    if (typeof mousePrice !== 'number') return false;
     if (isP0Top) {
       p0.value = mousePrice;
       p1.value = orig1.value;
@@ -881,7 +1020,10 @@ export function handleRectPressedMoving(event: any) {
     }
     p0.timestamp = orig0.timestamp;
     p1.timestamp = orig1.timestamp;
+    p0.dataIndex = orig0.dataIndex;
+    p1.dataIndex = orig1.dataIndex;
   } else if (handle === 'midBottom') {
+    if (typeof mousePrice !== 'number') return false;
     if (isP0Top) {
       p1.value = mousePrice;
       p0.value = orig0.value;
@@ -891,27 +1033,40 @@ export function handleRectPressedMoving(event: any) {
     }
     p0.timestamp = orig0.timestamp;
     p1.timestamp = orig1.timestamp;
+    p0.dataIndex = orig0.dataIndex;
+    p1.dataIndex = orig1.dataIndex;
   } else if (handle === 'midLeft') {
+    if (typeof mouseTimestamp !== 'number' && typeof mouseDataIndex !== 'number') return false;
     if (isP0Left) {
-      p0.timestamp = mouseTimestamp;
+      if (typeof mouseTimestamp === 'number') p0.timestamp = mouseTimestamp;
+      if (typeof mouseDataIndex === 'number') p0.dataIndex = mouseDataIndex;
       p1.timestamp = orig1.timestamp;
+      p1.dataIndex = orig1.dataIndex;
     } else {
-      p1.timestamp = mouseTimestamp;
+      if (typeof mouseTimestamp === 'number') p1.timestamp = mouseTimestamp;
+      if (typeof mouseDataIndex === 'number') p1.dataIndex = mouseDataIndex;
       p0.timestamp = orig0.timestamp;
+      p0.dataIndex = orig0.dataIndex;
     }
     p0.value = orig0.value;
     p1.value = orig1.value;
   } else if (handle === 'midRight') {
+    if (typeof mouseTimestamp !== 'number' && typeof mouseDataIndex !== 'number') return false;
     if (isP0Left) {
-      p1.timestamp = mouseTimestamp;
+      if (typeof mouseTimestamp === 'number') p1.timestamp = mouseTimestamp;
+      if (typeof mouseDataIndex === 'number') p1.dataIndex = mouseDataIndex;
       p0.timestamp = orig0.timestamp;
+      p0.dataIndex = orig0.dataIndex;
     } else {
-      p0.timestamp = mouseTimestamp;
+      if (typeof mouseTimestamp === 'number') p0.timestamp = mouseTimestamp;
+      if (typeof mouseDataIndex === 'number') p0.dataIndex = mouseDataIndex;
       p1.timestamp = orig1.timestamp;
+      p1.dataIndex = orig1.dataIndex;
     }
     p0.value = orig0.value;
     p1.value = orig1.value;
   }
+
   event.overlay.points[0] = p0;
   event.overlay.points[1] = p1;
   chart.overrideOverlay({
@@ -921,7 +1076,12 @@ export function handleRectPressedMoving(event: any) {
   return true;
 };
 export function handleRectPressedMoveEnd(event: any) {
-  if (event.overlay && rectDragStateMap[event.overlay.id]) {
+  if (event.overlay) {
+    if (Object.prototype.hasOwnProperty.call(event.overlay, 'eventPressedOtherMove')) {
+      delete (event.overlay as any).eventPressedOtherMove;
+    }
+    delete (event.overlay as any)._origEventPressedOtherMove;
+
     const chart = event.chart || (window as any).__currentKlineChart;
     if (chart && event.overlay.points) {
       chart.overrideOverlay({
@@ -952,25 +1112,32 @@ registerOverlay({
     const minY = Math.min(p1.y, p2.y);
     const maxY = Math.max(p1.y, p2.y);
     const borderStyles = { color: '#2962ff', size: 1 };
+    const H = 7;
     const figures: any[] = [
-      { type: 'polygon', attrs: { coordinates: [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: minX, y: maxY }] }, styles: { style: 'fill', color: 'rgba(41, 98, 255, 0.05)' } },
-      { type: 'line', attrs: { coordinates: [{ x: minX, y: minY }, { x: maxX, y: minY }] }, styles: borderStyles },
-      { type: 'line', attrs: { coordinates: [{ x: maxX, y: minY }, { x: maxX, y: maxY }] }, styles: borderStyles },
-      { type: 'line', attrs: { coordinates: [{ x: maxX, y: maxY }, { x: minX, y: maxY }] }, styles: borderStyles },
-      { type: 'line', attrs: { coordinates: [{ x: minX, y: maxY }, { x: minX, y: minY }] }, styles: borderStyles },
-      // X cross lines
-      { type: 'line', attrs: { coordinates: [{ x: minX, y: minY }, { x: maxX, y: maxY }] }, styles: { color: 'rgba(41, 98, 255, 0.5)' } },
-      { type: 'line', attrs: { coordinates: [{ x: maxX, y: minY }, { x: minX, y: maxY }] }, styles: { color: 'rgba(41, 98, 255, 0.5)' } },
-      // Middle cross lines
-      { type: 'line', attrs: { coordinates: [{ x: (minX + maxX) / 2, y: minY }, { x: (minX + maxX) / 2, y: maxY }] }, styles: { color: 'rgba(41, 98, 255, 0.5)' } },
-      { type: 'line', attrs: { coordinates: [{ x: minX, y: (minY + maxY) / 2 }, { x: maxX, y: (minY + maxY) / 2 }] }, styles: { color: 'rgba(41, 98, 255, 0.5)' } },
+      { type: 'polygon', ignoreEvent: true, attrs: { coordinates: [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: minX, y: maxY }] }, styles: { style: 'fill', color: 'rgba(41, 98, 255, 0.05)' } },
+      // 4 border clickable zones (dải polygon 14px để nhấp chuột cực nhạy)
+      { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: minX, y: minY - H }, { x: maxX, y: minY - H }, { x: maxX, y: minY + H }, { x: minX, y: minY + H }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+      { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: maxX - H, y: minY }, { x: maxX + H, y: minY }, { x: maxX + H, y: maxY }, { x: maxX - H, y: maxY }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+      { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: minX, y: maxY - H }, { x: maxX, y: maxY - H }, { x: maxX, y: maxY + H }, { x: minX, y: maxY + H }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+      { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: minX - H, y: minY }, { x: minX + H, y: minY }, { x: minX + H, y: maxY }, { x: minX - H, y: maxY }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+      // 4 viền vẽ nét mảnh hiển thị
+      { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: minX, y: minY }, { x: maxX, y: minY }] }, styles: borderStyles },
+      { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: maxX, y: minY }, { x: maxX, y: maxY }] }, styles: borderStyles },
+      { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: maxX, y: maxY }, { x: minX, y: maxY }] }, styles: borderStyles },
+      { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: minX, y: maxY }, { x: minX, y: minY }] }, styles: borderStyles },
+      // X cross lines (trang trí)
+      { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: minX, y: minY }, { x: maxX, y: maxY }] }, styles: { color: 'rgba(41, 98, 255, 0.5)' } },
+      { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: maxX, y: minY }, { x: minX, y: maxY }] }, styles: { color: 'rgba(41, 98, 255, 0.5)' } },
+      // Middle cross lines (trang trí)
+      { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: (minX + maxX) / 2, y: minY }, { x: (minX + maxX) / 2, y: maxY }] }, styles: { color: 'rgba(41, 98, 255, 0.5)' } },
+      { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: minX, y: (minY + maxY) / 2 }, { x: maxX, y: (minY + maxY) / 2 }] }, styles: { color: 'rgba(41, 98, 255, 0.5)' } },
     ];
     const fractions = [0.25, 0.382, 0.618, 0.75];
     fractions.forEach(f => {
       const y = minY + (maxY - minY) * f;
-      figures.push({ type: 'line', attrs: { coordinates: [{ x: minX, y }, { x: maxX, y }] }, styles: { color: 'rgba(41, 98, 255, 0.3)', style: 'dashed' } });
+      figures.push({ type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: minX, y }, { x: maxX, y }] }, styles: { color: 'rgba(41, 98, 255, 0.3)', style: 'dashed' } });
       const x = minX + (maxX - minX) * f;
-      figures.push({ type: 'line', attrs: { coordinates: [{ x, y: minY }, { x, y: maxY }] }, styles: { color: 'rgba(41, 98, 255, 0.3)', style: 'dashed' } });
+      figures.push({ type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x, y: minY }, { x, y: maxY }] }, styles: { color: 'rgba(41, 98, 255, 0.3)', style: 'dashed' } });
     });
     if (isOverlayInteracting(overlay, chart)) {
       const midTop = { x: (minX + maxX) / 2, y: minY };
@@ -990,10 +1157,10 @@ registerOverlay({
           attrs: {
             isHandle: key,
             coordinates: [
-              { x: p.x - 6, y: p.y - 6 },
-              { x: p.x + 6, y: p.y - 6 },
-              { x: p.x + 6, y: p.y + 6 },
-              { x: p.x - 6, y: p.y + 6 }
+              { x: p.x - 7, y: p.y - 7 },
+              { x: p.x + 7, y: p.y - 7 },
+              { x: p.x + 7, y: p.y + 7 },
+              { x: p.x - 7, y: p.y + 7 }
             ]
           },
           styles: { style: 'stroke_fill', color: '#131722', borderColor: '#2962ff', borderSize: 2 }
@@ -1043,19 +1210,27 @@ registerOverlay({
         }
         const figures: any[] = [];
         const borderStyles = { color: '#2196f3', size: 1 };
+        const H = 7;
         figures.push({
           type: 'polygon',
+          ignoreEvent: true,
           attrs: { coordinates: [{ x: leftX, y: topY }, { x: rightX, y: topY }, { x: rightX, y: btmY }, { x: leftX, y: btmY }] },
           styles: { style: 'fill', color: 'rgba(33, 150, 243, 0.2)' }
         });
         figures.push(
-          { type: 'line', attrs: { coordinates: [{ x: leftX, y: topY }, { x: rightX, y: topY }] }, styles: borderStyles },
-          { type: 'line', attrs: { coordinates: [{ x: rightX, y: topY }, { x: rightX, y: btmY }] }, styles: borderStyles },
-          { type: 'line', attrs: { coordinates: [{ x: rightX, y: btmY }, { x: leftX, y: btmY }] }, styles: borderStyles },
-          { type: 'line', attrs: { coordinates: [{ x: leftX, y: btmY }, { x: leftX, y: topY }] }, styles: borderStyles }
+          // 4 border clickable zones (dải polygon 14px)
+          { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: leftX, y: topY - H }, { x: rightX, y: topY - H }, { x: rightX, y: topY + H }, { x: leftX, y: topY + H }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+          { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: rightX - H, y: topY }, { x: rightX + H, y: topY }, { x: rightX + H, y: btmY }, { x: rightX - H, y: btmY }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+          { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: leftX, y: btmY - H }, { x: rightX, y: btmY - H }, { x: rightX, y: btmY + H }, { x: leftX, y: btmY + H }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+          { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: leftX - H, y: topY }, { x: leftX + H, y: topY }, { x: leftX + H, y: btmY }, { x: leftX - H, y: btmY }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+          // 4 viền hiển thị
+          { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: leftX, y: topY }, { x: rightX, y: topY }] }, styles: borderStyles },
+          { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: rightX, y: topY }, { x: rightX, y: btmY }] }, styles: borderStyles },
+          { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: rightX, y: btmY }, { x: leftX, y: btmY }] }, styles: borderStyles },
+          { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: leftX, y: btmY }, { x: leftX, y: topY }] }, styles: borderStyles }
         );
-        figures.push({ type: 'line', attrs: { coordinates: [{ x: leftX, y: p1.y }, { x: rightX, y: p1.y }] }, styles: { color: '#2196f3', style: 'dashed' } });
-        figures.push({ type: 'line', attrs: { coordinates: [{ x: leftX, y: p2.y }, { x: rightX, y: p2.y }] }, styles: { color: '#2196f3', style: 'dashed' } });
+        figures.push({ type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: leftX, y: p1.y }, { x: rightX, y: p1.y }] }, styles: { color: '#2196f3', style: 'dashed' } });
+        figures.push({ type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: leftX, y: p2.y }, { x: rightX, y: p2.y }] }, styles: { color: '#2196f3', style: 'dashed' } });
         const text = `${valDif > 0 ? '+' : ''}${valDif.toFixed(2)} (${valDif > 0 ? '+' : ''}${pctDif.toFixed(2)}%)`;
         figures.push({
           type: 'text',
@@ -1080,10 +1255,10 @@ registerOverlay({
               attrs: {
                 isHandle: key,
                 coordinates: [
-                  { x: p.x - 6, y: p.y - 6 },
-                  { x: p.x + 6, y: p.y - 6 },
-                  { x: p.x + 6, y: p.y + 6 },
-                  { x: p.x - 6, y: p.y + 6 }
+                  { x: p.x - 7, y: p.y - 7 },
+                  { x: p.x + 7, y: p.y - 7 },
+                  { x: p.x + 7, y: p.y + 7 },
+                  { x: p.x - 7, y: p.y + 7 }
                 ]
               },
               styles: { style: 'stroke_fill', color: '#131722', borderColor: '#2196f3', borderSize: 2 }
@@ -1132,16 +1307,24 @@ registerOverlay({
         }
         const figures: any[] = [];
         const borderStyles = { color: '#9c27b0', size: 1 };
+        const H = 7;
         figures.push({
           type: 'polygon',
+          ignoreEvent: true,
           attrs: { coordinates: [{ x: leftX, y: topY }, { x: rightX, y: topY }, { x: rightX, y: btmY }, { x: leftX, y: btmY }] },
           styles: { style: 'fill', color: 'rgba(156, 39, 176, 0.2)' }
         });
         figures.push(
-          { type: 'line', attrs: { coordinates: [{ x: leftX, y: topY }, { x: rightX, y: topY }] }, styles: borderStyles },
-          { type: 'line', attrs: { coordinates: [{ x: rightX, y: topY }, { x: rightX, y: btmY }] }, styles: borderStyles },
-          { type: 'line', attrs: { coordinates: [{ x: rightX, y: btmY }, { x: leftX, y: btmY }] }, styles: borderStyles },
-          { type: 'line', attrs: { coordinates: [{ x: leftX, y: btmY }, { x: leftX, y: topY }] }, styles: borderStyles }
+          // 4 border clickable zones (dải polygon 14px)
+          { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: leftX, y: topY - H }, { x: rightX, y: topY - H }, { x: rightX, y: topY + H }, { x: leftX, y: topY + H }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+          { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: rightX - H, y: topY }, { x: rightX + H, y: topY }, { x: rightX + H, y: btmY }, { x: rightX - H, y: btmY }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+          { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: leftX, y: btmY - H }, { x: rightX, y: btmY - H }, { x: rightX, y: btmY + H }, { x: leftX, y: btmY + H }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+          { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: leftX - H, y: topY }, { x: leftX + H, y: topY }, { x: leftX + H, y: btmY }, { x: leftX - H, y: btmY }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+          // 4 viền hiển thị
+          { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: leftX, y: topY }, { x: rightX, y: topY }] }, styles: borderStyles },
+          { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: rightX, y: topY }, { x: rightX, y: btmY }] }, styles: borderStyles },
+          { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: rightX, y: btmY }, { x: leftX, y: btmY }] }, styles: borderStyles },
+          { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: leftX, y: btmY }, { x: leftX, y: topY }] }, styles: borderStyles }
         );
         const text = `${barCount} Thanh`;
         figures.push({
@@ -1167,10 +1350,10 @@ registerOverlay({
               attrs: {
                 isHandle: key,
                 coordinates: [
-                  { x: p.x - 6, y: p.y - 6 },
-                  { x: p.x + 6, y: p.y - 6 },
-                  { x: p.x + 6, y: p.y + 6 },
-                  { x: p.x - 6, y: p.y + 6 }
+                  { x: p.x - 7, y: p.y - 7 },
+                  { x: p.x + 7, y: p.y - 7 },
+                  { x: p.x + 7, y: p.y + 7 },
+                  { x: p.x - 7, y: p.y + 7 }
                 ]
               },
               styles: { style: 'stroke_fill', color: '#131722', borderColor: '#9c27b0', borderSize: 2 }
@@ -1227,16 +1410,24 @@ registerOverlay({
         }
         const figures: any[] = [];
         const borderStyles = { color: '#e91e63', size: 1 };
+        const H = 7;
         figures.push({
           type: 'polygon',
+          ignoreEvent: true,
           attrs: { coordinates: [{ x: leftX, y: topY }, { x: rightX, y: topY }, { x: rightX, y: btmY }, { x: leftX, y: btmY }] },
           styles: { style: 'fill', color: 'rgba(233, 30, 99, 0.2)' }
         });
         figures.push(
-          { type: 'line', attrs: { coordinates: [{ x: leftX, y: topY }, { x: rightX, y: topY }] }, styles: borderStyles },
-          { type: 'line', attrs: { coordinates: [{ x: rightX, y: topY }, { x: rightX, y: btmY }] }, styles: borderStyles },
-          { type: 'line', attrs: { coordinates: [{ x: rightX, y: btmY }, { x: leftX, y: btmY }] }, styles: borderStyles },
-          { type: 'line', attrs: { coordinates: [{ x: leftX, y: btmY }, { x: leftX, y: topY }] }, styles: borderStyles }
+          // 4 border clickable zones (dải polygon 14px)
+          { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: leftX, y: topY - H }, { x: rightX, y: topY - H }, { x: rightX, y: topY + H }, { x: leftX, y: topY + H }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+          { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: rightX - H, y: topY }, { x: rightX + H, y: topY }, { x: rightX + H, y: btmY }, { x: rightX - H, y: btmY }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+          { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: leftX, y: btmY - H }, { x: rightX, y: btmY - H }, { x: rightX, y: btmY + H }, { x: leftX, y: btmY + H }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+          { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: leftX - H, y: topY }, { x: leftX + H, y: topY }, { x: leftX + H, y: btmY }, { x: leftX - H, y: btmY }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+          // 4 viền hiển thị
+          { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: leftX, y: topY }, { x: rightX, y: topY }] }, styles: borderStyles },
+          { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: rightX, y: topY }, { x: rightX, y: btmY }] }, styles: borderStyles },
+          { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: rightX, y: btmY }, { x: leftX, y: btmY }] }, styles: borderStyles },
+          { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: leftX, y: btmY }, { x: leftX, y: topY }] }, styles: borderStyles }
         );
         const barsUnit = getTr('chart.bars', 'Thanh');
         const text = `${barCount} ${barsUnit} | ${valDif > 0 ? '+' : ''}${valDif.toFixed(2)} (${valDif > 0 ? '+' : ''}${pctDif.toFixed(2)}%)`;
@@ -1263,10 +1454,10 @@ registerOverlay({
               attrs: {
                 isHandle: key,
                 coordinates: [
-                  { x: p.x - 6, y: p.y - 6 },
-                  { x: p.x + 6, y: p.y - 6 },
-                  { x: p.x + 6, y: p.y + 6 },
-                  { x: p.x - 6, y: p.y + 6 }
+                  { x: p.x - 7, y: p.y - 7 },
+                  { x: p.x + 7, y: p.y - 7 },
+                  { x: p.x + 7, y: p.y + 7 },
+                  { x: p.x - 7, y: p.y + 7 }
                 ]
               },
               styles: { style: 'stroke_fill', color: '#131722', borderColor: '#e91e63', borderSize: 2 }
@@ -1308,16 +1499,24 @@ registerOverlay({
       const midBottom = { x: (minX + maxX) / 2, y: maxY };
       const midLeft = { x: minX, y: (minY + maxY) / 2 };
       const borderStyles = { color: overlay.styles?.polygon?.borderColor || '#9c27b0', size: overlay.styles?.polygon?.borderSize ?? 2 };
+      const H = 7;
       const figures: any[] = [
         {
           type: 'polygon',
+          ignoreEvent: true,
           attrs: { coordinates: [p0, p2, p1, p3] },
           styles: { style: 'fill', color: overlay.styles?.polygon?.color || 'rgba(156, 39, 176, 0.15)' }
         },
-        { type: 'line', attrs: { coordinates: [p0, p2] }, styles: borderStyles },
-        { type: 'line', attrs: { coordinates: [p2, p1] }, styles: borderStyles },
-        { type: 'line', attrs: { coordinates: [p1, p3] }, styles: borderStyles },
-        { type: 'line', attrs: { coordinates: [p3, p0] }, styles: borderStyles }
+        // 4 border clickable zones (dải polygon 14px)
+        { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: minX, y: minY - H }, { x: maxX, y: minY - H }, { x: maxX, y: minY + H }, { x: minX, y: minY + H }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+        { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: maxX - H, y: minY }, { x: maxX + H, y: minY }, { x: maxX + H, y: maxY }, { x: maxX - H, y: maxY }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+        { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: minX, y: maxY - H }, { x: maxX, y: maxY - H }, { x: maxX, y: maxY + H }, { x: minX, y: maxY + H }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+        { key: 'border', type: 'polygon', ignoreEvent: false, attrs: { coordinates: [{ x: minX - H, y: minY }, { x: minX + H, y: minY }, { x: minX + H, y: maxY }, { x: minX - H, y: maxY }] }, styles: { style: 'fill', color: 'rgba(0,0,0,0)' } },
+        // 4 viền hiển thị
+        { type: 'line', ignoreEvent: true, attrs: { coordinates: [p0, p2] }, styles: borderStyles },
+        { type: 'line', ignoreEvent: true, attrs: { coordinates: [p2, p1] }, styles: borderStyles },
+        { type: 'line', ignoreEvent: true, attrs: { coordinates: [p1, p3] }, styles: borderStyles },
+        { type: 'line', ignoreEvent: true, attrs: { coordinates: [p3, p0] }, styles: borderStyles }
       ];
       if (isOverlayInteracting(overlay, chart)) {
         // Draw the other 2 corners (circles)
@@ -1343,10 +1542,10 @@ registerOverlay({
             attrs: {
               isHandle: key,
               coordinates: [
-                { x: p.x - 6, y: p.y - 6 },
-                { x: p.x + 6, y: p.y - 6 },
-                { x: p.x + 6, y: p.y + 6 },
-                { x: p.x - 6, y: p.y + 6 }
+                { x: p.x - 7, y: p.y - 7 },
+                { x: p.x + 7, y: p.y - 7 },
+                { x: p.x + 7, y: p.y + 7 },
+                { x: p.x - 7, y: p.y + 7 }
               ]
             },
             styles: { style: 'stroke_fill', color: '#131722', borderColor: '#2962ff', borderSize: 2 }
@@ -4672,6 +4871,9 @@ export const ChartArea = ({
   useEffect(() => {
     isSelectingReplayStartRef.current = isSelectingReplayStart;
     onSelectReplayStartRef.current = onSelectReplayStart;
+    if (isSelectingReplayStart) {
+      replayPriceRef.current = null;
+    }
   }, [isSelectingReplayStart, onSelectReplayStart]);
   // Apply Lock All and Hide All Drawing Tools
   useEffect(() => {
@@ -5024,8 +5226,9 @@ export const ChartArea = ({
         };
         const originalOnDrawing = value.onDrawing;
         value.onDrawing = (event: any) => {
+          let handled = false;
           if (typeof originalOnDrawing === 'function') {
-            originalOnDrawing(event);
+            handled = originalOnDrawing(event) === true;
           }
           const isLine = ['segment', 'rayLine', 'arrow', 'trendAngle', 'straightLine', 'measure', 'infoLine', 'horizontalStraightLine', 'verticalStraightLine', 'priceLine'].includes(event.overlay?.name);
           if (isLine && event.overlay?.points?.length > 1) {
@@ -5036,14 +5239,19 @@ export const ChartArea = ({
               const pLast = pts[pts.length - 1];
               if (p0?.value !== undefined && pLast?.value !== undefined) {
                 pLast.value = p0.value;
-                chart.overrideOverlay({ id: event.overlay.id, points: pts });
+                return true;
               }
             }
           }
+          return handled;
         };
         const originalOnPressedMoveStart = value.onPressedMoveStart;
         value.onPressedMoveStart = (event: any) => {
           isOverlayDraggingRef.current = true;
+          const allowedRects = ['rect', 'gannBox', 'priceRange', 'timeRange', 'timePriceRange'];
+          if (allowedRects.includes(event.overlay?.name)) {
+            handleRectPressedMoveStart(event);
+          }
           const isLine = ['segment', 'rayLine', 'arrow', 'trendAngle', 'straightLine', 'measure', 'infoLine', 'horizontalStraightLine', 'verticalStraightLine', 'priceLine'].includes(event.overlay?.name);
           if (isLine && event.overlay?.points?.length > 1) {
             const pts = event.overlay.points;
@@ -5065,14 +5273,18 @@ export const ChartArea = ({
             }
             lineDragHandleRef.current[overlayId] = dragHandle;
           }
-          if (typeof originalOnPressedMoveStart === 'function') {
+          if (typeof originalOnPressedMoveStart === 'function' && originalOnPressedMoveStart !== handleRectPressedMoveStart) {
             originalOnPressedMoveStart(event);
           }
         };
         const originalOnPressedMoving = value.onPressedMoving;
         value.onPressedMoving = (event: any) => {
           let handled = false;
-          if (typeof originalOnPressedMoving === 'function') {
+          const allowedRects = ['rect', 'gannBox', 'priceRange', 'timeRange', 'timePriceRange'];
+          if (allowedRects.includes(event.overlay?.name)) {
+            handled = handleRectPressedMoving(event) === true;
+          }
+          if (!handled && typeof originalOnPressedMoving === 'function' && originalOnPressedMoving !== handleRectPressedMoving) {
             handled = originalOnPressedMoving(event) === true;
           }
           const isLine = ['segment', 'rayLine', 'arrow', 'trendAngle', 'straightLine', 'measure', 'infoLine', 'horizontalStraightLine', 'verticalStraightLine', 'priceLine'].includes(event.overlay?.name);
@@ -5097,12 +5309,10 @@ export const ChartArea = ({
               }
               if (handle === 'p0') {
                 p0.value = p1.value;
-                chart.overrideOverlay({ id: overlayId, points: pts });
                 lastOverlayPointsRef.current[overlayId] = pts.map((p: any) => ({ ...p }));
                 return true;
               } else if (handle === 'p1') {
                 p1.value = p0.value;
-                chart.overrideOverlay({ id: overlayId, points: pts });
                 lastOverlayPointsRef.current[overlayId] = pts.map((p: any) => ({ ...p }));
                 return true;
               }
@@ -5114,10 +5324,14 @@ export const ChartArea = ({
         const originalOnPressedMoveEnd = value.onPressedMoveEnd;
         value.onPressedMoveEnd = (event: any) => {
           isOverlayDraggingRef.current = false;
+          const allowedRects = ['rect', 'gannBox', 'priceRange', 'timeRange', 'timePriceRange'];
+          if (allowedRects.includes(event.overlay?.name)) {
+            handleRectPressedMoveEnd(event);
+          }
           if (event.overlay?.id) {
             delete lineDragHandleRef.current[event.overlay.id];
           }
-          if (typeof originalOnPressedMoveEnd === 'function') {
+          if (typeof originalOnPressedMoveEnd === 'function' && originalOnPressedMoveEnd !== handleRectPressedMoveEnd) {
             originalOnPressedMoveEnd(event);
           }
         };
@@ -5132,7 +5346,7 @@ export const ChartArea = ({
               const pLast = pts[pts.length - 1];
               if (p0?.value !== undefined && pLast?.value !== undefined) {
                 pLast.value = p0.value;
-                chart.overrideOverlay({ id: event.overlay.id, points: pts });
+                // Mutating is enough, calling overrideOverlay here breaks internal state
               }
             }
           }
@@ -5151,6 +5365,8 @@ export const ChartArea = ({
       const overlayId = event?.overlay?.id;
       if (overlayId) {
         (window as any).__selectedOverlayId = overlayId;
+        setSelectedOverlay(event.overlay);
+        setSelectedOverlayId(overlayId);
       }
       const now = Date.now();
       // If Eraser tool is active, delete it immediately!
@@ -5190,21 +5406,9 @@ export const ChartArea = ({
     };
     // Attach handleOverlayClick to chart context so it can be used later
     (chart as any).handleOverlayClick = handleOverlayClick;
-    // Listen for overlay finished event to re-activate same tool
+    // Listen for overlay finished event to save drawings
     chart.subscribeAction('onOverlayDrawEnd' as any, () => {
       triggerAutoSaveDrawings();
-      const currentTool = activeToolRef.current;
-      if (currentTool !== 'cursor' && currentTool !== 'clear') {
-        // Small delay then re-create overlay to keep tool active
-        setTimeout(() => {
-          chart.createOverlay({
-            name: currentTool,
-            lock: false,
-            onClick: handleOverlayClick,
-            onRightClick: () => false // prevent default right-click remove
-          });
-        }, 50);
-      }
     });
     chart.subscribeAction('onCandleTooltipFeatureClick' as any, () => {
       // logic for tooltip feature click
@@ -5216,12 +5420,18 @@ export const ChartArea = ({
     chart.subscribeAction('onCandleBarClick', (data: any) => {
       if (isSelectingReplayStartRef.current) {
         let ts: number | undefined = data?.kLineData?.timestamp;
-        if (!ts && typeof data?.dataIndex === 'number') {
+        let p: number | undefined = data?.kLineData?.close;
+        if ((!ts || p === undefined) && typeof data?.dataIndex === 'number') {
           const list = chartRef.current?.getDataList();
           ts = list?.[data.dataIndex]?.timestamp;
+          p = list?.[data.dataIndex]?.close;
         }
         if (ts) {
-          onSelectReplayStartRef.current?.(ts);
+          isSelectingReplayStartRef.current = false;
+          if (p !== undefined && !isNaN(p)) {
+            replayPriceRef.current = p;
+          }
+          onSelectReplayStartRef.current?.(ts, p);
         }
       }
     });
@@ -5340,7 +5550,8 @@ export const ChartArea = ({
         const ts = selCandle?.timestamp;
         const p = selCandle?.close;
         if (ts) {
-          if (p && !isNaN(p)) {
+          isSelectingReplayStartRef.current = false;
+          if (p !== undefined && !isNaN(p)) {
             replayPriceRef.current = p;
           }
           onSelectReplayStartRef.current?.(ts, p);
@@ -5982,25 +6193,26 @@ export const ChartArea = ({
       if (isReplaying && visibleData.length > 0) {
         const lastCandle = visibleData[visibleData.length - 1];
         const effectiveTime = currentReplayTime || lastCandle.timestamp;
-        // Neo má»©c giĂ¡ chuáº©n (currentReplayPrice) khi chuyá»ƒn khung thá»i gian
         const targetPrice = (replayPriceRef.current && !isNaN(replayPriceRef.current))
           ? replayPriceRef.current
           : lastCandle.close;
-        // Äá»“ng bá»™ náº¿n cuá»‘i cĂ¹ng Ä‘á»ƒ nĂ³ khĂ´ng chá»©a giĂ¡ tÆ°Æ¡ng lai cá»§a khung lá»›n
-        if (targetPrice && targetPrice !== lastCandle.close) {
+        // Chỉ đồng bộ giá nến cuối nếu thời gian replay đang nằm giữa một thanh nến khung lớn (intra-bar)
+        const isMiddleOfBar = !!(currentReplayTime && lastCandle.timestamp && (currentReplayTime > lastCandle.timestamp) && (currentReplayTime < lastCandle.timestamp + intervalMs));
+        if (isMiddleOfBar && targetPrice && targetPrice !== lastCandle.close) {
           const lastIdx = visibleData.length - 1;
           const orig = visibleData[lastIdx];
           visibleData[lastIdx] = {
             ...orig,
             close: targetPrice,
-            high: Math.max(orig.open, targetPrice, orig.high >= targetPrice ? orig.high : targetPrice),
-            low: Math.min(orig.open, targetPrice, orig.low <= targetPrice ? orig.low : targetPrice),
+            high: Math.max(orig.open, targetPrice, orig.high),
+            low: Math.min(orig.open, targetPrice, orig.low),
           };
-        } else if (!replayPriceRef.current && lastCandle.close) {
+        } else {
+          // Giữ nguyên nến lịch sử tại điểm cắt kéo, không làm biến dạng hay đổi màu nến
           replayPriceRef.current = lastCandle.close;
           onReplayPriceChangeRef.current?.(lastCandle.close);
         }
-        if (onPriceUpdate) onPriceUpdate(targetPrice, effectiveTime, visibleData[visibleData.length - 1]);
+        if (onPriceUpdate) onPriceUpdate(visibleData[visibleData.length - 1].close, effectiveTime, visibleData[visibleData.length - 1]);
       } else if (!isReplaying && allData.length > 0 && onPriceUpdate) {
         onPriceUpdate(allData[allData.length - 1].close, allData[allData.length - 1].timestamp, allData[allData.length - 1]);
       }
@@ -6710,9 +6922,18 @@ export const ChartArea = ({
           triggerAutoSaveDrawings();
         }
       }
+      // Escape
+      if (e.key === 'Escape') {
+        setFloatingToolbar(null);
+        setSelectedOverlay(null);
+        (window as any).__selectedOverlayId = null;
+        if (activeToolRef.current !== 'cursor') {
+          onToolSelect?.('cursor');
+        }
+      }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, [floatingToolbar, selectedOverlay]);
 
   // Persist user overlays per symbol and per account across reloads (F5) and clean up when switching symbol/user

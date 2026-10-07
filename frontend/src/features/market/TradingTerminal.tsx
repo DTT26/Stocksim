@@ -1213,6 +1213,7 @@ export const TradingTerminal = () => {
 
   const handleStartReplaySelection = () => {
     setIsSelectingReplayStart(true);
+    setReplayPrice(null);
   };
 
   const handleCancelReplaySelection = () => {
