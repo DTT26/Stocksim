@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:match*",
-      "destination": "https://stocksim-backend-7f8h.onrender.com/api/:match*"
+      "destination": "https://stocksim-1-mxxy.onrender.com/api/:match*"
     },
     {
       "source": "/(.*)",
