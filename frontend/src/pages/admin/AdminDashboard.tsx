@@ -1,3 +1,24 @@
+
+const GMAIL_COLORS = [
+  'bg-emerald-600 text-white',
+  'bg-rose-600 text-white',
+  'bg-amber-600 text-white',
+  'bg-purple-600 text-white',
+  'bg-blue-600 text-white',
+  'bg-teal-600 text-white',
+  'bg-indigo-600 text-white'
+];
+
+function getGmailAvatarBg(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % GMAIL_COLORS.length;
+  return GMAIL_COLORS[index];
+}
+
+import { TractionFunnelSection } from '../../components/admin/TractionFunnelSection';
 import { Users, GraduationCap, Shield, Target, ArrowRight, UserPlus, Play, CheckCircle, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -135,9 +156,6 @@ export const AdminDashboard = () => {
       {/* Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Bảng điều khiển Quản trị</h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-1 sm:mt-2 text-sm sm:text-base">
-          Chào mừng trở lại, <span className="text-blue-600 dark:text-blue-400 font-medium">{currentUser?.name || 'Quản trị viên'}</span>. Dưới đây là tình hình hoạt động tổng quan của StockSim.
-        </p>
       </div>
 
       {/* Pending Lecturer Applications Alert */}
@@ -168,6 +186,9 @@ export const AdminDashboard = () => {
           </Link>
         </div>
       )}
+
+      {/* EXE201 Traction & Funnel Section */}
+      <TractionFunnelSection />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -317,11 +338,11 @@ export const AdminDashboard = () => {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5 min-w-0">
                       {u.picture ? (
-                        <img src={u.picture} alt="" className="w-8 h-8 rounded-full border border-slate-200 dark:border-[#1e293b] shrink-0 object-cover" />
+                        <img src={u.picture} alt="" referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border border-slate-200 dark:border-[#1e293b] shrink-0 object-cover" />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-600/20 border border-blue-500/30 text-blue-500 dark:text-blue-400 flex items-center justify-center text-xs font-bold shrink-0">
-                          {u.name ? u.name.charAt(0).toUpperCase() : u.email.charAt(0).toUpperCase()}
-                        </div>
+                        <div className={`w-8 h-8 rounded-full ${getGmailAvatarBg(u.email || u.name || '')} flex items-center justify-center text-xs font-bold shrink-0 shadow-sm`}>
+    {u.name ? u.name.charAt(0).toUpperCase() : u.email.charAt(0).toUpperCase()}
+  </div>
                       )}
                       <div className="min-w-0">
                         <p className="font-medium text-slate-900 dark:text-white text-sm truncate">{u.name || 'Chưa đặt tên'}</p>
@@ -380,11 +401,11 @@ export const AdminDashboard = () => {
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           {u.picture ? (
-                            <img src={u.picture} alt="" className="w-8 h-8 rounded-full border border-slate-200 dark:border-[#1e293b] shrink-0 object-cover" />
+                            <img src={u.picture} alt="" referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border border-slate-200 dark:border-[#1e293b] shrink-0 object-cover" />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-600/20 border border-blue-500/30 text-blue-500 dark:text-blue-400 flex items-center justify-center text-xs font-bold shrink-0">
-                              {u.name ? u.name.charAt(0).toUpperCase() : u.email.charAt(0).toUpperCase()}
-                            </div>
+                            <div className={`w-8 h-8 rounded-full ${getGmailAvatarBg(u.email || u.name || '')} flex items-center justify-center text-xs font-bold shrink-0 shadow-sm`}>
+    {u.name ? u.name.charAt(0).toUpperCase() : u.email.charAt(0).toUpperCase()}
+  </div>
                           )}
                           <div className="min-w-0">
                             <p className="font-medium text-slate-900 dark:text-white text-sm truncate">{u.name || 'Chưa đặt tên'}</p>

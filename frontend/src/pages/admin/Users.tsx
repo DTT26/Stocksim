@@ -1,3 +1,23 @@
+
+const GMAIL_COLORS = [
+  'bg-emerald-600 text-white',
+  'bg-rose-600 text-white',
+  'bg-amber-600 text-white',
+  'bg-purple-600 text-white',
+  'bg-blue-600 text-white',
+  'bg-teal-600 text-white',
+  'bg-indigo-600 text-white'
+];
+
+function getGmailAvatarBg(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % GMAIL_COLORS.length;
+  return GMAIL_COLORS[index];
+}
+
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, Filter, MoreVertical, UserX, UserCheck, Shield, ChevronLeft, ChevronRight, AlertTriangle, Users, X, ArrowUpDown, GraduationCap } from 'lucide-react';
@@ -35,11 +55,11 @@ const EditRoleModal = ({ user, onClose, onSave }: { user: UserData; onClose: () 
         <div className="p-5 sm:p-6 space-y-5">
           <div className="flex items-center gap-4">
             {user.picture ? (
-              <img src={user.picture} alt="" className="w-12 h-12 rounded-full border border-slate-200 dark:border-[#262626] object-cover" />
+              <img src={user.picture} alt="" referrerPolicy="no-referrer" className="w-12 h-12 rounded-full border border-slate-200 dark:border-[#262626] object-cover" />
             ) : (
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-600/20 border border-blue-500/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-lg font-bold">
-                {user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
-              </div>
+              <div className={`w-12 h-12 rounded-full ${getGmailAvatarBg(user.email || user.name || '')} flex items-center justify-center text-lg font-bold shrink-0 shadow-sm`}>
+    {user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
+  </div>
             )}
             <div className="min-w-0">
               <p className="font-bold text-slate-900 dark:text-white truncate">{user.name || 'Unknown'}</p>
@@ -86,11 +106,11 @@ const SuspendModal = ({ user, onClose, onConfirm }: { user: UserData; onClose: (
         <div className="p-5 sm:p-6 space-y-4">
           <div className="flex items-center gap-4">
             {user.picture ? (
-              <img src={user.picture} alt="" className="w-12 h-12 rounded-full border border-slate-200 dark:border-[#262626] object-cover" />
+              <img src={user.picture} alt="" referrerPolicy="no-referrer" className="w-12 h-12 rounded-full border border-slate-200 dark:border-[#262626] object-cover" />
             ) : (
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-600/20 border border-blue-500/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-lg font-bold">
-                {user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
-              </div>
+              <div className={`w-12 h-12 rounded-full ${getGmailAvatarBg(user.email || user.name || '')} flex items-center justify-center text-lg font-bold shrink-0 shadow-sm`}>
+    {user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
+  </div>
             )}
             <div className="min-w-0">
               <p className="font-bold text-slate-900 dark:text-white truncate">{user.name || 'Unknown'}</p>
@@ -382,11 +402,11 @@ export const AdminUsers = () => {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         {u.picture ? (
-                          <img src={u.picture} alt="" className="w-10 h-10 rounded-full border border-slate-200 dark:border-[#262626] object-cover shrink-0" />
+                          <img src={u.picture} alt="" referrerPolicy="no-referrer" className="w-10 h-10 rounded-full border border-slate-200 dark:border-[#262626] object-cover shrink-0" />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-600/20 border border-blue-500/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold shrink-0">
-                            {u.name ? u.name.charAt(0).toUpperCase() : u.email.charAt(0).toUpperCase()}
-                          </div>
+                          <div className={`w-10 h-10 rounded-full ${getGmailAvatarBg(u.email || u.name || '')} flex items-center justify-center text-sm font-bold shrink-0 shadow-sm`}>
+    {u.name ? u.name.charAt(0).toUpperCase() : u.email.charAt(0).toUpperCase()}
+  </div>
                         )}
                         <div className="min-w-0">
                           <p className="font-semibold text-slate-900 dark:text-white text-sm truncate">{u.name || 'Unknown'}</p>
@@ -486,11 +506,11 @@ export const AdminUsers = () => {
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           {u.picture ? (
-                            <img src={u.picture} alt="" className="w-9 h-9 rounded-full border border-slate-200 dark:border-[#262626] object-cover shrink-0" />
+                            <img src={u.picture} alt="" referrerPolicy="no-referrer" className="w-9 h-9 rounded-full border border-slate-200 dark:border-[#262626] object-cover shrink-0" />
                           ) : (
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-600/20 border border-blue-500/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold shrink-0">
-                              {u.name ? u.name.charAt(0).toUpperCase() : u.email.charAt(0).toUpperCase()}
-                            </div>
+                            <div className={`w-9 h-9 rounded-full ${getGmailAvatarBg(u.email || u.name || '')} flex items-center justify-center text-xs font-bold shrink-0 shadow-sm`}>
+    {u.name ? u.name.charAt(0).toUpperCase() : u.email.charAt(0).toUpperCase()}
+  </div>
                           )}
                           <span className="font-semibold text-slate-900 dark:text-white">{u.name || 'Unknown'}</span>
                         </div>
