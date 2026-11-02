@@ -16,6 +16,7 @@ import lecturerApplicationRoutes from './routes/lecturerApplication';
 import paymentRoutes from './routes/paymentRoutes';
 import subscriptionRoutes from './routes/subscriptionRoutes';
 import marketRoutes from './routes/marketRoutes';
+import analyticsRoutes from './routes/analyticsRoutes';
 
 const app = express();
 
@@ -84,5 +85,6 @@ app.use('/api/lecturer-applications', lecturerApplicationRoutes);
 app.use('/api/v1/payment', paymentRoutes);
 app.use('/api/v1/subscription', subscriptionRoutes);
 app.use('/api/market', marketRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 export default app;

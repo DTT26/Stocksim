@@ -1,3 +1,4 @@
+import { trackVisit, trackLinkClick } from '../../utils/tractionTracker';
 import React, { useEffect } from 'react';
 import { LandingNavbar } from './landing/LandingNavbar';
 import { CinematicHero } from './landing/CinematicHero';
@@ -18,6 +19,27 @@ import { useMarketStore } from '../../stores/useMarketStore';
 
 export const LandingPage: React.FC = () => {
   const { lang } = useI18n();
+
+  useEffect(() => {
+    trackVisit();
+
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const clickable = target.closest('button, a');
+      if (clickable) {
+        const text = (clickable.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 35);
+        if (text) {
+          trackLinkClick(text);
+        }
+      }
+    };
+
+    document.addEventListener('click', handleDocumentClick);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+    };
+  }, []);
 
   useEffect(() => {
     document.title = lang === 'vi'
