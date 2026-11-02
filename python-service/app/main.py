@@ -24,7 +24,13 @@ app.include_router(replay.router, prefix="/internal/replay", tags=["Replay"])
 app.include_router(simulation.router, prefix="/internal/simulation", tags=["Simulation"])
 app.include_router(ai.router, prefix="/internal/ai", tags=["AI Tutor & Trade Analysis"])
 
+@app.get("/")
+@app.head("/")
+def root():
+    return {"status": "ok", "service": "stocksim-python", "message": "StockSim Python Service is running"}
+
 @app.get("/health")
+@app.head("/health")
 def health_check():
     return {"status": "ok", "service": "stocksim-python"}
 
